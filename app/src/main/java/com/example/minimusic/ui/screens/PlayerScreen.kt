@@ -188,10 +188,6 @@ private fun NowPlayingPanel(
     onQueueItemClick: (Int) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Auxio-style swipeable cover: drag horizontally to skip prev/next,
-        // release past the commit threshold to trigger the skip. The art
-        // itself moves with the drag as visual feedback, resetting when the
-        // song (and therefore the remember key) changes.
         var dragOffsetPx by remember(song.id) { mutableFloatStateOf(0f) }
         var artWidthPx by remember { mutableFloatStateOf(1f) }
         val density = LocalDensity.current
@@ -210,4 +206,250 @@ private fun NowPlayingPanel(
                     onDragStopped = {
                         val threshold = artWidthPx * SWIPE_COMMIT_FRACTION
                         when {
-                            dragOffsetPx
+                            dragOffsetPx <= -threshold -> onSkipNext()
+                            dragOffsetPx >= threshold -> onSkipPrevious()
+                        }
+                        dragOffsetPx = 0f
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MusicNote,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(0.3f),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            AsyncImage(
+                model = song.albumArtUri,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(PillShape)
+                    .offset(x = with(density) { dragOffsetPx.toDp() })
+            )
+        }
+
+        Column(modifier = Modifier.padding(top = 24.dp)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${song.artist} • ${song.album}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            Slider(
+                value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
+                onValueChange = { onSeekTo(it.toLong()) },
+                valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
+                colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent)
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatDuration(playbackState.positionMs), style = MaterialTheme.typography.labelMedium)
+                Text(formatDuration(playbackState.durationMs), style = MaterialTheme.typography.labelMedium)
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ToggleGlyphButton(
+                icon = Icons.Filled.Shuffle,
+                active = playbackState.isShuffled,
+                accent = accent,
+                contentDescription = "Shuffle",
+                onClick = onToggleShuffle
+            )
+            IconButton(onClick = onSkipPrevious) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", modifier = Modifier.fillMaxSize(0.55f))
+            }
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(accent)
+                    .clickable(onClick = onTogglePlayPause),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                    tint = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxSize(0.45f)
+                )
+            }
+            IconButton(onClick = onSkipNext) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "Next", modifier = Modifier.fillMaxSize(0.55f))
+            }
+            ToggleGlyphButton(
+                icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                active = playbackState.repeatMode != RepeatMode.OFF,
+                accent = accent,
+                contentDescription = "Repeat",
+                onClick = onCycleRepeat
+            )
+        }
+
+        if (playbackState.queue.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+                    .clickable(onClick = onToggleQueueExpanded),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.QueueMusic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = "Up next (${(playbackState.queue.size - playbackState.currentIndex - 1).coerceAtLeast(0)})",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .weight(1f)
+                )
+                Icon(
+                    imageVector = if (queueExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (queueExpanded) "Collapse queue" else "Expand queue"
+                )
+            }
+            AnimatedVisibility(
+                visible = queueExpanded,
+                enter = expandVertically(animationSpec = tween(220)),
+                exit = shrinkVertically(animationSpec = tween(220))
+            ) {
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                    items(playbackState.queue.withIndex().toList(), key = { it.value.id }) { (index, queuedSong) ->
+                        QueueRow(
+                            song = queuedSong,
+                            isCurrent = index == playbackState.currentIndex,
+                            accent = accent,
+                            onClick = { onQueueItemClick(index) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToggleGlyphButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    active: Boolean,
+    accent: Color,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxSize(0.55f)
+        )
+    }
+}
+
+@Composable
+private fun LyricsPanel(song: Song, lyricsState: LyricsState) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = song.title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+        )
+        Text(
+            text = song.artist,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 20.dp)
+        )
+
+        when (lyricsState) {
+            is LyricsState.Loading, LyricsState.Idle -> Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+
+            is LyricsState.NotFound -> Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "No embedded lyrics found for this track",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "MiniMusic reads lyrics straight from the file's own tag (ID3 USLT/SYLT) — add them with a tag editor to see them here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp)
+                )
+            }
+
+            is LyricsState.Found -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                item {
+                    Text(
+                        text = lyricsState.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = MaterialTheme.typography.bodyLarge.fontSize * 1.6f
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueRow(song: Song, isCurrent: Boolean, accent: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = song.title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (isCurrent) accent else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = song.artist,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun formatDuration(ms: Long): String {
+    val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(ms.coerceAtLeast(0L))
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
+}
