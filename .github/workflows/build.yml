@@ -19,11 +19,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      # Installs Gradle 8.10 directly on the runner and runs it as `gradle`.
+      # This sidesteps needing gradlew / gradle-wrapper.jar in the repo at all —
+      # useful since those didn't make it into the uploaded project.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
