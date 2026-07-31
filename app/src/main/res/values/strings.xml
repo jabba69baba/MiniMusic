@@ -1,6 +1,0 @@
-<resources>
-    <string name="app_name">MiniMusic</string>
-    <string name="permission_rationale">MiniMusic needs access to your music to build your library. Nothing is ever uploaded — everything stays on this device.</string>
-    <string name="grant_access">Grant access</string>
-    <string name="no_songs_found">No songs found on this device yet.</string>
-</resources>
