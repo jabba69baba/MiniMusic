@@ -33,21 +33,15 @@ private val DarkColors = darkColorScheme(
 /**
  * App-wide theme.
  *
- * NOTE: Material 3 "Expressive" (`MaterialExpressiveTheme`, `MotionScheme`) is still
- * behind `@ExperimentalMaterial3ExpressiveApi` in every material3 release as of this
- * writing — including the 1.5.0-alpha line — and isn't present at all in the stable
- * 1.4.0 release this project depends on. Rather than pin the whole app to a moving
- * alpha artifact for a system-wide motion-curve change, this uses the stable
- * `MaterialTheme` wrapper. The actual "expressive" *look* the app asks for — the
- * blob-shaped album art, the scalloped cookie-shaped play button, the pill-shaped
- * surfaces, the pushed-up corner-radius scale — all comes from this app's own
- * custom shapes (see Shape.kt / ExpressiveShapes.kt) and doesn't depend on that
- * experimental API at all. If you want the extra expressive motion/animation
- * curves later, bump material3 to a current 1.5.0-alpha and swap this back to
- * MaterialExpressiveTheme + MotionScheme.expressive().
+ * The app's shape language is intentionally flat — see Shape.kt: every corner
+ * bucket collapses to a sharp rectangle, following Auxio's "no rounded corners"
+ * design philosophy, so there's no dependency on Material 3 Expressive's
+ * experimental shape/motion APIs here.
  *
- * Dynamic color (Monet) is preferred on Android 12+, matching the wallpaper-driven
- * theming both reference apps use.
+ * Dynamic color (Monet) is preferred on Android 12+ and applies app-wide. The
+ * one exception is the Player screen, which additionally tints itself with a
+ * hue extracted from the current song's album art on top of this base theme
+ * (see ArtColor.kt) — everywhere else in the app stays on pure system color.
  */
 @Composable
 fun MiniMusicTheme(

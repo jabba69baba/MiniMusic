@@ -71,6 +71,11 @@ dependencies {
     // Album art loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Palette extraction from album art bitmaps, used to derive the current
+    // song's accent hue for the Player screen only (rest of the app stays on
+    // system Material You / Monet colors)
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // Settings persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
