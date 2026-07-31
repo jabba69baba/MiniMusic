@@ -25,10 +25,6 @@ import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.PillShape
 
-/**
- * Compact now-playing bar shown above the bottom navigation. Tapping it opens
- * the full Player screen; the play/pause button on the right works inline.
- */
 @Composable
 fun MiniPlayer(
     song: Song,
@@ -88,9 +84,6 @@ fun MiniPlayer(
                 )
             }
 
-            // Flat play/pause button, matching the unornamented control style
-            // used on the full player screen — no shape morph, just a plain
-            // filled square.
             Box(
                 modifier = Modifier
                     .size(40.dp)
