@@ -12,17 +12,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,24 +41,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.minimusic.data.AudioFormatInfo
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.RepeatMode
-import com.example.minimusic.ui.components.PillNavRow
 import com.example.minimusic.ui.components.WavyMusicSlider
-import com.example.minimusic.ui.theme.PillShape
-import com.example.minimusic.ui.theme.cookieShape
-import com.example.minimusic.ui.theme.expressiveBlobShape
 import com.example.minimusic.ui.theme.rememberArtAccentColor
 import com.example.minimusic.ui.viewmodel.LyricsState
 import java.util.concurrent.TimeUnit
 
 private enum class PlayerPanel { NOW_PLAYING, LYRICS }
 
+/** Large rounded-square corner radius used for the album art frame. */
+private val ArtCornerShape = RoundedCornerShape(28.dp)
+
+/** Rounded-square (not full circle) used only on the primary play/pause button. */
+private val PlayButtonShape = RoundedCornerShape(20.dp)
+
+/**
+ * Player screen. Layout follows a reference design: chevron-down collapse on the
+ * left, centered "Now Playing" label, queue button on the right; large rounded
+ * album art; a wavy seek bar with a circular thumb and an audio-format badge
+ * ("44.1 kHz • 320 kbps • MP3") when the file exposes that info; a transport row
+ * of two circular buttons flanking a rounded-square play/pause; and a bottom row
+ * of three equal-width pills (shuffle, repeat, lyrics) spanning the same width
+ * as the transport row above it.
+ *
+ * The whole screen tints itself with a hue pulled from the current song's album
+ * art (see ArtColor.kt) — the rest of the app stays on the system Material You
+ * palette from Theme.kt.
+ */
 @Composable
 fun PlayerScreen(
     playbackState: PlaybackUiState,
@@ -67,7 +90,8 @@ fun PlayerScreen(
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
-    onQueueItemClick: (Int) -> Unit
+    onQueueItemClick: (Int) -> Unit,
+    onOpenQueue: () -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
     var panel by remember(song.id) {
@@ -78,18 +102,20 @@ fun PlayerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBackIosNew, contentDescription = "Back")
+        Box(modifier = Modifier.fillMaxWidth()) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Collapse")
             }
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-            PillNavRow(
-                options = listOf(PlayerPanel.NOW_PLAYING to "Player", PlayerPanel.LYRICS to "Lyrics"),
-                selected = panel,
-                onSelect = { panel = it }
+            Text(
+                text = "Now Playing",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.Center)
             )
+            IconButton(onClick = onOpenQueue, modifier = Modifier.align(Alignment.CenterEnd)) {
+                Icon(Icons.Filled.QueueMusic, contentDescription = "Queue")
+            }
         }
 
         when (panel) {
@@ -103,9 +129,13 @@ fun PlayerScreen(
                 onTogglePlayPause = onTogglePlayPause,
                 onSkipNext = onSkipNext,
                 onCycleRepeat = onCycleRepeat,
-                onQueueItemClick = onQueueItemClick
+                onOpenLyrics = { panel = PlayerPanel.LYRICS }
             )
-            PlayerPanel.LYRICS -> LyricsPanel(song = song, lyricsState = lyricsState)
+            PlayerPanel.LYRICS -> LyricsPanel(
+                song = song,
+                lyricsState = lyricsState,
+                onBackToPlayer = { panel = PlayerPanel.NOW_PLAYING }
+            )
         }
     }
 }
@@ -114,22 +144,29 @@ fun PlayerScreen(
 private fun NowPlayingPanel(
     song: Song,
     playbackState: PlaybackUiState,
-    accent: androidx.compose.ui.graphics.Color,
+    accent: Color,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onSkipPrevious: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onCycleRepeat: () -> Unit,
-    onQueueItemClick: (Int) -> Unit
+    onOpenLyrics: () -> Unit
 ) {
-    Column {
+    val context = LocalContext.current
+    var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
+
+    LaunchedEffect(song.id) {
+        formatInfo = readAudioFormatInfo(context, song.contentUri)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp)
+                .padding(top = 12.dp)
                 .aspectRatio(1f)
-                .clip(expressiveBlobShape())
+                .clip(ArtCornerShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
@@ -145,7 +182,7 @@ private fun NowPlayingPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(expressiveBlobShape())
+                    .clip(ArtCornerShape)
             )
         }
 
@@ -157,7 +194,7 @@ private fun NowPlayingPanel(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${song.artist} • ${song.album}",
+                text = song.artist,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -165,127 +202,182 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 8.dp)) {
+        Column(modifier = Modifier.padding(top = 16.dp)) {
             WavyMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
                 isPlaying = playbackState.isPlaying,
                 onValueChange = { onSeekTo(it.toLong()) },
-                activeColor = accent
+                activeColor = accent,
+                showThumb = true
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(formatDuration(playbackState.positionMs), style = MaterialTheme.typography.labelMedium)
+
+                val badgeText = formatInfo?.toBadgeText()
+                if (badgeText != null) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
                 Text(formatDuration(playbackState.durationMs), style = MaterialTheme.typography.labelMedium)
             }
         }
 
-        Surface(
-            shape = PillShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp)
+                .padding(top = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp, horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ToggleGlyphButton(
-                    icon = Icons.Filled.Shuffle,
-                    active = playbackState.isShuffled,
-                    contentDescription = "Shuffle",
-                    onClick = onToggleShuffle
-                )
-                IconButton(onClick = onSkipPrevious) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", modifier = Modifier.fillMaxSize(0.55f))
-                }
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(cookieShape(petals = 10, amplitude = 0.10f))
-                        .background(accent)
-                        .clickable(onClick = onTogglePlayPause),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.fillMaxSize(0.45f)
-                    )
-                }
-                IconButton(onClick = onSkipNext) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Next", modifier = Modifier.fillMaxSize(0.55f))
-                }
-                ToggleGlyphButton(
-                    icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                    active = playbackState.repeatMode != RepeatMode.OFF,
-                    contentDescription = "Repeat",
-                    onClick = onCycleRepeat
-                )
-            }
+            TransportButton(
+                icon = Icons.Filled.SkipPrevious,
+                contentDescription = "Previous",
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = onSkipPrevious
+            )
+            TransportButton(
+                icon = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                shape = PlayButtonShape,
+                containerColor = accent,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                sizeMultiplier = 1.15f,
+                onClick = onTogglePlayPause
+            )
+            TransportButton(
+                icon = Icons.Filled.SkipNext,
+                contentDescription = "Next",
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = onSkipNext
+            )
         }
 
-        if (playbackState.queue.size > 1) {
-            Text(
-                text = "Up next",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            PillToggleButton(
+                icon = Icons.Filled.Shuffle,
+                active = playbackState.isShuffled,
+                contentDescription = "Shuffle",
+                onClick = onToggleShuffle,
+                modifier = Modifier.weight(1f)
             )
-            LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-                items(playbackState.queue.withIndex().toList(), key = { it.value.id }) { (index, queuedSong) ->
-                    QueueRow(
-                        song = queuedSong,
-                        isCurrent = index == playbackState.currentIndex,
-                        onClick = { onQueueItemClick(index) }
-                    )
-                }
-            }
+            PillToggleButton(
+                icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                active = playbackState.repeatMode != RepeatMode.OFF,
+                contentDescription = "Repeat",
+                onClick = onCycleRepeat,
+                modifier = Modifier.weight(1f)
+            )
+            PillToggleButton(
+                icon = Icons.Filled.Subtitles,
+                active = false,
+                contentDescription = "Lyrics",
+                onClick = onOpenLyrics,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @Composable
-private fun ToggleGlyphButton(
+private fun TransportButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    active: Boolean,
     contentDescription: String,
-    onClick: () -> Unit
+    shape: androidx.compose.ui.graphics.Shape,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+    sizeMultiplier: Float = 1f
 ) {
+    val baseSize = 72.dp
     Box(
         modifier = Modifier
-            .size(40.dp)
-            .clip(if (active) cookieShape(petals = 8, amplitude = 0.16f) else PillShape)
-            .background(if (active) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+            .size(baseSize * sizeMultiplier)
+            .clip(shape)
+            .background(containerColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxSize(0.55f)
+            tint = contentColor,
+            modifier = Modifier.fillMaxSize(0.45f)
         )
     }
 }
 
 @Composable
-private fun LyricsPanel(song: Song, lyricsState: LyricsState) {
+private fun PillToggleButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    active: Boolean,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (active) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun LyricsPanel(song: Song, lyricsState: LyricsState, onBackToPlayer: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = song.title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-        )
-        Text(
-            text = song.artist,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 20.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = song.title, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onBackToPlayer) {
+                Icon(Icons.Filled.MusicNote, contentDescription = "Back to player")
+            }
+        }
 
         when (lyricsState) {
             is LyricsState.Loading, LyricsState.Idle -> Box(
@@ -322,33 +414,6 @@ private fun LyricsPanel(song: Song, lyricsState: LyricsState) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun QueueRow(song: Song, isCurrent: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = song.title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = song.artist,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 
