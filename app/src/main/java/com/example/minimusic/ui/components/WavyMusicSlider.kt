@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -27,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
+private const val TWO_PI_F = (2.0 * PI).toFloat()
+
 /**
  * A seek bar whose active (played) portion draws as a gentle traveling sine wave
  * while music is playing, and flattens to a straight line while paused or while
@@ -51,9 +54,9 @@ fun WavyMusicSlider(
     val fraction = if (isDragging) dragFraction else committedFraction
 
     val infiniteTransition = rememberInfiniteTransition(label = "wavy_slider_phase")
-    val phase by infiniteTransition.animateFloat(
+    val phase: Float by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
+        targetValue = TWO_PI_F,
         animationSpec = infiniteRepeatable(animation = tween(durationMillis = 1400, easing = LinearEasing)),
         label = "wavy_slider_phase_value"
     )
@@ -96,10 +99,8 @@ fun WavyMusicSlider(
         val activeWidth = size.width * fraction
         val strokeWidth = 6.dp.toPx()
         val maxAmplitudePx = 5.dp.toPx()
-        // A handful of gentle cycles across the full track, regardless of width.
         val waveLength = (size.width / 6f).coerceAtLeast(1f)
 
-        // Inactive remainder — flat line.
         if (activeWidth < size.width) {
             drawLine(
                 color = trackColor,
@@ -110,14 +111,13 @@ fun WavyMusicSlider(
             )
         }
 
-        // Active portion — animated wave (flattens to a line when amplitude hits 0).
         if (activeWidth > 0f) {
             val path = Path()
             val step = 4f
             var x = 0f
             var first = true
             while (x <= activeWidth) {
-                val y = midY + amplitude * maxAmplitudePx * sin((2f * PI.toFloat() * x / waveLength) + phase)
+                val y = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * x / waveLength) + phase)
                 if (first) {
                     path.moveTo(x, y)
                     first = false
@@ -126,7 +126,7 @@ fun WavyMusicSlider(
                 }
                 x += step
             }
-            val endY = midY + amplitude * maxAmplitudePx * sin((2f * PI.toFloat() * activeWidth / waveLength) + phase)
+            val endY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * activeWidth / waveLength) + phase)
             path.lineTo(activeWidth, endY)
 
             drawPath(
