@@ -33,9 +33,11 @@ private const val TWO_PI_F = (2.0 * PI).toFloat()
 /**
  * A seek bar whose active (played) portion draws as a gentle traveling sine wave
  * while music is playing, and flattens to a straight line while paused or while
- * the user is actively dragging to seek — the same visual language PixelPlayer's
- * WavyMusicSlider uses. `value`/`valueRange` behave like the standard Slider;
- * tapping or dragging anywhere on the track seeks to that position.
+ * the user is actively dragging to seek. `value`/`valueRange` behave like the
+ * standard Slider; tapping or dragging anywhere on the track seeks to that
+ * position. Optionally draws a solid circular thumb at the current position
+ * (matching a filled-dot seek-bar reference design) — off by default so it
+ * doesn't change the look anywhere this component was already in use.
  */
 @Composable
 fun WavyMusicSlider(
@@ -44,7 +46,8 @@ fun WavyMusicSlider(
     isPlaying: Boolean,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    activeColor: androidx.compose.ui.graphics.Color? = null
+    activeColor: androidx.compose.ui.graphics.Color? = null,
+    showThumb: Boolean = false
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
@@ -111,6 +114,7 @@ fun WavyMusicSlider(
             )
         }
 
+        var lastActiveY = midY
         if (activeWidth > 0f) {
             val path = Path()
             val step = 4f
@@ -128,11 +132,21 @@ fun WavyMusicSlider(
             }
             val endY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * activeWidth / waveLength) + phase)
             path.lineTo(activeWidth, endY)
+            lastActiveY = endY
 
             drawPath(
                 path = path,
                 color = resolvedActiveColor,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+        }
+
+        if (showThumb) {
+            val thumbRadius = 8.dp.toPx()
+            drawCircle(
+                color = resolvedActiveColor,
+                radius = thumbRadius,
+                center = Offset(activeWidth, lastActiveY)
             )
         }
     }
