@@ -1,9 +1,5 @@
 package com.example.minimusic.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,8 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -67,6 +61,7 @@ import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
+import com.example.minimusic.ui.components.QueueSheet
 import com.example.minimusic.ui.theme.rememberArtAccentColor
 import com.example.minimusic.ui.viewmodel.LyricsState
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -114,6 +109,7 @@ fun PlayerScreen(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
+    onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
@@ -121,7 +117,7 @@ fun PlayerScreen(
     var panel by remember(song.id) {
         mutableStateOf(if (showLyricsInitially) PlayerPanel.LYRICS else PlayerPanel.NOW_PLAYING)
     }
-    var queueExpanded by remember { mutableStateOf(false) }
+    var queueSheetOpen by remember { mutableStateOf(false) }
     val accent = rememberArtAccentColor(song.albumArtUri)
 
     Column(
@@ -171,14 +167,40 @@ fun PlayerScreen(
         }
 
         if (playbackState.queue.size > 1) {
-            QueueBar(
-                playbackState = playbackState,
-                accent = accent,
-                expanded = queueExpanded,
-                onToggleExpanded = { queueExpanded = !queueExpanded },
-                onQueueItemClick = onQueueItemClick
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(50))
+                    .clickable { queueSheetOpen = true }
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.QueueMusic,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Queue",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            }
         }
+    }
+
+    if (queueSheetOpen) {
+        QueueSheet(
+            queue = playbackState.queue,
+            currentIndex = playbackState.currentIndex,
+            accent = accent,
+            onDismiss = { queueSheetOpen = false },
+            onSongClick = onQueueItemClick,
+            onMove = onMoveQueueItem
+        )
     }
 }
 
@@ -489,31 +511,5 @@ private fun CapsuleSegment(
             .padding(horizontal = 2.dp)
             .clip(ActiveSegmentShape)
             .background(
-                if (active) MaterialTheme.colorScheme.primaryContainer
-                else Color.Transparent
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun QueueBar(
-    playbackState: PlaybackUiState,
-    accent: Color,
-    expanded: Boolean,
-    onToggleExpanded: () -> Unit,
-    onQueueItemClick: (Int) -> Unit
-) {
-    Column {
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(animationSpec = tween(220)),
+                if (active) MaterialTheme.colorScheme.primaryContain
       
