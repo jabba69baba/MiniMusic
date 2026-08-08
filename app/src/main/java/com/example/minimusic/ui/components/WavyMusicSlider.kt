@@ -137,7 +137,7 @@ fun WavyMusicSlider(
             drawPath(
                 path = path,
                 color = resolvedActiveColor,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
             )
         }
 
