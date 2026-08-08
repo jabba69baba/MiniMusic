@@ -118,6 +118,7 @@ fun MiniMusicNavGraph(
                 onToggleShuffle = playerViewModel::toggleShuffle,
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
                 onQueueItemClick = playerViewModel::playFromQueue,
+                onMoveQueueItem = playerViewModel::moveQueueItem,
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )
