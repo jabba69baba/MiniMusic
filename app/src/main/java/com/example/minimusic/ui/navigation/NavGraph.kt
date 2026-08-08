@@ -104,10 +104,12 @@ fun MiniMusicNavGraph(
 
         composable(Routes.PLAYER) {
             val lyricsState by playerViewModel.lyricsState.collectAsState()
+            val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
             PlayerScreen(
                 playbackState = playbackState,
                 lyricsState = lyricsState,
                 showLyricsInitially = appSettings.autoShowLyrics,
+                sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
@@ -115,7 +117,9 @@ fun MiniMusicNavGraph(
                 onSeekTo = playerViewModel::seekTo,
                 onToggleShuffle = playerViewModel::toggleShuffle,
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
-                onQueueItemClick = playerViewModel::playFromQueue
+                onQueueItemClick = playerViewModel::playFromQueue,
+                onStartSleepTimer = playerViewModel::startSleepTimer,
+                onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )
         }
     }
