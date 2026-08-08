@@ -343,13 +343,14 @@ private fun NowPlayingPanel(
             }
         }
 
-        // Transport row: circular previous / rounded-square play-pause / circular next.
-        // Its total width is the reference the capsule row below matches.
+        // Transport row: fixed-size circular previous/next, with the play/pause
+        // button expanding to fill the space between them (rather than a small
+        // fixed button leaving gaps) and showing a text label alongside the icon.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TransportButton(
@@ -360,14 +361,12 @@ private fun NowPlayingPanel(
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 onClick = onSkipPrevious
             )
-            TransportButton(
-                icon = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                shape = PlayButtonShape,
+            PlayPauseButton(
+                isPlaying = playbackState.isPlaying,
                 containerColor = accent,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                sizeMultiplier = 1.15f,
-                onClick = onTogglePlayPause
+                onClick = onTogglePlayPause,
+                modifier = Modifier.weight(1f)
             )
             TransportButton(
                 icon = Icons.Filled.SkipNext,
@@ -440,6 +439,44 @@ private fun TransportButton(
             contentDescription = contentDescription,
             tint = contentColor,
             modifier = Modifier.fillMaxSize(0.45f)
+        )
+    }
+}
+
+/**
+ * The primary play/pause control — fills the space left over between the fixed-size
+ * previous/next circles (via the caller's `Modifier.weight(1f)`) rather than staying
+ * a small fixed button, and shows a text label next to the icon that switches
+ * between "Play" and "Pause" with playback state.
+ */
+@Composable
+private fun PlayPauseButton(
+    isPlaying: Boolean,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .clip(PlayButtonShape)
+            .background(containerColor)
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(28.dp)
+        )
+        Text(
+            text = if (isPlaying) "Pause" else "Play",
+            style = MaterialTheme.typography.titleMedium,
+            color = contentColor,
+            modifier = Modifier.padding(start = 8.dp)
         )
     }
 }
