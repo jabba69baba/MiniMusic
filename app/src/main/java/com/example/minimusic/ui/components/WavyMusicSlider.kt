@@ -103,11 +103,17 @@ fun WavyMusicSlider(
         val strokeWidth = 6.dp.toPx()
         val maxAmplitudePx = 5.dp.toPx()
         val waveLength = (size.width / 6f).coerceAtLeast(1f)
+        // Small breathing room around the thumb dot itself — the wave stops short
+        // of it, and the flat inactive track resumes after it, rather than both
+        // running flush into the dot.
+        val thumbGap = if (showThumb) 10.dp.toPx() else 0f
+        val waveEndX = (activeWidth - thumbGap).coerceAtLeast(0f)
+        val trackStartX = (activeWidth + thumbGap).coerceAtMost(size.width)
 
-        if (activeWidth < size.width) {
+        if (trackStartX < size.width) {
             drawLine(
                 color = trackColor,
-                start = Offset(activeWidth, midY),
+                start = Offset(trackStartX, midY),
                 end = Offset(size.width, midY),
                 strokeWidth = strokeWidth,
                 cap = StrokeCap.Round
@@ -115,12 +121,12 @@ fun WavyMusicSlider(
         }
 
         var lastActiveY = midY
-        if (activeWidth > 0f) {
+        if (waveEndX > 0f) {
             val path = Path()
             val step = 4f
             var x = 0f
             var first = true
-            while (x <= activeWidth) {
+            while (x <= waveEndX) {
                 val y = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * x / waveLength) + phase)
                 if (first) {
                     path.moveTo(x, y)
@@ -130,14 +136,14 @@ fun WavyMusicSlider(
                 }
                 x += step
             }
-            val endY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * activeWidth / waveLength) + phase)
-            path.lineTo(activeWidth, endY)
-            lastActiveY = endY
+            val endY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * waveEndX / waveLength) + phase)
+            path.lineTo(waveEndX, endY)
+            lastActiveY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * activeWidth / waveLength) + phase)
 
             drawPath(
                 path = path,
                 color = resolvedActiveColor,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
         }
 
