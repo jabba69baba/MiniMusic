@@ -120,7 +120,8 @@ fun PlayerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp)
+            .padding(top = 4.dp, bottom = 12.dp)
     ) {
         // Header: chevron-down (left) — "Now Playing" (centered) — sleep timer (right).
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -344,7 +345,7 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             TransportButton(
@@ -609,5 +610,5 @@ private fun formatDuration(ms: Long): String {
     val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(ms.coerceAtLeast(0L))
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
+    return "%02d:%02d".format(minutes, seconds)
 }
