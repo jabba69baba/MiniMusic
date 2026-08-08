@@ -35,9 +35,11 @@ private const val TWO_PI_F = (2.0 * PI).toFloat()
  * while music is playing, and flattens to a straight line while paused or while
  * the user is actively dragging to seek. `value`/`valueRange` behave like the
  * standard Slider; tapping or dragging anywhere on the track seeks to that
- * position. Optionally draws a solid circular thumb at the current position
- * (matching a filled-dot seek-bar reference design) — off by default so it
- * doesn't change the look anywhere this component was already in use.
+ * position. Optionally draws a solid circular thumb at the current position —
+ * off by default so it doesn't change the look anywhere this component was
+ * already in use. When the thumb is shown, the wave runs flush into it on the
+ * played side, but the flat inactive track on the other side starts with a
+ * small visible gap rather than touching the dot.
  */
 @Composable
 fun WavyMusicSlider(
@@ -103,12 +105,12 @@ fun WavyMusicSlider(
         val strokeWidth = 6.dp.toPx()
         val maxAmplitudePx = 5.dp.toPx()
         val waveLength = (size.width / 6f).coerceAtLeast(1f)
-        // Small breathing room around the thumb dot itself — the wave stops short
-        // of it, and the flat inactive track resumes after it, rather than both
-        // running flush into the dot.
-        val thumbGap = if (showThumb) 10.dp.toPx() else 0f
-        val waveEndX = (activeWidth - thumbGap).coerceAtLeast(0f)
-        val trackStartX = (activeWidth + thumbGap).coerceAtMost(size.width)
+
+        // Asymmetric gap around the thumb dot: the wave runs flush into the dot
+        // on the played side (no gap), but the flat inactive track on the other
+        // side starts with a visible gap rather than touching the dot.
+        val trackGap = if (showThumb) 10.dp.toPx() else 0f
+        val trackStartX = (activeWidth + trackGap).coerceAtMost(size.width)
 
         if (trackStartX < size.width) {
             drawLine(
@@ -121,12 +123,12 @@ fun WavyMusicSlider(
         }
 
         var lastActiveY = midY
-        if (waveEndX > 0f) {
+        if (activeWidth > 0f) {
             val path = Path()
             val step = 4f
             var x = 0f
             var first = true
-            while (x <= waveEndX) {
+            while (x <= activeWidth) {
                 val y = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * x / waveLength) + phase)
                 if (first) {
                     path.moveTo(x, y)
@@ -136,9 +138,9 @@ fun WavyMusicSlider(
                 }
                 x += step
             }
-            val endY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * waveEndX / waveLength) + phase)
-            path.lineTo(waveEndX, endY)
-            lastActiveY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * activeWidth / waveLength) + phase)
+            val endY = midY + amplitude * maxAmplitudePx * sin((TWO_PI_F * activeWidth / waveLength) + phase)
+            path.lineTo(activeWidth, endY)
+            lastActiveY = endY
 
             drawPath(
                 path = path,
