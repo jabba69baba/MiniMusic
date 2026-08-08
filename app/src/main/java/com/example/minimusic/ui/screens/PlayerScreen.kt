@@ -241,9 +241,10 @@ private fun SleepTimerButton(
 }
 
 private fun formatRemaining(ms: Long): String {
-    val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(ms.coerceAtLeast(0L))
-    val seconds = TimeUnit.MILLISECONDS.toSeconds(ms.coerceAtLeast(0L)) % 60
-    return if (totalMinutes > 0) "${totalMinutes}m" else "${seconds}s"
+    val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(ms.coerceAtLeast(0L))
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
 }
 
 @Composable
