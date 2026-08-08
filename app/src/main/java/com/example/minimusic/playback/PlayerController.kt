@@ -91,6 +91,25 @@ class PlayerController(private val context: Context) {
         controller?.play()
     }
 
+    /**
+     * Moves the queue item at [fromIndex] to [toIndex], reordering both ExoPlayer's
+     * live timeline (so playback order actually changes) and the local [currentQueue]
+     * mirror (so the UI stays in sync). No-ops on an out-of-range index rather than
+     * throwing, since drag gestures can occasionally report a stale index mid-drag.
+     */
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        val c = controller ?: return
+        if (fromIndex == toIndex) return
+        if (fromIndex !in currentQueue.indices || toIndex !in currentQueue.indices) return
+
+        c.moveMediaItem(fromIndex, toIndex)
+
+        currentQueue = currentQueue.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
+        }
+        refreshCurrentItem()
+    }
+
     fun toggleShuffle() {
         val c = controller ?: return
         c.shuffleModeEnabled = !c.shuffleModeEnabled
