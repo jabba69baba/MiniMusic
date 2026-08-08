@@ -66,7 +66,7 @@ import com.example.minimusic.data.model.Song
 import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.RepeatMode
-import com.example.minimusic.ui.components.WavyMusicSlider
+import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.theme.rememberArtAccentColor
 import com.example.minimusic.ui.viewmodel.LyricsState
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -77,20 +77,24 @@ private enum class PlayerPanel { NOW_PLAYING, LYRICS }
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(28.dp)
 
-/** Rounded-square (not full circle) used only on the primary play/pause button. */
-private val PlayButtonShape = RoundedCornerShape(20.dp)
+/** Play/pause button corner radius — noticeably rounded, not a near-square. */
+private val PlayButtonShape = RoundedCornerShape(36.dp)
+
+/** Corner radius each capsule segment takes on when it becomes active. */
+private val ActiveSegmentShape = RoundedCornerShape(50)
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 
 /**
  * Player screen. Header: chevron-down collapse (left), centered "Now Playing"
- * label, sleep timer button (right). Large rounded album art; wavy seek bar with
- * a circular thumb and an audio-format badge when the file exposes that info;
- * a transport row of two circular buttons flanking a rounded-square play/pause;
- * a single enclosed capsule (not separate pills) holding shuffle/repeat/lyrics,
- * spanning the same width as the transport row above it; and a slim "Queue" bar
- * pinned at the bottom that expands in place to show the upcoming tracks.
+ * label, sleep timer button (right). Large rounded album art; a flat solid-fill
+ * seek bar (Apple Music style) with a circular thumb and an audio-format badge
+ * when the file exposes that info; a transport row of two circular buttons
+ * flanking a rounded play/pause; a single outer capsule holding shuffle/repeat/
+ * lyrics where each segment is flush with the shared background until active,
+ * at which point it gets its own filled rounded-pill highlight; and a slim
+ * "Queue" bar pinned at the bottom that expands in place.
  *
  * The screen tints itself with a hue pulled from the current song's album art
  * (see ArtColor.kt) — the rest of the app stays on the system Material You
@@ -127,7 +131,6 @@ fun PlayerScreen(
             .padding(horizontal = 20.dp)
             .padding(top = 4.dp, bottom = 12.dp)
     ) {
-        // Header: chevron-down (left) — "Now Playing" (centered) — sleep timer (right).
         Box(modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
                 Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Collapse")
@@ -145,7 +148,6 @@ fun PlayerScreen(
             )
         }
 
-        // Main content grows to fill available space; queue bar stays pinned below it.
         Box(modifier = Modifier.weight(1f)) {
             when (panel) {
                 PlayerPanel.NOW_PLAYING -> NowPlayingPanel(
@@ -168,7 +170,6 @@ fun PlayerScreen(
             }
         }
 
-        // Slim "Queue" bar pinned at the bottom — expands in place to show upcoming tracks.
         if (playbackState.queue.size > 1) {
             QueueBar(
                 playbackState = playbackState,
@@ -192,7 +193,6 @@ private fun SleepTimerButton(
 
     Box(modifier = modifier) {
         if (sleepTimerState != null) {
-            // Active timer: tapping shows remaining time and offers to cancel.
             Surface(
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -310,13 +310,11 @@ private fun NowPlayingPanel(
         }
 
         Column(modifier = Modifier.padding(top = 16.dp)) {
-            WavyMusicSlider(
+            FlatMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
-                isPlaying = playbackState.isPlaying,
                 onValueChange = { onSeekTo(it.toLong()) },
-                activeColor = accent,
-                showThumb = true
+                activeColor = accent
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -344,9 +342,6 @@ private fun NowPlayingPanel(
             }
         }
 
-        // Transport row: fixed-size circular previous/next, with the play/pause
-        // button expanding to fill the space between them (rather than a small
-        // fixed button leaving gaps) and showing a text label alongside the icon.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -379,9 +374,10 @@ private fun NowPlayingPanel(
             )
         }
 
-        // Single enclosed capsule (one continuous Surface, internally divided) holding
-        // shuffle/repeat/lyrics — fillMaxWidth so it spans the same total width as the
-        // transport row above, rather than three separate pill buttons with gaps.
+        // Outer capsule: one continuous background. Each segment is flush with
+        // it while inactive; when active, that segment gets its own filled
+        // rounded-pill highlight that visually pops out from the shared
+        // background — independently, so more than one can be active at once.
         Surface(
             shape = RoundedCornerShape(50),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -389,7 +385,7 @@ private fun NowPlayingPanel(
                 .fillMaxWidth()
                 .padding(top = 16.dp)
         ) {
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(4.dp)) {
                 CapsuleSegment(
                     icon = Icons.Filled.Shuffle,
                     active = playbackState.isShuffled,
@@ -423,13 +419,11 @@ private fun TransportButton(
     shape: androidx.compose.ui.graphics.Shape,
     containerColor: Color,
     contentColor: Color,
-    onClick: () -> Unit,
-    sizeMultiplier: Float = 1f
+    onClick: () -> Unit
 ) {
-    val baseSize = 72.dp
     Box(
         modifier = Modifier
-            .size(baseSize * sizeMultiplier)
+            .size(72.dp)
             .clip(shape)
             .background(containerColor)
             .clickable(onClick = onClick),
@@ -444,12 +438,6 @@ private fun TransportButton(
     }
 }
 
-/**
- * The primary play/pause control — fills the space left over between the fixed-size
- * previous/next circles (via the caller's `Modifier.weight(1f)`) rather than staying
- * a small fixed button, and shows a text label next to the icon that switches
- * between "Play" and "Pause" with playback state.
- */
 @Composable
 private fun PlayPauseButton(
     isPlaying: Boolean,
@@ -482,7 +470,12 @@ private fun PlayPauseButton(
     }
 }
 
-/** One segment of the enclosed capsule row — no individual background/border, just an icon with an active tint. */
+/**
+ * One segment of the outer capsule row. Inactive: transparent, flush with the
+ * shared capsule background. Active: gets its own filled rounded-pill
+ * background that pops out visually — independent of the other segments, so
+ * shuffle and lyrics (for example) can both show as active simultaneously.
+ */
 @Composable
 private fun CapsuleSegment(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -493,6 +486,12 @@ private fun CapsuleSegment(
 ) {
     Box(
         modifier = modifier
+            .padding(horizontal = 2.dp)
+            .clip(ActiveSegmentShape)
+            .background(
+                if (active) MaterialTheme.colorScheme.primaryContainer
+                else Color.Transparent
+            )
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center
@@ -500,7 +499,7 @@ private fun CapsuleSegment(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -517,140 +516,4 @@ private fun QueueBar(
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically(animationSpec = tween(220)),
-            exit = shrinkVertically(animationSpec = tween(220))
-        ) {
-            LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
-                items(playbackState.queue.withIndex().toList(), key = { it.value.id }) { (index, queuedSong) ->
-                    QueueRow(
-                        song = queuedSong,
-                        isCurrent = index == playbackState.currentIndex,
-                        accent = accent,
-                        onClick = { onQueueItemClick(index) }
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggleExpanded)
-                .padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Filled.QueueMusic,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Queue",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 6.dp, end = 4.dp)
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
-                contentDescription = if (expanded) "Collapse queue" else "Expand queue",
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun QueueRow(song: Song, isCurrent: Boolean, accent: Color, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = song.title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (isCurrent) accent else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = song.artist,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun LyricsPanel(song: Song, lyricsState: LyricsState, onBackToPlayer: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = song.title, style = MaterialTheme.typography.titleLarge)
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = onBackToPlayer) {
-                Icon(Icons.Filled.MusicNote, contentDescription = "Back to player")
-            }
-        }
-
-        when (lyricsState) {
-            is LyricsState.Loading, LyricsState.Idle -> Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
-
-            is LyricsState.NotFound -> Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "No embedded lyrics found for this track",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "MiniMusic reads lyrics straight from the file's own tag (ID3 USLT) — add them with a tag editor to see them here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp)
-                )
-            }
-
-            is LyricsState.Found -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                item {
-                    Text(
-                        text = lyricsState.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = MaterialTheme.typography.bodyLarge.fontSize * 1.6f
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun formatDuration(ms: Long): String {
-    val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(ms.coerceAtLeast(0L))
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%02d:%02d".format(minutes, seconds)
-}
+      
