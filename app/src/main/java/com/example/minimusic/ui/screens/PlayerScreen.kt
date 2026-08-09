@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -61,7 +62,7 @@ import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
-import com.example.minimusic.ui.components.QueueSheet
+import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.theme.rememberArtAccentColor
 import com.example.minimusic.ui.viewmodel.LyricsState
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -117,90 +118,74 @@ fun PlayerScreen(
     var panel by remember(song.id) {
         mutableStateOf(if (showLyricsInitially) PlayerPanel.LYRICS else PlayerPanel.NOW_PLAYING)
     }
-    var queueSheetOpen by remember { mutableStateOf(false) }
+    var queueOpen by remember { mutableStateOf(false) }
     val accent = rememberArtAccentColor(song.albumArtUri)
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 20.dp)
-            .padding(top = 4.dp, bottom = 12.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Collapse")
-            }
-            Text(
-                text = "Now Playing",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.align(Alignment.Center)
-            )
-            SleepTimerButton(
-                sleepTimerState = sleepTimerState,
-                onStart = onStartSleepTimer,
-                onCancel = onCancelSleepTimer,
-                modifier = Modifier.align(Alignment.CenterEnd)
-            )
-        }
-
-        Box(modifier = Modifier.weight(1f)) {
-            when (panel) {
-                PlayerPanel.NOW_PLAYING -> NowPlayingPanel(
-                    song = song,
-                    playbackState = playbackState,
-                    accent = accent,
-                    onSeekTo = onSeekTo,
-                    onToggleShuffle = onToggleShuffle,
-                    onSkipPrevious = onSkipPrevious,
-                    onTogglePlayPause = onTogglePlayPause,
-                    onSkipNext = onSkipNext,
-                    onCycleRepeat = onCycleRepeat,
-                    onOpenLyrics = { panel = PlayerPanel.LYRICS }
-                )
-                PlayerPanel.LYRICS -> LyricsPanel(
-                    song = song,
-                    lyricsState = lyricsState,
-                    onBackToPlayer = { panel = PlayerPanel.NOW_PLAYING }
-                )
-            }
-        }
-
-        if (playbackState.queue.size > 1) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(50))
-                    .clickable { queueSheetOpen = true }
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Filled.QueueMusic,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 12.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Collapse")
+                }
                 Text(
-                    text = "Queue",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 6.dp)
+                    text = "Now Playing",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                SleepTimerButton(
+                    sleepTimerState = sleepTimerState,
+                    onStart = onStartSleepTimer,
+                    onCancel = onCancelSleepTimer,
+                    modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
-        }
-    }
 
-    if (queueSheetOpen) {
-        QueueSheet(
-            queue = playbackState.queue,
-            currentIndex = playbackState.currentIndex,
-            accent = accent,
-            onDismiss = { queueSheetOpen = false },
-            onSongClick = onQueueItemClick,
-            onMove = onMoveQueueItem
-        )
+            Box(modifier = Modifier.weight(1f)) {
+                when (panel) {
+                    PlayerPanel.NOW_PLAYING -> NowPlayingPanel(
+                        song = song,
+                        playbackState = playbackState,
+                        accent = accent,
+                        onSeekTo = onSeekTo,
+                        onToggleShuffle = onToggleShuffle,
+                        onSkipPrevious = onSkipPrevious,
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipNext = onSkipNext,
+                        onCycleRepeat = onCycleRepeat,
+                        onOpenLyrics = { panel = PlayerPanel.LYRICS }
+                    )
+                    PlayerPanel.LYRICS -> LyricsPanel(
+                        song = song,
+                        lyricsState = lyricsState,
+                        onBackToPlayer = { panel = PlayerPanel.NOW_PLAYING }
+                    )
+                }
+            }
+        }
+
+        // Draggable queue drawer overlay — Auxio-style: album art and header
+        // above stay put, the drawer slides up over the lower portion of the
+        // screen rather than a separate full-screen modal.
+        if (playbackState.queue.size > 1) {
+            QueueDrawer(
+                queue = playbackState.queue,
+                currentIndex = playbackState.currentIndex,
+                accent = accent,
+                isOpen = queueOpen,
+                onOpenChange = { queueOpen = it },
+                onSongClick = onQueueItemClick,
+                onMove = onMoveQueueItem
+            )
+        }
     }
 }
 
