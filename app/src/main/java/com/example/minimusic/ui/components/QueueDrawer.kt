@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** How far up the drawer sits when open, as a fraction of the available height. */
 private const val OPEN_FRACTION = 0.82f
@@ -119,7 +121,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         }
                     },
                     onDragStopped = { velocity ->
-                        val shouldOpen = if (kotlin.math.abs(velocity) > 800f) {
+                        val shouldOpen = if (abs(velocity) > 800f) {
                             velocity < 0f
                         } else {
                             offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
