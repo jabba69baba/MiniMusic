@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -134,10 +135,13 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = 8.dp)
             ) {
-                // Collapsed bar: drag handle + "Queue" label, always visible at
-                // the top of the drawer regardless of open/closed state — tapping
-                // it toggles, matching the slim bar in the collapsed reference.
+                // Collapsed bar: drag handle + icon + "Queue" label, always visible
+                // at the top of the drawer regardless of open/closed state —
+                // tapping it toggles, matching the slim bar in the collapsed
+                // reference. Extra bottom padding above keeps it clear of the
+                // system navigation bar rather than sitting flush against it.
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -152,11 +156,20 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             .clip(RoundedCornerShape(50))
                             .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                     )
-                    Text(
-                        text = "Queue",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.QueueMusic,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Queue",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
                 }
 
                 QueueDrawerList(
