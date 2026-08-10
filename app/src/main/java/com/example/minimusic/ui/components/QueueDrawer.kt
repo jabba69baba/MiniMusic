@@ -60,7 +60,7 @@ import kotlin.math.abs
 private const val OPEN_FRACTION = 0.82f
 
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
-private val CollapsedBarHeight = 56.dp
+private val CollapsedBarHeight = 64.dp
 
 private const val ROW_HEIGHT_DP = 64
 
@@ -87,8 +87,13 @@ fun BoxWithConstraintsScope.QueueDrawer(
     val density = LocalDensity.current
     val fullHeightPx = with(density) { maxHeight.toPx() }
     val collapsedBarHeightPx = with(density) { CollapsedBarHeight.toPx() }
+    val navBarHeightPx = androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(density).toFloat()
     val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
-    val closedOffsetPx = fullHeightPx - collapsedBarHeightPx
+    // The drawer's own Column already pads its content below the nav bar, but the
+    // *resting* (closed) position is calculated here against the full screen height
+    // before that inner padding applies — so the nav bar height is subtracted
+    // explicitly as well, or the collapsed bar visually sits underneath/behind it.
+    val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
 
     val offsetY = remember { Animatable(closedOffsetPx) }
     val scope = rememberCoroutineScope()
@@ -134,7 +139,6 @@ fun BoxWithConstraintsScope.QueueDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(bottom = 8.dp)
             ) {
                 // Collapsed bar: drag handle + icon + "Queue" label, always visible
