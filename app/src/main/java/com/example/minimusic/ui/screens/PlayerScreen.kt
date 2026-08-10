@@ -71,7 +71,7 @@ import java.util.concurrent.TimeUnit
 private enum class PlayerPanel { NOW_PLAYING, LYRICS }
 
 /** Large rounded-square corner radius used for the album art frame. */
-private val ArtCornerShape = RoundedCornerShape(28.dp)
+private val ArtCornerShape = RoundedCornerShape(10.dp)
 
 /** Play/pause button corner radius — noticeably rounded, not a near-square. */
 private val PlayButtonShape = RoundedCornerShape(36.dp)
@@ -326,7 +326,7 @@ private fun NowPlayingPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
