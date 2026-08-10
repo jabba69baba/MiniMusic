@@ -176,16 +176,22 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     }
                 }
 
-                QueueDrawerList(
-                    queue = queue,
-                    currentIndex = currentIndex,
-                    accent = accent,
-                    onSongClick = { index ->
-                        onSongClick(index)
-                        onOpenChange(false)
-                    },
-                    onMove = onMove
-                )
+                // Only render the list once the drawer is meaningfully open —
+                // this is what actually stops the collapsed state from showing
+                // a sliver of the first row peeking out below the handle bar.
+                val isSubstantiallyOpen = offsetY.value < closedOffsetPx - collapsedBarHeightPx / 2f
+                if (isSubstantiallyOpen) {
+                    QueueDrawerList(
+                        queue = queue,
+                        currentIndex = currentIndex,
+                        accent = accent,
+                        onSongClick = { index ->
+                            onSongClick(index)
+                            onOpenChange(false)
+                        },
+                        onMove = onMove
+                    )
+                }
             }
         }
     }
