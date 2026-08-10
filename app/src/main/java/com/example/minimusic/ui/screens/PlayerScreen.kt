@@ -316,7 +316,7 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 16.dp)) {
+        Column(modifier = Modifier.padding(top = 12.dp)) {
             FlatMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
@@ -324,7 +324,9 @@ private fun NowPlayingPanel(
                 activeColor = accent
             )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
