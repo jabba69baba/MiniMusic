@@ -50,7 +50,7 @@ fun FlatMusicSlider(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(14.dp)
+            .height(8.dp)
             .pointerInput(valueRange) {
                 detectTapGestures { offset ->
                     val newFraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
