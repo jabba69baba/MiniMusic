@@ -13,17 +13,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
 /**
- * A flat, solid-fill seek bar in the Apple Music / Spotify style: a rounded
- * track, a filled active portion in [activeColor], and a small circular thumb
- * at the current position. Replaces the earlier wavy slider, which turned out
- * to be a maintenance headache for comparatively little payoff — this is a
- * simpler, more standard control. `value`/`valueRange` behave like the
+ * A flat, solid-fill seek bar in the Apple Music style: a thick rounded (squircle)
+ * track, with the played portion drawn as a solid rounded-rect fill that ends in
+ * the same rounded shape as the track itself — no separate circular thumb, the
+ * fill's own rounded end IS the indicator. `value`/`valueRange` behave like the
  * standard Slider; tapping or dragging anywhere on the track seeks to that
  * position.
  */
@@ -48,7 +50,7 @@ fun FlatMusicSlider(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp)
+            .height(14.dp)
             .pointerInput(valueRange) {
                 detectTapGestures { offset ->
                     val newFraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
@@ -72,31 +74,26 @@ fun FlatMusicSlider(
                 )
             }
     ) {
-        val midY = size.height / 2f
-        val activeWidth = size.width * fraction
-        val strokeWidth = 6.dp.toPx()
-        val thumbRadius = 8.dp.toPx()
+        val cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+        val activeWidth = (size.width * fraction).coerceAtLeast(size.height) // never smaller than the round cap itself
 
-        drawLine(
-            color = trackColor,
-            start = Offset(0f, midY),
-            end = Offset(size.width, midY),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
+        // Full track — squircle/pill shaped, drawn as a single rounded-rect.
+        drawPath(
+            path = Path().apply {
+                addRoundRect(RoundRect(rect = androidx.compose.ui.geometry.Rect(Offset.Zero, Size(size.width, size.height)), cornerRadius = cornerRadius))
+            },
+            color = trackColor
         )
-        if (activeWidth > 0f) {
-            drawLine(
-                color = resolvedActiveColor,
-                start = Offset(0f, midY),
-                end = Offset(activeWidth, midY),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
+
+        // Active (played) portion — its own rounded-rect fill from the start;
+        // its rounded right edge is the only "thumb" indicator, no separate dot.
+        if (fraction > 0f) {
+            drawPath(
+                path = Path().apply {
+                    addRoundRect(RoundRect(rect = androidx.compose.ui.geometry.Rect(Offset.Zero, Size(activeWidth, size.height)), cornerRadius = cornerRadius))
+                },
+                color = resolvedActiveColor
             )
         }
-        drawCircle(
-            color = resolvedActiveColor,
-            radius = thumbRadius,
-            center = Offset(activeWidth, midY)
-        )
     }
 }
