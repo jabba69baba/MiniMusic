@@ -392,7 +392,7 @@ private fun NowPlayingPanel(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp)
+                .padding(top = 24.dp)
         ) {
             Row(modifier = Modifier.padding(4.dp)) {
                 CapsuleSegment(
