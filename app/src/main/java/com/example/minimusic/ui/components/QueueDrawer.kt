@@ -60,7 +60,10 @@ import kotlin.math.abs
 private const val OPEN_FRACTION = 0.82f
 
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
-private val CollapsedBarHeight = 64.dp
+/** Height of the always-visible collapsed bar (handle + "Queue" label). Public so
+ *  callers (e.g. PlayerScreen) can reserve matching bottom clearance for their
+ *  own content above the drawer. */
+val QueueDrawerCollapsedHeight = 64.dp
 
 private const val ROW_HEIGHT_DP = 64
 
@@ -86,7 +89,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
 ) {
     val density = LocalDensity.current
     val fullHeightPx = with(density) { maxHeight.toPx() }
-    val collapsedBarHeightPx = with(density) { CollapsedBarHeight.toPx() }
+    val collapsedBarHeightPx = with(density) { QueueDrawerCollapsedHeight.toPx() }
     val navBarHeightPx = androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(density).toFloat()
     val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
     // The drawer's own Column already pads its content below the nav bar, but the
