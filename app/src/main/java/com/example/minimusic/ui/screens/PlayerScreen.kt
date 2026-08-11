@@ -63,6 +63,7 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
+import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.rememberArtAccentColor
 import com.example.minimusic.ui.viewmodel.LyricsState
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -131,6 +132,11 @@ fun PlayerScreen(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .padding(top = 4.dp, bottom = 12.dp)
+                // Reserve real space for the drawer's collapsed bar sitting on top
+                // as a separate overlay below — it isn't part of this Column's
+                // layout flow, so padding on the last child here has no effect on
+                // the gap before it; this Column has to stop short itself instead.
+                .padding(bottom = if (playbackState.queue.size > 1) QueueDrawerCollapsedHeight + 20.dp else 0.dp)
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
@@ -354,7 +360,7 @@ private fun NowPlayingPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp),
+                .padding(top = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -392,7 +398,7 @@ private fun NowPlayingPanel(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 20.dp, bottom = 24.dp)
+                .padding(top = 20.dp)
         ) {
             Row(modifier = Modifier.padding(4.dp)) {
                 CapsuleSegment(
