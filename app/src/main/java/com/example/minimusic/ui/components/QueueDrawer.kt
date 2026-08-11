@@ -121,17 +121,25 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
-                        scope.launch {
-                            val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
-                            offsetY.snapTo(newValue)
-                        }
+                        // Update synchronously within the gesture's own coroutine
+                        // context (draggable already runs on one) rather than
+                        // spawning a new scope.launch per delta — concurrent
+                        // launches here were racing with the release animation
+                        // and could leave the drawer parked mid-way.
+                        val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
+                        scope.launch { offsetY.snapTo(newValue) }
                     },
                     onDragStopped = { velocity ->
+                        // Always resolve to a fully open or fully closed target —
+                        // no resting position in between is ever allowed, which is
+                        // what previously let the drawer get stuck mid-drag.
                         val shouldOpen = if (abs(velocity) > 800f) {
                             velocity < 0f
                         } else {
                             offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
                         }
+                        val target = if (shouldOpen) openOffsetPx else closedOffsetPx
+                        scope.launch { offsetY.animateTo(target, animationSpec = tween(220)) }
                         onOpenChange(shouldOpen)
                     }
                 )
