@@ -1,40 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Flat vinyl record glyph matching the reference: a single angled triangular
-  drop shadow to the lower-left of the disc, then the disc itself as clean
-  concentric flat-color rings (not shaded/gradient), a lighter label, dark
-  center, and a small white spindle dot.
+  Vinyl record with real dimensional shading: a radial-gradient disc (lighter
+  upper-left highlight fading to darker lower-right), fine concentric groove
+  lines etched into it, a lighter label with darker inner ring, white spindle
+  dot, and a soft gradient-fading directional shadow cast onto the backdrop —
+  matching the reference photo's lit, slightly glossy look.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Angled flat drop shadow, lower-left of the disc -->
-    <path
-        android:fillColor="#00000029"
-        android:pathData="M54,20 L88,54 L60,96 L20,68 Z" />
+    <!-- Soft directional shadow, fading out toward its far edge -->
+    <path android:pathData="M46,22 L92,58 L58,94 L18,64 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="30"
+                android:startY="40"
+                android:endX="80"
+                android:endY="85"
+                android:startColor="#55000000"
+                android:endColor="#00000000" />
+        </aapt:attr>
+    </path>
 
-    <!-- Ring 1 (outermost) -->
-    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-38,0 a38,38 0 1,0 76,0 a38,38 0 1,0 -76,0 Z" />
-    <!-- Ring 2 -->
-    <path android:fillColor="#E8E8E8" android:pathData="M54,54 m-34,0 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0 Z" />
-    <!-- Ring 3 -->
-    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-31,0 a31,31 0 1,0 62,0 a31,31 0 1,0 -62,0 Z" />
-    <!-- Ring 4 -->
-    <path android:fillColor="#E8E8E8" android:pathData="M54,54 m-27,0 a27,27 0 1,0 54,0 a27,27 0 1,0 -54,0 Z" />
-    <!-- Ring 5 -->
-    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-24,0 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0 Z" />
-    <!-- Ring 6 -->
-    <path android:fillColor="#E8E8E8" android:pathData="M54,54 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0 Z" />
-    <!-- Disc body fill from here inward (covers remaining ring steps solid) -->
-    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-17,0 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0 Z" />
+    <!-- Disc body: radial gradient for a lit, dimensional look -->
+    <path android:pathData="M54,54 m-38,0 a38,38 0 1,0 76,0 a38,38 0 1,0 -76,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="42"
+                android:centerY="42"
+                android:gradientRadius="58"
+                android:startColor="#4A4A4A"
+                android:centerColor="#242424"
+                android:endColor="#0E0E0E" />
+        </aapt:attr>
+    </path>
+
+    <!-- Fine concentric groove lines, evenly spaced, subtle -->
+    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+        android:pathData="M54,54 m-33,0 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+        android:pathData="M54,54 m-29,0 a29,29 0 1,0 58,0 a29,29 0 1,0 -58,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+        android:pathData="M54,54 m-25,0 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+        android:pathData="M54,54 m-21,0 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z" />
 
     <!-- Center label -->
-    <path android:fillColor="#8C8C8C" android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z" />
-    <!-- Label center dark disc -->
-    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z" />
+    <path android:fillColor="#9A9A9A" android:pathData="M54,54 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
+    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z" />
+
     <!-- Spindle hole -->
-    <path android:fillColor="#F7F7F7" android:pathData="M54,54 m-2.4,0 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z" />
+    <path android:fillColor="#FAFAFA" android:pathData="M54,54 m-2.6,0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" />
 </vector>
