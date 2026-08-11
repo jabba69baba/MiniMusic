@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flat light-gray backdrop, matching the reference art (plain, no vignette texture). -->
+<!-- Soft radial-lit backdrop, brighter center-top fading to darker edges, matching the reference card. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#E8E8E8"
-        android:pathData="M0,0h108v108h-108z" />
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="54"
+                android:centerY="40"
+                android:gradientRadius="80"
+                android:startColor="#F2F2F2"
+                android:centerColor="#D6D6D6"
+                android:endColor="#B0B0B0" />
+        </aapt:attr>
+    </path>
 </vector>
