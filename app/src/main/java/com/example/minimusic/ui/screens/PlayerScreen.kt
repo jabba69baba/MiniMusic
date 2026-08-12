@@ -83,10 +83,10 @@ private val PlayButtonShape = RoundedCornerShape(36.dp)
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
 /** Fixed height for the transport row's circular buttons and the play/pause pill — never allowed to shrink. */
-private val TransportButtonSize = 72.dp
+private val TransportButtonSize = 80.dp
 
 /** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
-private val CapsuleSegmentHeight = 56.dp
+private val CapsuleSegmentHeight = 52.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -292,7 +292,7 @@ private fun NowPlayingPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp)
+                .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
@@ -314,7 +314,7 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 24.dp)) {
+        Column(modifier = Modifier.padding(top = 18.dp)) {
             Text(
                 text = song.title,
                 style = MaterialTheme.typography.headlineSmall,
