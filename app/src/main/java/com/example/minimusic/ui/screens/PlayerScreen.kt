@@ -76,8 +76,9 @@ private enum class PlayerPanel { NOW_PLAYING, LYRICS }
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
 
-/** Play/pause button corner radius — noticeably rounded, not a near-square. */
-private val PlayButtonShape = RoundedCornerShape(36.dp)
+/** Play/pause button shape — a true stadium pill: corner radius is always
+ *  exactly half its own height, so it looks correct regardless of TransportButtonSize. */
+private val PlayButtonShape = RoundedCornerShape(percent = 50)
 
 /** Corner radius each capsule segment takes on when it becomes active. */
 private val ActiveSegmentShape = RoundedCornerShape(50)
@@ -86,7 +87,7 @@ private val ActiveSegmentShape = RoundedCornerShape(50)
 private val TransportButtonSize = 96.dp
 
 /** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
-private val CapsuleSegmentHeight = 52.dp
+private val CapsuleSegmentHeight = 56.dp
 
 /** Equal vertical gap used between each of the panel's major sections (art block,
  *  transport row, action capsule) so the layout reads as evenly spaced/symmetrical
@@ -149,7 +150,7 @@ fun PlayerScreen(
                 // as a separate overlay below — it isn't part of this Column's
                 // layout flow, so padding on the last child here has no effect on
                 // the gap before it; this Column has to stop short itself instead.
-                .padding(bottom = if (playbackState.queue.size > 1) QueueDrawerCollapsedHeight + 20.dp else 0.dp)
+                .padding(bottom = if (playbackState.queue.size > 1) QueueDrawerCollapsedHeight + SectionGap else 0.dp)
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
@@ -410,7 +411,7 @@ private fun NowPlayingPanel(
         // it while inactive; when active, that segment gets its own filled
         // rounded-pill highlight that visually pops out from the shared
         // background — independently, so more than one can be active at once.
-        Column(modifier = Modifier.padding(top = SectionGap, bottom = SectionGap)) {
+        Column(modifier = Modifier.padding(top = SectionGap)) {
             Surface(
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
