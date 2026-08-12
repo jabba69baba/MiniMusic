@@ -136,11 +136,7 @@ fun LibraryScreen(
                     0 -> SongsTab(
                         songs = uiState.filteredSongs,
                         currentSongId = playbackState.currentSong?.id,
-                        isPlaying = playbackState.isPlaying,
-                        onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
-                        onTogglePlayPause = onTogglePlayPause,
-                        onSkipNext = onSkipNext,
-                        onSkipPrevious = onSkipPrevious
+                        onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) }
                     )
                     1 -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
                     else -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
@@ -154,11 +150,7 @@ fun LibraryScreen(
 private fun SongsTab(
     songs: List<Song>,
     currentSongId: Long?,
-    isPlaying: Boolean,
-    onPlaySong: (Song) -> Unit,
-    onTogglePlayPause: () -> Unit,
-    onSkipNext: () -> Unit,
-    onSkipPrevious: () -> Unit
+    onPlaySong: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -181,15 +173,10 @@ private fun SongsTab(
             contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
         ) {
             items(songs, key = { it.id }) { song ->
-                val isCurrent = song.id == currentSongId
                 SongListItem(
                     song = song,
-                    isPlaying = isCurrent,
-                    onClick = { onPlaySong(song) },
-                    isActuallyPlaying = isCurrent && isPlaying,
-                    onTogglePlayPause = if (isCurrent) onTogglePlayPause else null,
-                    onSkipNext = if (isCurrent) onSkipNext else null,
-                    onSkipPrevious = if (isCurrent) onSkipPrevious else null
+                    isPlaying = song.id == currentSongId,
+                    onClick = { onPlaySong(song) }
                 )
             }
         }
