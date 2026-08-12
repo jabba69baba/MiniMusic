@@ -83,10 +83,15 @@ private val PlayButtonShape = RoundedCornerShape(36.dp)
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
 /** Fixed height for the transport row's circular buttons and the play/pause pill — never allowed to shrink. */
-private val TransportButtonSize = 80.dp
+private val TransportButtonSize = 96.dp
 
 /** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
 private val CapsuleSegmentHeight = 52.dp
+
+/** Equal vertical gap used between each of the panel's major sections (art block,
+ *  transport row, action capsule) so the layout reads as evenly spaced/symmetrical
+ *  rather than leaving unconstrained slack for Compose to distribute unevenly. */
+private val SectionGap = 20.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -288,7 +293,7 @@ private fun NowPlayingPanel(
         formatInfo = readAudioFormatInfo(context, song.contentUri)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -370,7 +375,7 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(TransportButtonSize)
-                .padding(top = 20.dp),
+                .padding(top = SectionGap),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -405,36 +410,37 @@ private fun NowPlayingPanel(
         // it while inactive; when active, that segment gets its own filled
         // rounded-pill highlight that visually pops out from the shared
         // background — independently, so more than one can be active at once.
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp)
-                .height(CapsuleSegmentHeight)
-        ) {
-            Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
-                CapsuleSegment(
-                    icon = Icons.Filled.Shuffle,
-                    active = playbackState.isShuffled,
-                    contentDescription = "Shuffle",
-                    onClick = onToggleShuffle,
-                    modifier = Modifier.weight(1f)
-                )
-                CapsuleSegment(
-                    icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                    active = playbackState.repeatMode != RepeatMode.OFF,
-                    contentDescription = "Repeat",
-                    onClick = onCycleRepeat,
-                    modifier = Modifier.weight(1f)
-                )
-                CapsuleSegment(
-                    icon = Icons.Filled.Subtitles,
-                    active = false,
-                    contentDescription = "Lyrics",
-                    onClick = onOpenLyrics,
-                    modifier = Modifier.weight(1f)
-                )
+        Column(modifier = Modifier.padding(top = SectionGap, bottom = SectionGap)) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(CapsuleSegmentHeight)
+            ) {
+                Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
+                    CapsuleSegment(
+                        icon = Icons.Filled.Shuffle,
+                        active = playbackState.isShuffled,
+                        contentDescription = "Shuffle",
+                        onClick = onToggleShuffle,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CapsuleSegment(
+                        icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        active = playbackState.repeatMode != RepeatMode.OFF,
+                        contentDescription = "Repeat",
+                        onClick = onCycleRepeat,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CapsuleSegment(
+                        icon = Icons.Filled.Subtitles,
+                        active = false,
+                        contentDescription = "Lyrics",
+                        onClick = onOpenLyrics,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
