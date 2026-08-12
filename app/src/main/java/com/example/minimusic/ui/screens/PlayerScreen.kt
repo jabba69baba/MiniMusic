@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -79,6 +81,12 @@ private val PlayButtonShape = RoundedCornerShape(36.dp)
 
 /** Corner radius each capsule segment takes on when it becomes active. */
 private val ActiveSegmentShape = RoundedCornerShape(50)
+
+/** Fixed height for the transport row's circular buttons and the play/pause pill — never allowed to shrink. */
+private val TransportButtonSize = 72.dp
+
+/** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
+private val CapsuleSegmentHeight = 56.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -332,6 +340,7 @@ private fun NowPlayingPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 24.dp)
                     .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -360,6 +369,7 @@ private fun NowPlayingPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(TransportButtonSize)
                 .padding(top = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -377,7 +387,9 @@ private fun NowPlayingPanel(
                 containerColor = accent,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 onClick = onTogglePlayPause,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
             )
             TransportButton(
                 icon = Icons.Filled.SkipNext,
@@ -399,8 +411,9 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 20.dp)
+                .height(CapsuleSegmentHeight)
         ) {
-            Row(modifier = Modifier.padding(4.dp)) {
+            Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
                 CapsuleSegment(
                     icon = Icons.Filled.Shuffle,
                     active = playbackState.isShuffled,
@@ -438,7 +451,7 @@ private fun TransportButton(
 ) {
     Box(
         modifier = Modifier
-            .size(72.dp)
+            .size(TransportButtonSize)
             .clip(shape)
             .background(containerColor)
             .clickable(onClick = onClick),
@@ -463,7 +476,7 @@ private fun PlayPauseButton(
 ) {
     Row(
         modifier = modifier
-            .heightIn(min = 72.dp)
+            .fillMaxHeight()
             .clip(PlayButtonShape)
             .background(containerColor)
             .clickable(onClick = onClick),
@@ -501,14 +514,14 @@ private fun CapsuleSegment(
 ) {
     Box(
         modifier = modifier
+            .fillMaxHeight()
             .padding(horizontal = 2.dp)
             .clip(ActiveSegmentShape)
             .background(
                 if (active) MaterialTheme.colorScheme.primaryContainer
                 else Color.Transparent
             )
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
