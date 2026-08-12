@@ -324,7 +324,7 @@ private fun QueueDrawerRow(
                 Text(
                     text = song.title,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (isCurrent) accent else MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
