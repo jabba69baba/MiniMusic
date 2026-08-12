@@ -458,7 +458,11 @@ private fun TransportButton(
 ) {
     Box(
         modifier = Modifier
-            .size(TransportButtonSize)
+            .fillMaxHeight()
+            // Width is locked to height (not a fixed size), so this stays a
+            // perfect circle no matter how the row's available width changes —
+            // only ever adjusts horizontally, never distorts vertically.
+            .aspectRatio(1f, matchHeightConstraintsFirst = true)
             .clip(shape)
             .background(containerColor)
             .clickable(onClick = onClick),
