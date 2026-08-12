@@ -46,6 +46,7 @@ import com.example.minimusic.ui.components.AlbumGridItem
 import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.MiniPlayer
+import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import kotlinx.coroutines.launch
 
@@ -62,6 +63,7 @@ fun LibraryScreen(
     onArtistClick: (Artist) -> Unit,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit = {},
     onOpenPlayer: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -134,7 +136,11 @@ fun LibraryScreen(
                     0 -> SongsTab(
                         songs = uiState.filteredSongs,
                         currentSongId = playbackState.currentSong?.id,
-                        onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) }
+                        isPlaying = playbackState.isPlaying,
+                        onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipNext = onSkipNext,
+                        onSkipPrevious = onSkipPrevious
                     )
                     1 -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
                     else -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
@@ -145,7 +151,15 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun SongsTab(songs: List<Song>, currentSongId: Long?, onPlaySong: (Song) -> Unit) {
+private fun SongsTab(
+    songs: List<Song>,
+    currentSongId: Long?,
+    isPlaying: Boolean,
+    onPlaySong: (Song) -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit
+) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -167,10 +181,15 @@ private fun SongsTab(songs: List<Song>, currentSongId: Long?, onPlaySong: (Song)
             contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
         ) {
             items(songs, key = { it.id }) { song ->
-                com.example.minimusic.ui.components.SongListItem(
+                val isCurrent = song.id == currentSongId
+                SongListItem(
                     song = song,
-                    isPlaying = song.id == currentSongId,
-                    onClick = { onPlaySong(song) }
+                    isPlaying = isCurrent,
+                    onClick = { onPlaySong(song) },
+                    isActuallyPlaying = isCurrent && isPlaying,
+                    onTogglePlayPause = if (isCurrent) onTogglePlayPause else null,
+                    onSkipNext = if (isCurrent) onSkipNext else null,
+                    onSkipPrevious = if (isCurrent) onSkipPrevious else null
                 )
             }
         }
