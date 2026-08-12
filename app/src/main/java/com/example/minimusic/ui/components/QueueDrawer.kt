@@ -279,64 +279,76 @@ private fun QueueDrawerRow(
     onClick: () -> Unit,
     dragModifier: Modifier
 ) {
-    Row(
+    val containerColor = if (isCurrent) {
+        accent.copy(alpha = 0.18f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = containerColor,
         modifier = rowModifier
             .fillMaxWidth()
             .height(ROW_HEIGHT_DP.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
+            Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
-            )
-        }
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                AsyncImage(
+                    model = song.albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                )
+            }
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isCurrent) accent else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isCurrent) accent else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .then(dragModifier),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.DragHandle,
-                contentDescription = "Drag to reorder",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .then(dragModifier),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.DragHandle,
+                    contentDescription = "Drag to reorder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
