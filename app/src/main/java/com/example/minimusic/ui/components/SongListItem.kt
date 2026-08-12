@@ -12,12 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,19 +28,14 @@ import com.example.minimusic.data.model.Song
 /**
  * A single song row, presented as its own rounded-pill container (PixelPlayer
  * style) with spacing between rows rather than a flat continuous list. The
- * currently-playing row gets a tinted background, accent-colored text, and
- * inline previous/play-pause/next controls in place of the plain thumbnail —
- * matching the reference "Next up" / library list design.
+ * currently-playing row just gets a tinted background and accent text — no
+ * inline transport controls, matching the reference library list design.
  */
 @Composable
 fun SongListItem(
     song: Song,
     isPlaying: Boolean,
-    onClick: () -> Unit,
-    isActuallyPlaying: Boolean = false,
-    onTogglePlayPause: (() -> Unit)? = null,
-    onSkipNext: (() -> Unit)? = null,
-    onSkipPrevious: (() -> Unit)? = null
+    onClick: () -> Unit
 ) {
     val containerColor = if (isPlaying) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
@@ -103,29 +93,6 @@ fun SongListItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-
-            // Inline transport controls on the now-playing row only, matching
-            // the reference; everywhere else just shows the row itself (tap
-            // anywhere to play that track).
-            if (isPlaying && onTogglePlayPause != null) {
-                if (onSkipPrevious != null) {
-                    IconButton(onClick = onSkipPrevious) {
-                        Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", tint = contentColor)
-                    }
-                }
-                IconButton(onClick = onTogglePlayPause) {
-                    Icon(
-                        imageVector = if (isActuallyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isActuallyPlaying) "Pause" else "Play",
-                        tint = contentColor
-                    )
-                }
-                if (onSkipNext != null) {
-                    IconButton(onClick = onSkipNext) {
-                        Icon(Icons.Filled.SkipNext, contentDescription = "Next", tint = contentColor)
-                    }
-                }
             }
         }
     }
