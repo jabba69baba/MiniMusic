@@ -52,6 +52,7 @@ fun MiniMusicNavGraph(
                 onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
+                onSkipPrevious = playerViewModel::skipToPrevious,
                 onOpenPlayer = { navController.navigate(Routes.PLAYER) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) }
             )
