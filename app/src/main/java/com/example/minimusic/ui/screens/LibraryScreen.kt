@@ -291,15 +291,16 @@ private fun SongsTab(
     }
     val letters = remember(firstIndexByLetter) { firstIndexByLetter.keys.sorted() }
 
-    // For turning the currently-visible list index back into a section letter
-    // while scrolling, so the popup sticker always matches what's on screen.
-    val letterForIndex = remember(firstIndexByLetter) {
-        val sortedEntries = firstIndexByLetter.entries.sortedBy { it.value }
-        { visibleIndex: Int ->
-            sortedEntries.lastOrNull { it.value <= visibleIndex }?.key ?: sortedEntries.firstOrNull()?.key
-        }
+    // Sorted (startIndex -> letter) pairs, used below to turn the currently-visible
+    // list index into a section letter so the popup sticker tracks real scroll position.
+    val sortedLetterEntries = remember(firstIndexByLetter) {
+        firstIndexByLetter.entries.map { it.value to it.key }.sortedBy { it.first }
     }
-    val currentLetter = letterForIndex(listState.firstVisibleItemIndex)
+    val currentLetter = remember(sortedLetterEntries, listState.firstVisibleItemIndex) {
+        val visibleIndex = listState.firstVisibleItemIndex
+        sortedLetterEntries.lastOrNull { it.first <= visibleIndex }?.second
+            ?: sortedLetterEntries.firstOrNull()?.second
+    }
 
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
