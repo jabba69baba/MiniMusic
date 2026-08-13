@@ -291,6 +291,16 @@ private fun SongsTab(
     }
     val letters = remember(firstIndexByLetter) { firstIndexByLetter.keys.sorted() }
 
+    // For turning the currently-visible list index back into a section letter
+    // while scrolling, so the popup sticker always matches what's on screen.
+    val letterForIndex = remember(firstIndexByLetter) {
+        val sortedEntries = firstIndexByLetter.entries.sortedBy { it.value }
+        { visibleIndex: Int ->
+            sortedEntries.lastOrNull { it.value <= visibleIndex }?.key ?: sortedEntries.firstOrNull()?.key
+        }
+    }
+    val currentLetter = letterForIndex(listState.firstVisibleItemIndex)
+
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
         val index = songs.indexOfFirst { it.id == currentSongId }
@@ -317,6 +327,8 @@ private fun SongsTab(
 
         AlphabetScrollbar(
             letters = letters,
+            currentLetter = currentLetter,
+            isListScrolling = listState.isScrollInProgress,
             onLetterSelected = { letter ->
                 firstIndexByLetter[letter]?.let { index ->
                     scope.launch { listState.scrollToItem(index) }
