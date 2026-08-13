@@ -4,18 +4,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
-// Auxio-style "no rounded corners" rational look: every corner bucket in the
-// Material shape scale collapses to a sharp rectangle. This is a deliberate
-// design choice (see Auxio's own README: "No rounded corners") rather than a
-// missing style — flat, plain surfaces with no shape ornamentation anywhere
-// in the app, including the album art frame and the play button.
+// M3 Expressive rounded look: generous corner radii across the shape scale,
+// used for cards, containers, and buttons throughout the app.
 val MiniMusicShapes = Shapes(
-    extraSmall = RoundedCornerShape(0.dp),
-    small = RoundedCornerShape(0.dp),
-    medium = RoundedCornerShape(0.dp),
-    large = RoundedCornerShape(0.dp),
-    extraLarge = RoundedCornerShape(0.dp)
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp)
 )
 
-/** Sharp rectangle — used everywhere a shape reference is needed (mini player, controls, art frame). */
-val PillShape = RoundedCornerShape(0.dp)
+/** True stadium/pill shape — corner radius always exactly half the element's height,
+ *  so it looks correct at any size. Used for the mini player, capsule controls,
+ *  floating nav bars, and anywhere else a fully-rounded pill is needed. */
+val PillShape = RoundedCornerShape(percent = 50)
