@@ -329,7 +329,6 @@ private fun SongsTab(
         AlphabetScrollbar(
             letters = letters,
             currentLetter = currentLetter,
-            isListScrolling = listState.isScrollInProgress,
             onLetterSelected = { letter ->
                 firstIndexByLetter[letter]?.let { index ->
                     scope.launch { listState.scrollToItem(index) }
