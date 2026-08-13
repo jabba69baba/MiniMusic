@@ -334,7 +334,12 @@ private fun SongsTab(
                     scope.launch { listState.scrollToItem(index) }
                 }
             },
-            modifier = Modifier.align(Alignment.CenterEnd)
+            // Match the LazyColumn's own content padding exactly, so the track's
+            // start/end line up with the first and last song rows — not the
+            // full Box, which is slightly taller than the padded content area.
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(top = 8.dp, bottom = 8.dp)
         )
     }
 }
