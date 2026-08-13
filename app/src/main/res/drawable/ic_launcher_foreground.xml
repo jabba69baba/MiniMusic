@@ -1,11 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Vinyl record with real dimensional shading: a radial-gradient disc (lighter
-  upper-left highlight fading to darker lower-right), fine concentric groove
-  lines etched into it, a lighter label with darker inner ring, white spindle
-  dot, and a soft gradient-fading directional shadow cast onto the backdrop —
-  matching the reference photo's lit, slightly glossy look.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -13,48 +6,46 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Soft directional shadow, fading out toward its far edge -->
-    <path android:pathData="M46,22 L92,58 L58,94 L18,64 Z">
+    <!-- Directional shadow -->
+    <path android:pathData="M46,26 L86,58 L58,90 L22,64 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="30"
-                android:startY="40"
-                android:endX="80"
-                android:endY="85"
-                android:startColor="#55000000"
+                android:startX="34"
+                android:startY="44"
+                android:endX="76"
+                android:endY="82"
+                android:startColor="#70000000"
                 android:endColor="#00000000" />
         </aapt:attr>
     </path>
 
-    <!-- Disc body: radial gradient for a lit, dimensional look -->
-    <path android:pathData="M54,54 m-38,0 a38,38 0 1,0 76,0 a38,38 0 1,0 -76,0 Z">
+    <!-- Disc body -->
+    <path android:pathData="M54,54 m-33,0 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="radial"
                 android:centerX="42"
                 android:centerY="42"
-                android:gradientRadius="58"
-                android:startColor="#4A4A4A"
+                android:gradientRadius="50"
+                android:startColor="#525252"
                 android:centerColor="#242424"
                 android:endColor="#0E0E0E" />
         </aapt:attr>
     </path>
 
-    <!-- Fine concentric groove lines, evenly spaced, subtle -->
-    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
-        android:pathData="M54,54 m-33,0 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+    <!-- Groove lines: thicker + higher contrast so they read at small sizes -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF33" android:strokeWidth="1.4"
         android:pathData="M54,54 m-29,0 a29,29 0 1,0 58,0 a29,29 0 1,0 -58,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF33" android:strokeWidth="1.4"
         android:pathData="M54,54 m-25,0 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#00000055" android:strokeWidth="0.8"
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF33" android:strokeWidth="1.4"
         android:pathData="M54,54 m-21,0 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z" />
 
     <!-- Center label -->
-    <path android:fillColor="#9A9A9A" android:pathData="M54,54 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
-    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z" />
+    <path android:fillColor="#9A9A9A" android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z" />
+    <path android:fillColor="#1C1C1C" android:pathData="M54,54 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z" />
 
     <!-- Spindle hole -->
-    <path android:fillColor="#FAFAFA" android:pathData="M54,54 m-2.6,0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" />
+    <path android:fillColor="#FAFAFA" android:pathData="M54,54 m-2.4,0 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z" />
 </vector>
