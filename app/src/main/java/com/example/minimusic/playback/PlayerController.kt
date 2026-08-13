@@ -110,6 +110,38 @@ class PlayerController(private val context: Context) {
         refreshCurrentItem()
     }
 
+    /**
+     * Inserts [song] immediately after the currently playing item, so it plays
+     * right after the current track without disturbing the rest of the queue.
+     * If nothing is playing yet, falls back to starting a fresh single-song queue.
+     */
+    fun playNext(song: Song) {
+        val c = controller ?: return
+        if (currentQueue.isEmpty()) {
+            playQueue(listOf(song), 0)
+            return
+        }
+        val insertAt = (c.currentMediaItemIndex + 1).coerceIn(0, currentQueue.size)
+        c.addMediaItem(insertAt, song.toMediaItem())
+        currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
+        refreshCurrentItem()
+    }
+
+    /**
+     * Appends [song] to the end of the current queue. If nothing is playing yet,
+     * falls back to starting a fresh single-song queue.
+     */
+    fun addToQueue(song: Song) {
+        val c = controller ?: return
+        if (currentQueue.isEmpty()) {
+            playQueue(listOf(song), 0)
+            return
+        }
+        c.addMediaItem(song.toMediaItem())
+        currentQueue = currentQueue + song
+        refreshCurrentItem()
+    }
+
     fun toggleShuffle() {
         val c = controller ?: return
         c.shuffleModeEnabled = !c.shuffleModeEnabled
