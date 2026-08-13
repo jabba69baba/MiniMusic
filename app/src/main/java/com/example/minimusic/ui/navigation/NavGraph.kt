@@ -44,10 +44,21 @@ fun MiniMusicNavGraph(
             LibraryScreen(
                 uiState = libraryState,
                 playbackState = playbackState,
+                events = libraryViewModel.events,
                 onSearchQueryChange = libraryViewModel::onSearchQueryChange,
                 onPlaySong = { song, queue ->
                     playerViewModel.playQueue(queue, queue.indexOf(song))
                 },
+                onPlayNext = playerViewModel::playNext,
+                onAddToQueue = playerViewModel::addToQueue,
+                onShufflePlayFrom = { song, songs ->
+                    val rest = (songs - song).shuffled()
+                    val shuffledQueue = listOf(song) + rest
+                    playerViewModel.playQueue(shuffledQueue, 0)
+                    if (!playbackState.isShuffled) playerViewModel.toggleShuffle()
+                },
+                onDeleteSong = libraryViewModel::deleteSong,
+                onRetryDelete = libraryViewModel::deleteSong,
                 onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
                 onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
