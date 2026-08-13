@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,16 +23,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * A slim fast-scroll index pinned to the right edge, similar to the Contacts-app
- * alphabet strip. Dragging (or tapping) a letter scrolls [onLetterSelected] and pops
- * up a large bubble showing the letter currently under the finger.
+ * A minimal Material-style fast-scroll thumb pinned to the right edge — a
+ * plain thin track with a pill-shaped handle, no permanently-visible letters.
+ * Dragging (or tapping) the track scrolls via [onLetterSelected] and pops up
+ * a circular bubble to the left of the thumb showing the letter currently
+ * under the finger; the bubble disappears once the drag ends.
  *
- * [letters] should be the distinct, sorted set of section letters actually present
- * in the list (so users never land on an empty letter).
+ * [letters] should be the distinct, sorted set of section letters actually
+ * present in the list (so users never land on an empty letter) — used only
+ * to map drag position to a section, not rendered directly.
  */
 @Composable
 fun AlphabetScrollbar(
@@ -55,6 +60,8 @@ fun AlphabetScrollbar(
         }
     }
 
+    val thumbFraction = (activeIndex + 0.5f) / letters.size
+
     Box(
         modifier = modifier
             .fillMaxHeight()
@@ -75,47 +82,52 @@ fun AlphabetScrollbar(
                     tryAwaitRelease()
                     isDragging = false
                 })
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        // The thin letter strip itself.
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.fillMaxHeight(),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            letters.forEachIndexed { index, letter ->
-                Text(
-                    text = letter.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isDragging && index == activeIndex) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
             }
-        }
+    ) {
+        // Plain thin track, centered in the touch target — no letters shown at rest.
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxHeight()
+                .width(4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        )
 
-        // Floating bubble showing the letter under the finger while dragging.
+        // Pill-shaped thumb that tracks drag position, Material fast-scroll style.
+        val thumbHeight = 40.dp
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset {
+                    IntOffset(
+                        x = 0,
+                        y = (trackHeightPx * thumbFraction).roundToInt() - thumbHeight.roundToPx() / 2
+                    )
+                }
+                .size(width = 4.dp, height = thumbHeight)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+
+        // Floating letter bubble to the left of the thumb, only while dragging.
         if (isDragging) {
-            val bubbleOffsetFraction = (activeIndex + 0.5f) / letters.size
             Box(
                 modifier = Modifier
                     .offset {
-                        androidx.compose.ui.unit.IntOffset(
-                            x = -64.dp.roundToPx(),
-                            y = (trackHeightPx * bubbleOffsetFraction).roundToInt() - 32.dp.roundToPx()
+                        IntOffset(
+                            x = -56.dp.roundToPx(),
+                            y = (trackHeightPx * thumbFraction).roundToInt() - 24.dp.roundToPx()
                         )
                     }
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomEnd = 4.dp, bottomStart = 28.dp))
+                    .size(48.dp)
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = letters[activeIndex].toString(),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             }
