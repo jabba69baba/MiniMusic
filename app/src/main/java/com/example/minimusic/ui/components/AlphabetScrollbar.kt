@@ -21,12 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
@@ -37,12 +39,11 @@ import kotlin.math.sin
  * A Material-style fast-scroll thumb pinned to the right edge — a plain
  * thicker track with a pill-shaped handle, no permanently-visible letters.
  *
- * The letter "sticker" (a rounded burst/cookie shape) pops up beside the
- * thumb whenever [isListScrolling] is true (i.e. the caller's list is being
- * actively scrolled, by any means — flinging, dragging the list itself, or
- * dragging this scrollbar), showing [currentLetter]. It disappears the
- * moment scrolling stops. Dragging or tapping this scrollbar's track also
- * scrolls the list via [onLetterSelected].
+ * A bold-lettered "dewdrop" bubble (a circle with a point aimed at the thumb)
+ * pops up beside the thumb only while the user is actively dragging or
+ * pressing this scrollbar itself — not while the caller's list is being
+ * scrolled by hand or fling, which stays silent. It disappears the moment
+ * the drag on this scrollbar ends.
  *
  * [letters] should be the distinct, sorted set of section letters actually
  * present in the list (so users never land on an empty letter) — used only
@@ -52,7 +53,6 @@ import kotlin.math.sin
 fun AlphabetScrollbar(
     letters: List<Char>,
     currentLetter: Char?,
-    isListScrolling: Boolean,
     onLetterSelected: (Char) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -72,16 +72,17 @@ fun AlphabetScrollbar(
         }
     }
 
-    // While the caller's list is scrolling by any means (fling, drag, or this
-    // thumb), show the bubble at the position matching currentLetter; while
-    // actively dragging this thumb specifically, show the drag position instead.
-    val showBubble = isDraggingThumb || isListScrolling
-    val bubbleIndex = if (isDraggingThumb) {
+    // The thumb itself always tracks real scroll position (from currentLetter,
+    // kept in sync with the list by the caller) — that part is independent of
+    // whether the user is touching the scrollbar. Only the dewdrop bubble is
+    // gated to isDraggingThumb, per the reference: it must NOT appear just
+    // because the list is being scrolled by hand.
+    val thumbIndex = if (isDraggingThumb) {
         dragIndex
     } else {
         currentLetter?.let { letters.indexOf(it).takeIf { i -> i >= 0 } } ?: dragIndex
     }
-    val thumbFraction = (bubbleIndex + 0.5f) / letters.size
+    val thumbFraction = (thumbIndex + 0.5f) / letters.size
 
     Box(
         modifier = modifier
@@ -130,27 +131,29 @@ fun AlphabetScrollbar(
                 .background(MaterialTheme.colorScheme.primary)
         )
 
-        // Burst/cookie-shaped letter sticker beside the thumb, shown while scrolling.
-        if (showBubble && bubbleIndex in letters.indices) {
+        // Dewdrop letter bubble beside the thumb — only while dragging this scrollbar.
+        if (isDraggingThumb && thumbIndex in letters.indices) {
             Box(
                 modifier = Modifier
                     .offset {
                         IntOffset(
-                            x = -60.dp.roundToPx(),
-                            y = (trackHeightPx * thumbFraction).roundToInt() - 32.dp.roundToPx()
+                            x = -56.dp.roundToPx(),
+                            y = (trackHeightPx * thumbFraction).roundToInt() - 28.dp.roundToPx()
                         )
                     }
-                    .size(64.dp),
+                    .size(56.dp),
                 contentAlignment = Alignment.Center
             ) {
-                BurstSticker(
-                    modifier = Modifier.size(64.dp),
+                DewdropSticker(
+                    modifier = Modifier.size(56.dp),
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = letters[bubbleIndex].toString(),
+                    text = letters[thumbIndex].toString(),
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.offset(x = (-6).dp)
                 )
             }
         }
@@ -158,38 +161,37 @@ fun AlphabetScrollbar(
 }
 
 /**
- * A rounded 10-point "cookie/sticker" burst shape, matching M3 Expressive's
- * playful shape language, drawn manually rather than via the experimental
- * MaterialShapes API so it doesn't depend on a bleeding-edge Material3 version.
+ * A circular "dewdrop" bubble with a point extending to the right toward the
+ * scrollbar thumb — matching the reference (Gramophone-style) fast-scroll
+ * indicator, drawn manually so it doesn't depend on any experimental API.
  */
 @Composable
-private fun BurstSticker(modifier: Modifier = Modifier, color: Color) {
+private fun DewdropSticker(modifier: Modifier = Modifier, color: Color) {
     Canvas(modifier = modifier) {
-        val points = 10
-        val outerRadius = size.minDimension / 2f
-        val innerRadius = outerRadius * 0.80f
-        val center = Offset(size.width / 2f, size.height / 2f)
+        val circleRadius = size.minDimension * 0.42f
+        val centerX = size.width * 0.40f
+        val centerY = size.height / 2f
+        val center = Offset(centerX, centerY)
+        val tipX = size.width * 0.98f
 
-        fun pointAt(index: Int, radius: Float): Offset {
-            val angle = (Math.PI * index / points) - Math.PI / 2
-            return Offset(
-                center.x + (radius * cos(angle)).toFloat(),
-                center.y + (radius * sin(angle)).toFloat()
-            )
-        }
+        // The point's two base vertices sit on the circle at roughly +/-40°
+        // from the horizontal axis facing the tip, so the point blends into
+        // the circle's curve rather than sticking out as a sharp triangle.
+        val baseAngle = Math.toRadians(38.0)
+        val topBase = Offset(
+            centerX + (circleRadius * cos(baseAngle)).toFloat(),
+            centerY - (circleRadius * sin(baseAngle)).toFloat()
+        )
+        val bottomBase = Offset(
+            centerX + (circleRadius * cos(baseAngle)).toFloat(),
+            centerY + (circleRadius * sin(baseAngle)).toFloat()
+        )
 
-        // Alternates outer (bump tip) and inner (valley) vertices, but connects
-        // them with quadratic curves through the valley points rather than
-        // straight lines — that's what turns a sharp star into the soft,
-        // rounded-bump "cookie" shape in the reference image.
         val path = Path().apply {
-            val firstOuter = pointAt(0, outerRadius)
-            moveTo(firstOuter.x, firstOuter.y)
-            for (i in 0 until points) {
-                val valley = pointAt(2 * i + 1, innerRadius)
-                val nextOuter = pointAt(2 * i + 2, outerRadius)
-                quadraticTo(valley.x, valley.y, nextOuter.x, nextOuter.y)
-            }
+            addOval(Rect(center = center, radius = circleRadius))
+            moveTo(topBase.x, topBase.y)
+            quadraticTo(centerX + circleRadius * 1.05f, centerY, tipX, centerY)
+            quadraticTo(centerX + circleRadius * 1.05f, centerY, bottomBase.x, bottomBase.y)
             close()
             fillType = PathFillType.NonZero
         }
