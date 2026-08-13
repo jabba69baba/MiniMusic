@@ -1,13 +1,30 @@
 package com.example.minimusic.data
 
+import android.app.RecoverableSecurityException
 import android.content.ContentUris
 import android.content.Context
+import android.content.IntentSender
+import android.os.Build
 import android.provider.MediaStore
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
 import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+/** Result of attempting to delete a song from MediaStore. */
+sealed interface DeleteResult {
+    /** The file was deleted successfully. */
+    data object Deleted : DeleteResult
+    /**
+     * Android (10+) requires user confirmation via a system dialog before an app
+     * can delete media it doesn't own the underlying file for. [intentSender]
+     * should be launched with an ActivityResultLauncher; on a successful result,
+     * call [MusicRepository.deleteSong] again for the same song to complete it.
+     */
+    data class NeedsPermission(val intentSender: IntentSender) : DeleteResult
+    data class Failed(val message: String) : DeleteResult
+}
 
 /**
  * Reads the on-device audio library via MediaStore. Everything here is local:
@@ -67,6 +84,28 @@ class MusicRepository(private val context: Context) {
         }
 
         songs
+    }
+
+    /**
+     * Deletes [song]'s underlying file via MediaStore. On Android 10+, deleting a
+     * file the app doesn't own requires user confirmation: this returns
+     * [DeleteResult.NeedsPermission] with an IntentSender the caller must launch
+     * via an ActivityResultLauncher, then call this again for the same song once
+     * that completes successfully.
+     */
+    suspend fun deleteSong(song: Song): DeleteResult = withContext(Dispatchers.IO) {
+        try {
+            val rows = context.contentResolver.delete(song.contentUri, null, null)
+            if (rows > 0) DeleteResult.Deleted else DeleteResult.Failed("File not found")
+        } catch (e: SecurityException) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
+                DeleteResult.NeedsPermission(e.userAction.actionIntent.intentSender)
+            } else {
+                DeleteResult.Failed(e.message ?: "Permission denied")
+            }
+        } catch (e: Exception) {
+            DeleteResult.Failed(e.message ?: "Unknown error")
+        }
     }
 
     /** Groups the flat song list into albums. Derived, not stored, so it always matches the library. */
