@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -66,6 +68,7 @@ import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.FloatingTabBar
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.SongListItem
+import com.example.minimusic.ui.components.miniPlayerSwipeUpModifier
 import com.example.minimusic.ui.components.TabBarItem
 import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.viewmodel.LibraryEvent
@@ -146,22 +149,32 @@ fun LibraryScreen(
                     MiniPlayer(
                         song = song,
                         isPlaying = playbackState.isPlaying,
+                        positionMs = playbackState.positionMs,
+                        durationMs = playbackState.durationMs,
                         onTogglePlayPause = onTogglePlayPause,
                         onSkipNext = onSkipNext,
                         onClick = onOpenPlayer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .miniPlayerSwipeUpModifier(onOpenPlayer)
                     )
                 }
-                FloatingTabBar(
-                    items = listOf(
-                        TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
-                        TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
-                        TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
-                    ),
-                    selected = selectedTab,
-                    onSelect = { selectedTab = it },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    FloatingTabBar(
+                        items = listOf(
+                            TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
+                            TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
+                            TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
+                        ),
+                        selected = selectedTab,
+                        onSelect = { selectedTab = it }
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -379,13 +392,13 @@ private fun SongsTab(
                     scope.launch { listState.scrollToItem(index) }
                 }
             },
-            // Inset further than the list's own content padding on both ends:
-            // extra top clearance keeps the track clear of the drawer's rounded
-            // top corners, and extra bottom clearance matches the reserved
-            // mini-player space so the track doesn't run into it either.
+            // Vertically centered within the drawer area rather than
+            // stretched edge-to-edge: equal top/bottom fraction so the track
+            // sits symmetrically in the middle of the interface instead of
+            // leaving mismatched dead space at either end.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(top = 20.dp, bottom = 96.dp)
+                .fillMaxHeight(0.72f)
         )
     }
 }
