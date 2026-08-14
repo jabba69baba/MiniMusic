@@ -18,21 +18,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -67,7 +65,6 @@ import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.FloatingTabBar
 import com.example.minimusic.ui.components.MiniPlayer
-import com.example.minimusic.ui.components.SongGridItem
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.components.TabBarItem
 import com.example.minimusic.ui.theme.PillShape
@@ -78,6 +75,16 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab { SONGS, ARTISTS, ALBUMS }
+
+/** Top drawer: rounded only at the bottom, so it reads as a shelf sitting flush under the header. */
+private val TopDrawerShape = RoundedCornerShape(
+    topStart = 0.dp, topEnd = 0.dp, bottomStart = 28.dp, bottomEnd = 28.dp
+)
+
+/** Bottom drawer: rounded only at the top, flowing down under the top drawer above it. */
+private val BottomDrawerShape = RoundedCornerShape(
+    topStart = 28.dp, topEnd = 28.dp, bottomStart = 0.dp, bottomEnd = 0.dp
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +158,10 @@ fun LibraryScreen(
     ) { innerPadding ->
         Column(modifier = Modifier
             .fillMaxSize()
-            .padding(top = innerPadding.calculateTopPadding())) {
+            .padding(
+                top = innerPadding.calculateTopPadding(),
+                bottom = innerPadding.calculateBottomPadding()
+            )) {
 
             Row(
                 modifier = Modifier
@@ -186,101 +196,109 @@ fun LibraryScreen(
             )
 
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
-            var isGridView by remember { mutableStateOf(false) }
             var sortMenuExpanded by remember { mutableStateOf(false) }
 
-            Row(
+            // Top drawer: Shuffle + Locate + Sort, its own rounded surface sitting
+            // directly above the (separately-rounded) song list drawer below —
+            // two distinct stacked containers, PixelPlayer-style, rather than one
+            // continuous background behind everything.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = TopDrawerShape,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 8.dp)
             ) {
-                Surface(
-                    shape = PillShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                Row(
                     modifier = Modifier
-                        .clickable(enabled = uiState.filteredSongs.isNotEmpty()) {
-                            val startSong = uiState.filteredSongs.random()
-                            onShufflePlayFrom(startSong, uiState.filteredSongs)
-                        }
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = PillShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier
+                            .clickable(enabled = uiState.filteredSongs.isNotEmpty()) {
+                                val startSong = uiState.filteredSongs.random()
+                                onShufflePlayFrom(startSong, uiState.filteredSongs)
+                            }
                     ) {
-                        Icon(Icons.Filled.Shuffle, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                        Text("Shuffle", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.Shuffle, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Text("Shuffle", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge)
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.weight(1f))
 
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.clickable { jumpToCurrentRequest++ }
-                ) {
-                    Icon(
-                        Icons.Filled.MyLocation,
-                        contentDescription = "Jump to current song",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.clickable { isGridView = !isGridView }
-                ) {
-                    Icon(
-                        imageVector = if (isGridView) Icons.Filled.ViewList else Icons.Filled.GridView,
-                        contentDescription = if (isGridView) "Switch to list view" else "Switch to grid view",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-                Box {
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.clickable { sortMenuExpanded = true }
+                        modifier = Modifier.clickable { jumpToCurrentRequest++ }
                     ) {
                         Icon(
-                            Icons.Filled.FilterList,
-                            contentDescription = "Sort songs",
+                            Icons.Filled.MyLocation,
+                            contentDescription = "Jump to current song",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
-                    SortMenu(
-                        expanded = sortMenuExpanded,
-                        selected = uiState.sortOrder,
-                        onDismiss = { sortMenuExpanded = false },
-                        onSelect = { onSortOrderChange(it); sortMenuExpanded = false }
-                    )
+                    Box {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.clickable { sortMenuExpanded = true }
+                        ) {
+                            Icon(
+                                Icons.Filled.FilterList,
+                                contentDescription = "Sort songs",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                        SortMenu(
+                            expanded = sortMenuExpanded,
+                            selected = uiState.sortOrder,
+                            onDismiss = { sortMenuExpanded = false },
+                            onSelect = { onSortOrderChange(it); sortMenuExpanded = false }
+                        )
+                    }
                 }
             }
 
-            Box(modifier = Modifier.weight(1f)) {
-                when {
-                    uiState.isLoading -> LoadingState()
-                    uiState.allSongs.isEmpty() -> EmptyLibraryState()
-                    else -> when (selectedTab) {
-                        LibraryTab.SONGS -> SongsTab(
-                            songs = uiState.filteredSongs,
-                            currentSongId = playbackState.currentSong?.id,
-                            jumpToCurrentRequest = jumpToCurrentRequest,
-                            isGridView = isGridView,
-                            onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
-                            onPlayNext = onPlayNext,
-                            onAddToQueue = onAddToQueue,
-                            onShufflePlayFrom = { song -> onShufflePlayFrom(song, uiState.filteredSongs) },
-                            onDelete = onDeleteSong
-                        )
-                        LibraryTab.ALBUMS -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
-                        LibraryTab.ARTISTS -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
+            // Bottom drawer: the actual song/album/artist list, its own rounded
+            // surface flowing beneath the top drawer above.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = BottomDrawerShape,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when {
+                        uiState.isLoading -> LoadingState()
+                        uiState.allSongs.isEmpty() -> EmptyLibraryState()
+                        else -> when (selectedTab) {
+                            LibraryTab.SONGS -> SongsTab(
+                                songs = uiState.filteredSongs,
+                                currentSongId = playbackState.currentSong?.id,
+                                jumpToCurrentRequest = jumpToCurrentRequest,
+                                onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
+                                onPlayNext = onPlayNext,
+                                onAddToQueue = onAddToQueue,
+                                onShufflePlayFrom = { song -> onShufflePlayFrom(song, uiState.filteredSongs) },
+                                onDelete = onDeleteSong
+                            )
+                            LibraryTab.ALBUMS -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
+                            LibraryTab.ARTISTS -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
+                        }
                     }
                 }
             }
@@ -299,12 +317,12 @@ fun LibraryScreen(
     }
 }
 
+
 @Composable
 private fun SongsTab(
     songs: List<Song>,
     currentSongId: Long?,
     jumpToCurrentRequest: Int,
-    isGridView: Boolean,
     onPlaySong: (Song) -> Unit,
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
@@ -312,21 +330,7 @@ private fun SongsTab(
     onDelete: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
-
-    // The item index the alphabet scrollbar should treat as "currently visible" —
-    // a flat index into `songs` either way, since LazyGridState's index is also
-    // flat (not per-row), so the same letter-lookup logic works for both modes.
-    val firstVisibleIndex = if (isGridView) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
-
-    suspend fun scrollToIndex(index: Int) {
-        if (isGridView) gridState.scrollToItem(index) else listState.scrollToItem(index)
-    }
-
-    suspend fun animateScrollToIndex(index: Int) {
-        if (isGridView) gridState.animateScrollToItem(index) else listState.animateScrollToItem(index)
-    }
 
     // First list index for each distinct starting letter, so the scrollbar only
     // ever offers letters that actually exist and always lands on the right spot.
@@ -345,52 +349,33 @@ private fun SongsTab(
     val sortedLetterEntries = remember(firstIndexByLetter) {
         firstIndexByLetter.entries.map { it.value to it.key }.sortedBy { it.first }
     }
-    val currentLetter = remember(sortedLetterEntries, firstVisibleIndex) {
-        sortedLetterEntries.lastOrNull { it.first <= firstVisibleIndex }?.second
+    val currentLetter = remember(sortedLetterEntries, listState.firstVisibleItemIndex) {
+        val visibleIndex = listState.firstVisibleItemIndex
+        sortedLetterEntries.lastOrNull { it.first <= visibleIndex }?.second
             ?: sortedLetterEntries.firstOrNull()?.second
     }
 
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
         val index = songs.indexOfFirst { it.id == currentSongId }
-        if (index >= 0) animateScrollToIndex(index)
+        if (index >= 0) listState.animateScrollToItem(index)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (isGridView) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                state = gridState,
-                contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, start = 8.dp, end = 28.dp)
-            ) {
-                gridItems(songs, key = { it.id }) { song ->
-                    SongGridItem(
-                        song = song,
-                        isPlaying = song.id == currentSongId,
-                        onClick = { onPlaySong(song) },
-                        onPlayNext = onPlayNext,
-                        onAddToQueue = onAddToQueue,
-                        onShufflePlayFrom = onShufflePlayFrom,
-                        onDelete = onDelete
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
-            ) {
-                items(songs, key = { it.id }) { song ->
-                    SongListItem(
-                        song = song,
-                        isPlaying = song.id == currentSongId,
-                        onClick = { onPlaySong(song) },
-                        onPlayNext = onPlayNext,
-                        onAddToQueue = onAddToQueue,
-                        onShufflePlayFrom = onShufflePlayFrom,
-                        onDelete = onDelete
-                    )
-                }
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
+        ) {
+            items(songs, key = { it.id }) { song ->
+                SongListItem(
+                    song = song,
+                    isPlaying = song.id == currentSongId,
+                    onClick = { onPlaySong(song) },
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    onShufflePlayFrom = onShufflePlayFrom,
+                    onDelete = onDelete
+                )
             }
         }
 
@@ -399,11 +384,11 @@ private fun SongsTab(
             currentLetter = currentLetter,
             onLetterSelected = { letter ->
                 firstIndexByLetter[letter]?.let { index ->
-                    scope.launch { scrollToIndex(index) }
+                    scope.launch { listState.scrollToItem(index) }
                 }
             },
-            // Match the LazyColumn/LazyGrid's own content padding exactly, so the
-            // track's start/end line up with the first and last song — not the
+            // Match the LazyColumn's own content padding exactly, so the track's
+            // start/end line up with the first and last song rows — not the
             // full Box, which is slightly taller than the padded content area.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
