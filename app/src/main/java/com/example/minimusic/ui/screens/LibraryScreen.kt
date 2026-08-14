@@ -11,11 +11,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,11 +41,9 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -68,7 +71,6 @@ import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.FloatingTabBar
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.SongListItem
-import com.example.minimusic.ui.components.miniPlayerSwipeUpModifier
 import com.example.minimusic.ui.components.TabBarItem
 import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.viewmodel.LibraryEvent
@@ -86,7 +88,6 @@ private val LibraryDrawerShape = RoundedCornerShape(
     topStart = 28.dp, topEnd = 28.dp, bottomStart = 0.dp, bottomEnd = 0.dp
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     uiState: LibraryUiState,
@@ -142,48 +143,12 @@ fun LibraryScreen(
         }
     }
 
-    Scaffold(
-        bottomBar = {
-            Column {
-                playbackState.currentSong?.let { song ->
-                    MiniPlayer(
-                        song = song,
-                        isPlaying = playbackState.isPlaying,
-                        positionMs = playbackState.positionMs,
-                        durationMs = playbackState.durationMs,
-                        onTogglePlayPause = onTogglePlayPause,
-                        onSkipNext = onSkipNext,
-                        onClick = onOpenPlayer,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .miniPlayerSwipeUpModifier(onOpenPlayer)
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    FloatingTabBar(
-                        items = listOf(
-                            TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
-                            TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
-                            TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
-                        ),
-                        selected = selectedTab,
-                        onSelect = { selectedTab = it }
-                    )
-                }
-            }
-        }
-    ) { innerPadding ->
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                top = innerPadding.calculateTopPadding(),
-                bottom = innerPadding.calculateBottomPadding()
-            )) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars)
+        ) {
 
             Row(
                 modifier = Modifier
@@ -317,6 +282,50 @@ fun LibraryScreen(
                 }
             }
         }
+
+        // Floating overlay, drawn on top of the library content with no
+        // Surface/background of its own at this level — Scaffold's bottomBar
+        // slot always wraps content in an opaque Material surface, which is
+        // what was fusing the mini player and nav pills into one solid band;
+        // building this as a plain overlay Column keeps everything genuinely
+        // transparent so library content shows through the gaps.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 12.dp)
+        ) {
+            playbackState.currentSong?.let { song ->
+                MiniPlayer(
+                    song = song,
+                    isPlaying = playbackState.isPlaying,
+                    positionMs = playbackState.positionMs,
+                    durationMs = playbackState.durationMs,
+                    onTogglePlayPause = onTogglePlayPause,
+                    onSkipNext = onSkipNext,
+                    onClick = onOpenPlayer,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                FloatingTabBar(
+                    items = listOf(
+                        TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
+                        TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
+                        TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
+                    ),
+                    selected = selectedTab,
+                    onSelect = { selectedTab = it }
+                )
+            }
+        }
     }
 }
 
@@ -367,9 +376,12 @@ private fun SongsTab(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            // Extra bottom padding reserves room for the floating mini-player so
-            // the last song in the list is never hidden underneath it.
-            contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp, end = 28.dp)
+            // No reserved bottom gap: the floating mini player has no opaque
+            // background of its own now, so the list can scroll all the way
+            // under it — matching the reference where content is visible
+            // through the gaps around the floating bar instead of stopping
+            // short to avoid a solid surface.
+            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
         ) {
             items(songs, key = { it.id }) { song ->
                 SongListItem(
@@ -392,13 +404,15 @@ private fun SongsTab(
                     scope.launch { listState.scrollToItem(index) }
                 }
             },
-            // Vertically centered within the drawer area rather than
-            // stretched edge-to-edge: equal top/bottom fraction so the track
-            // sits symmetrically in the middle of the interface instead of
-            // leaving mismatched dead space at either end.
+            // Matches the song list's own content padding exactly (top = 8.dp,
+            // bottom = 8.dp) so the track starts level with the first song
+            // container and ends level with the last one — same start/end
+            // points as the scrollable content itself, not an arbitrary
+            // fraction of the drawer's height.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .fillMaxHeight(0.72f)
+                .fillMaxHeight()
+                .padding(top = 8.dp, bottom = 8.dp)
         )
     }
 }
