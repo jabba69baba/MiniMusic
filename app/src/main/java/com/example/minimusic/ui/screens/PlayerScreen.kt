@@ -66,6 +66,7 @@ import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
+import com.example.minimusic.ui.components.playerSwipeDownDismissModifier
 import com.example.minimusic.ui.theme.rememberArtAccentColor
 import com.example.minimusic.ui.viewmodel.LyricsState
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -139,6 +140,7 @@ fun PlayerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .playerSwipeDownDismissModifier(onBack)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(
