@@ -103,7 +103,7 @@ fun AlphabetScrollbar(
         )
 
         // Pill-shaped thumb that tracks scroll position, Material fast-scroll style.
-        val thumbHeight = 44.dp
+        val thumbHeight = 52.dp
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
