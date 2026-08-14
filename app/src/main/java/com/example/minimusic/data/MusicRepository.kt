@@ -46,7 +46,8 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.TRACK,
-            MediaStore.Audio.Media.IS_MUSIC
+            MediaStore.Audio.Media.IS_MUSIC,
+            MediaStore.Audio.Media.DATE_ADDED
         )
         // Filter out very short clips (ringtones/notification blips) and non-music audio.
         // The threshold is user-configurable from Settings > Content.
@@ -62,6 +63,7 @@ class MusicRepository(private val context: Context) {
             val albumIdCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
+            val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
@@ -78,7 +80,8 @@ class MusicRepository(private val context: Context) {
                     durationMs = cursor.getLong(durationCol),
                     trackNumber = cursor.getInt(trackCol).let { if (it > 1000) it % 1000 else it },
                     contentUri = contentUri,
-                    albumArtUri = albumArtUri
+                    albumArtUri = albumArtUri,
+                    dateAddedSeconds = cursor.getLong(dateAddedCol)
                 )
             }
         }

@@ -18,18 +18,36 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+/** Sort order applied to the Songs tab's list. */
+enum class SongSortOrder {
+    NAME_A_Z, NAME_Z_A,
+    ARTIST_A_Z, ARTIST_Z_A,
+    DATE_ADDED_NEWEST, DATE_ADDED_OLDEST
+}
+
 data class LibraryUiState(
     val isLoading: Boolean = true,
     val allSongs: List<Song> = emptyList(),
     val albums: List<Album> = emptyList(),
     val artists: List<Artist> = emptyList(),
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val sortOrder: SongSortOrder = SongSortOrder.NAME_A_Z
 ) {
     val filteredSongs: List<Song>
-        get() = if (searchQuery.isBlank()) allSongs else allSongs.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-                it.artist.contains(searchQuery, ignoreCase = true) ||
-                it.album.contains(searchQuery, ignoreCase = true)
+        get() {
+            val base = if (searchQuery.isBlank()) allSongs else allSongs.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.artist.contains(searchQuery, ignoreCase = true) ||
+                    it.album.contains(searchQuery, ignoreCase = true)
+            }
+            return when (sortOrder) {
+                SongSortOrder.NAME_A_Z -> base.sortedBy { it.title.lowercase() }
+                SongSortOrder.NAME_Z_A -> base.sortedByDescending { it.title.lowercase() }
+                SongSortOrder.ARTIST_A_Z -> base.sortedBy { it.artist.lowercase() }
+                SongSortOrder.ARTIST_Z_A -> base.sortedByDescending { it.artist.lowercase() }
+                SongSortOrder.DATE_ADDED_NEWEST -> base.sortedByDescending { it.dateAddedSeconds }
+                SongSortOrder.DATE_ADDED_OLDEST -> base.sortedBy { it.dateAddedSeconds }
+            }
         }
 }
 
@@ -72,6 +90,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun onSearchQueryChange(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+
+    fun onSortOrderChange(sortOrder: SongSortOrder) {
+        _uiState.value = _uiState.value.copy(sortOrder = sortOrder)
     }
 
     fun songsForAlbum(albumId: Long): List<Song> =

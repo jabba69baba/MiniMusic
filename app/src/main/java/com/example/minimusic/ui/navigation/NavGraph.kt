@@ -46,6 +46,7 @@ fun MiniMusicNavGraph(
                 playbackState = playbackState,
                 events = libraryViewModel.events,
                 onSearchQueryChange = libraryViewModel::onSearchQueryChange,
+                onSortOrderChange = libraryViewModel::onSortOrderChange,
                 onPlaySong = { song, queue ->
                     playerViewModel.playQueue(queue, queue.indexOf(song))
                 },
