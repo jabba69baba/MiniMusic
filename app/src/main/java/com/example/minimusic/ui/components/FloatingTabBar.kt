@@ -1,14 +1,15 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,9 +27,12 @@ data class TabBarItem<T>(
 )
 
 /**
- * A row of plain icon buttons (no enclosing pill container) — the active
- * destination gets a tinted pill highlight behind just its own icon; inactive
- * ones are transparent. Used for the Songs/Albums/Artists switcher.
+ * Compact icon+label switcher for Songs/Albums/Artists. Each destination is
+ * its own small pill, sized to its content rather than stretched to fill —
+ * the active one gets a tinted pill fill behind the icon and label together;
+ * inactive ones are transparent with just the icon+label shown in a muted
+ * tone. Modeled on the reference bottom nav: small pills, not full-width
+ * segments, each carrying its own title next to the icon.
  */
 @Composable
 fun <T> FloatingTabBar(
@@ -38,24 +42,39 @@ fun <T> FloatingTabBar(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         items.forEach { item ->
             val isSelected = item.value == selected
-            Box(
+            val backgroundColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                label = "tabBarPillColor"
+            )
+            val contentColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                label = "tabBarContentColor"
+            )
+            Row(
                 modifier = Modifier
-                    .weight(1f)
                     .clip(PillShape)
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .background(backgroundColor)
                     .clickable { onSelect(item.value) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = item.label,
-                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = contentColor,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = item.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor
                 )
             }
         }
