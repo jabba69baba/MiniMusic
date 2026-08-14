@@ -76,13 +76,10 @@ import kotlinx.coroutines.launch
 
 private enum class LibraryTab { SONGS, ARTISTS, ALBUMS }
 
-/** Top drawer: rounded only at the bottom, so it reads as a shelf sitting flush under the header. */
-private val TopDrawerShape = RoundedCornerShape(
-    topStart = 0.dp, topEnd = 0.dp, bottomStart = 28.dp, bottomEnd = 28.dp
-)
-
-/** Bottom drawer: rounded only at the top, flowing down under the top drawer above it. */
-private val BottomDrawerShape = RoundedCornerShape(
+/** The library drawer's shape: rounded only at the top, flat everywhere else —
+ *  it's one continuous container holding both the Shuffle/Locate/Sort row and
+ *  the song list beneath it, with no visual seam between the two. */
+private val LibraryDrawerShape = RoundedCornerShape(
     topStart = 28.dp, topEnd = 28.dp, bottomStart = 0.dp, bottomEnd = 0.dp
 )
 
@@ -144,14 +141,26 @@ fun LibraryScreen(
 
     Scaffold(
         bottomBar = {
-            playbackState.currentSong?.let { song ->
-                MiniPlayer(
-                    song = song,
-                    isPlaying = playbackState.isPlaying,
-                    onTogglePlayPause = onTogglePlayPause,
-                    onSkipNext = onSkipNext,
-                    onClick = onOpenPlayer,
-                    modifier = Modifier.padding(12.dp)
+            Column {
+                playbackState.currentSong?.let { song ->
+                    MiniPlayer(
+                        song = song,
+                        isPlaying = playbackState.isPlaying,
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipNext = onSkipNext,
+                        onClick = onOpenPlayer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+                FloatingTabBar(
+                    items = listOf(
+                        TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
+                        TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
+                        TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
+                    ),
+                    selected = selectedTab,
+                    onSelect = { selectedTab = it },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
         }
@@ -198,121 +207,102 @@ fun LibraryScreen(
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
             var sortMenuExpanded by remember { mutableStateOf(false) }
 
-            // Top drawer: Shuffle + Locate + Sort, its own rounded surface sitting
-            // directly above the (separately-rounded) song list drawer below —
-            // two distinct stacked containers, PixelPlayer-style, rather than one
-            // continuous background behind everything.
+            // One continuous drawer, rounded only at the top: the Shuffle/Locate/Sort
+            // row and the song list beneath it share the same surface with no seam,
+            // matching the reference — not two visually separate stacked containers.
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = TopDrawerShape,
+                shape = LibraryDrawerShape,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f)
                     .padding(top = 8.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = PillShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
                         modifier = Modifier
-                            .clickable(enabled = uiState.filteredSongs.isNotEmpty()) {
-                                val startSong = uiState.filteredSongs.random()
-                                onShufflePlayFrom(startSong, uiState.filteredSongs)
-                            }
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = PillShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier
+                                .clickable(enabled = uiState.filteredSongs.isNotEmpty()) {
+                                    val startSong = uiState.filteredSongs.random()
+                                    onShufflePlayFrom(startSong, uiState.filteredSongs)
+                                }
                         ) {
-                            Icon(Icons.Filled.Shuffle, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                            Text("Shuffle", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Filled.Shuffle, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                Text("Shuffle", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge)
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.weight(1f))
 
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.clickable { jumpToCurrentRequest++ }
-                    ) {
-                        Icon(
-                            Icons.Filled.MyLocation,
-                            contentDescription = "Jump to current song",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                    Box {
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.clickable { sortMenuExpanded = true }
+                            modifier = Modifier.clickable { jumpToCurrentRequest++ }
                         ) {
                             Icon(
-                                Icons.Filled.FilterList,
-                                contentDescription = "Sort songs",
+                                Icons.Filled.MyLocation,
+                                contentDescription = "Jump to current song",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(12.dp)
                             )
                         }
-                        SortMenu(
-                            expanded = sortMenuExpanded,
-                            selected = uiState.sortOrder,
-                            onDismiss = { sortMenuExpanded = false },
-                            onSelect = { onSortOrderChange(it); sortMenuExpanded = false }
-                        )
-                    }
-                }
-            }
-
-            // Bottom drawer: the actual song/album/artist list, its own rounded
-            // surface flowing beneath the top drawer above.
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = BottomDrawerShape,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when {
-                        uiState.isLoading -> LoadingState()
-                        uiState.allSongs.isEmpty() -> EmptyLibraryState()
-                        else -> when (selectedTab) {
-                            LibraryTab.SONGS -> SongsTab(
-                                songs = uiState.filteredSongs,
-                                currentSongId = playbackState.currentSong?.id,
-                                jumpToCurrentRequest = jumpToCurrentRequest,
-                                onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
-                                onPlayNext = onPlayNext,
-                                onAddToQueue = onAddToQueue,
-                                onShufflePlayFrom = { song -> onShufflePlayFrom(song, uiState.filteredSongs) },
-                                onDelete = onDeleteSong
+                        Box {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.clickable { sortMenuExpanded = true }
+                            ) {
+                                Icon(
+                                    Icons.Filled.FilterList,
+                                    contentDescription = "Sort songs",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                            SortMenu(
+                                expanded = sortMenuExpanded,
+                                selected = uiState.sortOrder,
+                                onDismiss = { sortMenuExpanded = false },
+                                onSelect = { onSortOrderChange(it); sortMenuExpanded = false }
                             )
-                            LibraryTab.ALBUMS -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
-                            LibraryTab.ARTISTS -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
+                        }
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        when {
+                            uiState.isLoading -> LoadingState()
+                            uiState.allSongs.isEmpty() -> EmptyLibraryState()
+                            else -> when (selectedTab) {
+                                LibraryTab.SONGS -> SongsTab(
+                                    songs = uiState.filteredSongs,
+                                    currentSongId = playbackState.currentSong?.id,
+                                    jumpToCurrentRequest = jumpToCurrentRequest,
+                                    onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
+                                    onPlayNext = onPlayNext,
+                                    onAddToQueue = onAddToQueue,
+                                    onShufflePlayFrom = { song -> onShufflePlayFrom(song, uiState.filteredSongs) },
+                                    onDelete = onDeleteSong
+                                )
+                                LibraryTab.ALBUMS -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
+                                LibraryTab.ARTISTS -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
+                            }
                         }
                     }
                 }
             }
-
-            FloatingTabBar(
-                items = listOf(
-                    TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
-                    TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
-                    TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
-                ),
-                selected = selectedTab,
-                onSelect = { selectedTab = it },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
         }
     }
 }
@@ -364,7 +354,9 @@ private fun SongsTab(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
+            // Extra bottom padding reserves room for the floating mini-player so
+            // the last song in the list is never hidden underneath it.
+            contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp, end = 28.dp)
         ) {
             items(songs, key = { it.id }) { song ->
                 SongListItem(
@@ -387,12 +379,13 @@ private fun SongsTab(
                     scope.launch { listState.scrollToItem(index) }
                 }
             },
-            // Match the LazyColumn's own content padding exactly, so the track's
-            // start/end line up with the first and last song rows — not the
-            // full Box, which is slightly taller than the padded content area.
+            // Inset further than the list's own content padding on both ends:
+            // extra top clearance keeps the track clear of the drawer's rounded
+            // top corners, and extra bottom clearance matches the reserved
+            // mini-player space so the track doesn't run into it either.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(top = 8.dp, bottom = 8.dp)
+                .padding(top = 20.dp, bottom = 96.dp)
         )
     }
 }
