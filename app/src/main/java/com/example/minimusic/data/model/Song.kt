@@ -15,5 +15,7 @@ data class Song(
     val durationMs: Long,
     val trackNumber: Int,
     val contentUri: Uri,
-    val albumArtUri: Uri?
+    val albumArtUri: Uri?,
+    /** MediaStore's DATE_ADDED, in epoch seconds — when this file was added to the device's library. */
+    val dateAddedSeconds: Long
 )
