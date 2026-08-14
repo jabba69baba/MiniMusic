@@ -2,14 +2,13 @@ package com.example.minimusic.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,10 +26,9 @@ data class TabBarItem<T>(
 )
 
 /**
- * A floating, pill-shaped segmented control with an icon above a label for
- * each destination — used for the Songs/Albums/Artists switcher at the
- * bottom of the library screen, matching the app's persistent mini
- * player/nav bar visual language (M3 Expressive, monet-tinted, fully rounded).
+ * A row of plain icon buttons (no enclosing pill container) — the active
+ * destination gets a tinted pill highlight behind just its own icon; inactive
+ * ones are transparent. Used for the Songs/Albums/Artists switcher.
  */
 @Composable
 fun <T> FloatingTabBar(
@@ -39,36 +37,26 @@ fun <T> FloatingTabBar(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        shape = PillShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        modifier = modifier.fillMaxWidth()
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(modifier = Modifier.padding(6.dp)) {
-            items.forEach { item ->
-                val isSelected = item.value == selected
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(PillShape)
-                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                        .clickable { onSelect(item.value) }
-                        .padding(vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.label,
-                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = item.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
+        items.forEach { item ->
+            val isSelected = item.value == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(PillShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clickable { onSelect(item.value) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = item.label,
+                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
