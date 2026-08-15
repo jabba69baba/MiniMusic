@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
@@ -71,10 +74,8 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.components.AlbumGridItem
 import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
-import com.example.minimusic.ui.components.FloatingTabBar
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.SongListItem
-import com.example.minimusic.ui.components.TabBarItem
 import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
@@ -82,7 +83,11 @@ import com.example.minimusic.ui.viewmodel.SongSortOrder
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
-private enum class LibraryTab { SONGS, ARTISTS, ALBUMS }
+private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    SONGS("Songs", Icons.Filled.MusicNote),
+    ARTISTS("Artists", Icons.Filled.Person),
+    ALBUMS("Albums", Icons.Filled.Album)
+}
 
 /** The library drawer's shape: rounded only at the top, flat everywhere else —
  *  it's one continuous container holding both the Shuffle/Locate/Sort row and
@@ -189,10 +194,12 @@ fun LibraryScreen(
 
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
             var sortMenuExpanded by remember { mutableStateOf(false) }
+            var tabMenuExpanded by remember { mutableStateOf(false) }
 
-            // One continuous drawer, rounded only at the top: the Shuffle/Locate/Sort
-            // row and the song list beneath it share the same surface with no seam,
-            // matching the reference — not two visually separate stacked containers.
+            // One continuous drawer, rounded only at the top: the selector/
+            // controls row and the song list beneath it share the same
+            // surface with no seam, matching the reference — not two
+            // visually separate stacked containers.
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = LibraryDrawerShape,
@@ -206,54 +213,104 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = PillShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier
-                                .clickable(enabled = uiState.filteredSongs.isNotEmpty()) {
-                                    val startSong = uiState.filteredSongs.random()
-                                    onShufflePlayFrom(startSong, uiState.filteredSongs)
+                        // Left pill: current view (Songs/Artists/Albums) with a
+                        // chevron that opens a dropdown to switch between them —
+                        // replaces the old 3-tab row entirely.
+                        Box {
+                            DividedPill {
+                                PillSegment(
+                                    onClick = { tabMenuExpanded = true },
+                                    horizontalPadding = 16.dp
+                                ) {
+                                    Icon(
+                                        selectedTab.icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        selectedTab.label,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
                                 }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Filled.Shuffle, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                                Text("Shuffle", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge)
+                                PillSegment(
+                                    onClick = { tabMenuExpanded = true },
+                                    horizontalPadding = 12.dp
+                                ) {
+                                    Icon(
+                                        Icons.Filled.ExpandMore,
+                                        contentDescription = "Switch view",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            DropdownMenu(expanded = tabMenuExpanded, onDismissRequest = { tabMenuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Songs") },
+                                    leadingIcon = { Icon(Icons.Filled.MusicNote, contentDescription = null) },
+                                    onClick = { selectedTab = LibraryTab.SONGS; tabMenuExpanded = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Artists") },
+                                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                                    onClick = { selectedTab = LibraryTab.ARTISTS; tabMenuExpanded = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Albums") },
+                                    leadingIcon = { Icon(Icons.Filled.Album, contentDescription = null) },
+                                    onClick = { selectedTab = LibraryTab.ALBUMS; tabMenuExpanded = false }
+                                )
                             }
                         }
 
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.clickable { jumpToCurrentRequest++ }
-                        ) {
-                            Icon(
-                                Icons.Filled.MyLocation,
-                                contentDescription = "Jump to current song",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
+                        // Right pill: Shuffle, then Locate, then Sort — icon-only,
+                        // same pill shape and height as the left one, with clear
+                        // dividers between each control.
                         Box {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier.clickable { sortMenuExpanded = true }
-                            ) {
-                                Icon(
-                                    Icons.Filled.FilterList,
-                                    contentDescription = "Sort songs",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(12.dp)
-                                )
+                            DividedPill {
+                                PillSegment(
+                                    onClick = {
+                                        if (uiState.filteredSongs.isNotEmpty()) {
+                                            val startSong = uiState.filteredSongs.random()
+                                            onShufflePlayFrom(startSong, uiState.filteredSongs)
+                                        }
+                                    },
+                                    horizontalPadding = 12.dp
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Shuffle,
+                                        contentDescription = "Shuffle",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                PillSegment(
+                                    onClick = { jumpToCurrentRequest++ },
+                                    horizontalPadding = 12.dp
+                                ) {
+                                    Icon(
+                                        Icons.Filled.MyLocation,
+                                        contentDescription = "Jump to current song",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                PillSegment(
+                                    onClick = { sortMenuExpanded = true },
+                                    horizontalPadding = 12.dp
+                                ) {
+                                    Icon(
+                                        Icons.Filled.FilterList,
+                                        contentDescription = "Sort songs",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                             SortMenu(
                                 expanded = sortMenuExpanded,
@@ -289,45 +346,30 @@ fun LibraryScreen(
             }
         }
 
-        // Solid footer, pinned to the bottom edge: the mini player and nav
-        // bar are both fully opaque now (same dark surface as the app
-        // background) and sit flush against each other with no gap and no
-        // side margins, so together they read as one continuous bar —
-        // matching the reference exactly rather than floating pills.
+        // Permanent mini player, pinned to the bottom edge: always present
+        // regardless of playback state (shows a placeholder when nothing has
+        // ever been played), so its height never changes and the song list's
+        // bottom padding above it stays stable. Replaces the old separate
+        // Songs/Artists/Albums nav bar entirely — that switching now happens
+        // via the dropdown pill at the top of the drawer.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .onGloballyPositioned { coordinates ->
                     footerHeight = with(density) { coordinates.size.height.toDp() }
                 }
         ) {
-            playbackState.currentSong?.let { song ->
-                MiniPlayer(
-                    song = song,
-                    isPlaying = playbackState.isPlaying,
-                    positionMs = playbackState.positionMs,
-                    durationMs = playbackState.durationMs,
-                    onTogglePlayPause = onTogglePlayPause,
-                    onSkipNext = onSkipNext,
-                    onClick = onOpenPlayer
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surface)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-            ) {
-                FloatingTabBar(
-                    items = listOf(
-                        TabBarItem(LibraryTab.SONGS, "Songs", Icons.Filled.MusicNote),
-                        TabBarItem(LibraryTab.ARTISTS, "Artists", Icons.Filled.Person),
-                        TabBarItem(LibraryTab.ALBUMS, "Albums", Icons.Filled.Album)
-                    ),
-                    selected = selectedTab,
-                    onSelect = { selectedTab = it }
-                )
-            }
+            MiniPlayer(
+                song = playbackState.currentSong,
+                isPlaying = playbackState.isPlaying,
+                positionMs = playbackState.positionMs,
+                durationMs = playbackState.durationMs,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipNext = onSkipNext,
+                onClick = onOpenPlayer
+            )
         }
     }
 }
@@ -436,6 +478,61 @@ private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
             ArtistListItem(artist = artist, onClick = { onArtistClick(artist) })
         }
     }
+}
+
+/**
+ * A pill-shaped container holding a row of [PillSegment]s with a thin
+ * vertical divider between each one — used for both the Songs/Artists/
+ * Albums selector and the Shuffle/Locate/Sort controls, so the two pills
+ * share the exact same shape, height, and divider treatment and read as a
+ * matched pair on opposite sides of the row.
+ */
+@Composable
+private fun DividedPill(content: @Composable PillSegmentScope.() -> Unit) {
+    Surface(
+        shape = PillShape,
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Row(
+            modifier = Modifier.height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val dividerColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.25f)
+            PillSegmentScope(dividerColor).content()
+        }
+    }
+}
+
+/** Receiver scope for [DividedPill] — each [PillSegment] call automatically
+ *  gets a divider placed before it, except the first one. */
+private class PillSegmentScope(val dividerColor: androidx.compose.ui.graphics.Color) {
+    var isFirst = true
+}
+
+@Composable
+private fun PillSegmentScope.PillSegment(
+    onClick: () -> Unit,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
+    content: @Composable RowScope.() -> Unit
+) {
+    if (!isFirst) {
+        Box(
+            modifier = Modifier
+                .padding(vertical = 10.dp)
+                .width(1.dp)
+                .fillMaxHeight()
+                .background(dividerColor)
+        )
+    }
+    isFirst = false
+    Row(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = horizontalPadding, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content
+    )
 }
 
 @Composable
