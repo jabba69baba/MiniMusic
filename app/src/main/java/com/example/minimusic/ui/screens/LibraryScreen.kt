@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.minimusic.data.model.Album
@@ -110,6 +113,8 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
+    val density = LocalDensity.current
+    var footerHeight by remember { mutableStateOf(0.dp) }
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
     // doesn't own the underlying file for: launch the system confirmation dialog,
@@ -268,6 +273,7 @@ fun LibraryScreen(
                                     songs = uiState.filteredSongs,
                                     currentSongId = playbackState.currentSong?.id,
                                     jumpToCurrentRequest = jumpToCurrentRequest,
+                                    bottomContentPadding = footerHeight,
                                     onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
                                     onPlayNext = onPlayNext,
                                     onAddToQueue = onAddToQueue,
@@ -283,18 +289,18 @@ fun LibraryScreen(
             }
         }
 
-        // Floating overlay, drawn on top of the library content with no
-        // Surface/background of its own at this level — Scaffold's bottomBar
-        // slot always wraps content in an opaque Material surface, which is
-        // what was fusing the mini player and nav pills into one solid band;
-        // building this as a plain overlay Column keeps everything genuinely
-        // transparent so library content shows through the gaps.
+        // Solid footer, pinned to the bottom edge: the mini player and nav
+        // bar are both fully opaque now (same dark surface as the app
+        // background) and sit flush against each other with no gap and no
+        // side margins, so together they read as one continuous bar —
+        // matching the reference exactly rather than floating pills.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = 12.dp)
+                .onGloballyPositioned { coordinates ->
+                    footerHeight = with(density) { coordinates.size.height.toDp() }
+                }
         ) {
             playbackState.currentSong?.let { song ->
                 MiniPlayer(
@@ -304,16 +310,13 @@ fun LibraryScreen(
                     durationMs = playbackState.durationMs,
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipNext = onSkipNext,
-                    onClick = onOpenPlayer,
-                    modifier = Modifier.padding(horizontal = 12.dp)
+                    onClick = onOpenPlayer
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.Center
+                    .background(MaterialTheme.colorScheme.surface)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
             ) {
                 FloatingTabBar(
                     items = listOf(
@@ -335,6 +338,7 @@ private fun SongsTab(
     songs: List<Song>,
     currentSongId: Long?,
     jumpToCurrentRequest: Int,
+    bottomContentPadding: androidx.compose.ui.unit.Dp,
     onPlaySong: (Song) -> Unit,
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
@@ -376,12 +380,10 @@ private fun SongsTab(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            // No reserved bottom gap: the floating mini player has no opaque
-            // background of its own now, so the list can scroll all the way
-            // under it — matching the reference where content is visible
-            // through the gaps around the floating bar instead of stopping
-            // short to avoid a solid surface.
-            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp, end = 28.dp)
+            // Bottom padding matches the footer's actual measured height, so
+            // the last song is never hidden underneath the now-opaque mini
+            // player + nav bar, without reserving more space than needed.
+            contentPadding = PaddingValues(top = 8.dp, bottom = bottomContentPadding + 8.dp, end = 28.dp)
         ) {
             items(songs, key = { it.id }) { song ->
                 SongListItem(
@@ -404,15 +406,13 @@ private fun SongsTab(
                     scope.launch { listState.scrollToItem(index) }
                 }
             },
-            // Matches the song list's own content padding exactly (top = 8.dp,
-            // bottom = 8.dp) so the track starts level with the first song
-            // container and ends level with the last one — same start/end
-            // points as the scrollable content itself, not an arbitrary
-            // fraction of the drawer's height.
+            // Matches the song list's own top/bottom content padding exactly
+            // so the track starts level with the first song container and
+            // ends level with the last one, never running behind the footer.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = 8.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
         )
     }
 }
