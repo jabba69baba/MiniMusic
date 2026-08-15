@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,10 +33,16 @@ import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.PillShape
 
-/** Corner radius for the mini player bar — noticeably rounder than the old
- *  square-corner opaque bar, matching the rest of the app's Material
- *  Expressive shape scale (see [com.example.minimusic.ui.theme.MiniMusicShapes]). */
-private val MiniPlayerShape = RoundedCornerShape(20.dp)
+/** Corner shape for the mini player bar — rounded on top to match the app's
+ *  Material Expressive shape scale, but square on the bottom two corners so
+ *  it sits flush against the bottom of the screen instead of floating with
+ *  a gap on either side. */
+private val MiniPlayerShape = RoundedCornerShape(
+    topStart = 20.dp,
+    topEnd = 20.dp,
+    bottomStart = 0.dp,
+    bottomEnd = 0.dp
+)
 
 /**
  * Permanent mini player bar — always present at the bottom regardless of
@@ -75,18 +82,22 @@ fun MiniPlayer(
     ) {
         // Progress fill: a plain colored box sized to the played fraction,
         // behind the row's content — this IS the progress indicator, not a
-        // separate bar drawn on top of it. matchParentSize() ties this to
-        // the Box's own resolved size (driven by the Row below), instead of
-        // fillMaxHeight() which — with no bounded height on this Box itself —
-        // was expanding to fill all available space up the tree and covering
-        // the whole screen.
+        // separate bar drawn on top of it. Height comes from matchParentSize
+        // (ties to the Box's own resolved height, driven by the Row below,
+        // instead of fillMaxHeight() expanding to fill the whole screen);
+        // width is driven separately by fillMaxWidth(progress) on an inner
+        // Box, since chaining both size modifiers on one Box doesn't work —
+        // matchParentSize's parent-data sizing overrides fillMaxWidth's
+        // fraction rather than combining with it.
         if (song != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            )
+            Box(modifier = Modifier.matchParentSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                )
+            }
         }
 
         Row(
@@ -100,13 +111,13 @@ fun MiniPlayer(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = song?.title ?: "Nothing played yet",
+                    text = song?.title ?: "What's the vibe?",
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = song?.artist ?: "Pick a song to get started",
+                    text = song?.artist ?: "Tap a song to listen",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
