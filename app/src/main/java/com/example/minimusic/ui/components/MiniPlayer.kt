@@ -1,12 +1,12 @@
 package com.example.minimusic.ui.components
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,15 +33,26 @@ import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.PillShape
 
+/** Corner radius for the mini player bar — noticeably rounder than the old
+ *  square-corner opaque bar, matching the rest of the app's Material
+ *  Expressive shape scale (see [com.example.minimusic.ui.theme.MiniMusicShapes]). */
+private val MiniPlayerShape = RoundedCornerShape(20.dp)
+
 /**
- * Solid, full-width mini player bar — same opaque background as the app's
- * dark surface, flush edges, square corners, no side margins. Sits directly
- * above [FloatingTabBar] with no gap so the two read as one continuous
- * footer, matching the reference layout exactly.
+ * Permanent mini player bar — always present at the bottom regardless of
+ * whether a song is currently loaded. When [song] is null (nothing has
+ * ever been played this install), a muted placeholder state is shown
+ * instead of hiding the bar, so its height never changes and the layout
+ * around it stays stable.
+ *
+ * The bar's own background doubles as the progress indicator: the played
+ * portion (left) is tinted with the primary color, the remaining portion
+ * (right) is the plain surface color, and the split moves left-to-right as
+ * the song plays — rather than a separate progress line drawn on top.
  */
 @Composable
 fun MiniPlayer(
-    song: Song,
+    song: Song?,
     isPlaying: Boolean,
     positionMs: Long,
     durationMs: Long,
@@ -50,126 +61,120 @@ fun MiniPlayer(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        MiniPlayerArt(
-            artUri = song.albumArtUri,
-            positionMs = positionMs,
-            durationMs = durationMs
-        )
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        // Play/pause: filled squircle background, kept as-is.
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(PillShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .clickable(onClick = onTogglePlayPause),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.fillMaxSize(0.5f)
-            )
-        }
-        // Skip next: plain icon, no background, right-aligned next to play/pause.
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clickable(onClick = onSkipNext),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.SkipNext,
-                contentDescription = "Skip next",
-                modifier = Modifier.fillMaxSize(0.7f)
-            )
-        }
-    }
-}
-
-/**
- * Square album art thumbnail (not circular) with a thin progress line
- * beneath it showing time remaining — fills left to right as the song
- * plays and completes exactly when it ends.
- */
-@Composable
-private fun MiniPlayerArt(
-    artUri: android.net.Uri?,
-    positionMs: Long,
-    durationMs: Long,
-    modifier: Modifier = Modifier
-) {
     val progress by remember(positionMs, durationMs) {
         derivedStateOf {
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
         }
     }
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    val progressColor = MaterialTheme.colorScheme.primary
 
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MiniPlayerShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(enabled = song != null, onClick = onClick)
+    ) {
+        // Progress fill: a plain colored box sized to the played fraction,
+        // behind the row's content — this IS the progress indicator, not a
+        // separate bar drawn on top of it.
+        if (song != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
             )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MiniPlayerArt(artUri = song?.albumArtUri)
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song?.title ?: "Nothing played yet",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song?.artist ?: "Pick a song to get started",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Play/pause: filled squircle background, kept as-is; disabled
+            // (muted, non-interactive) in the placeholder state.
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(PillShape)
+                    .background(
+                        if (song != null) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    .clickable(enabled = song != null, onClick = onTogglePlayPause),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = if (song != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxSize(0.5f)
+                )
+            }
+            // Skip next: plain icon, no background, right-aligned next to play/pause.
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(enabled = song != null, onClick = onSkipNext),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SkipNext,
+                    contentDescription = "Skip next",
+                    tint = if (song != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxSize(0.7f)
+                )
+            }
+        }
+    }
+}
+
+/** Square album art thumbnail (not circular). Shows a muted music-note
+ *  placeholder tile when there's no art (or no song at all). */
+@Composable
+private fun MiniPlayerArt(
+    artUri: android.net.Uri?,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.MusicNote,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        if (artUri != null) {
             AsyncImage(
                 model = artUri,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp))
-            )
-        }
-        Canvas(
-            modifier = Modifier
-                .padding(top = 3.dp)
-                .size(width = 44.dp, height = 2.dp)
-        ) {
-            drawLine(
-                color = trackColor,
-                start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
-                end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f),
-                strokeWidth = size.height
-            )
-            drawLine(
-                color = progressColor,
-                start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
-                end = androidx.compose.ui.geometry.Offset(size.width * progress, size.height / 2f),
-                strokeWidth = size.height
+                    .clip(RoundedCornerShape(10.dp))
             )
         }
     }
