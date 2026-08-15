@@ -108,10 +108,15 @@ fun AlphabetScrollbar(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset {
-                    IntOffset(
-                        x = 0,
-                        y = (trackHeightPx * thumbFraction).roundToInt() - thumbHeight.roundToPx() / 2
-                    )
+                    val thumbHeightPx = thumbHeight.roundToPx()
+                    // Center the thumb on the section's midpoint, but clamp so
+                    // it never renders above the track's top or past its
+                    // bottom — without this, the first section's midpoint
+                    // minus half the thumb height can go negative, pushing the
+                    // thumb visibly above the top of the list it's tracking.
+                    val rawY = (trackHeightPx * thumbFraction).roundToInt() - thumbHeightPx / 2
+                    val clampedY = rawY.coerceIn(0, (trackHeightPx.roundToInt() - thumbHeightPx).coerceAtLeast(0))
+                    IntOffset(x = 0, y = clampedY)
                 }
                 .size(width = 8.dp, height = thumbHeight)
                 .clip(RoundedCornerShape(50))
