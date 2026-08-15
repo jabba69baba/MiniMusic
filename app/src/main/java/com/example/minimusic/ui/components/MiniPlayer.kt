@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -27,23 +27,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.PillShape
-import kotlin.math.min
 
 /**
- * Floating mini player — no enclosing surface/pill container of its own, so
- * the library content behind it is always visible through the gaps around
- * the row (album art, text, and controls simply sit on top of whatever's
- * beneath them). The only "pill" left is the shape of the tap targets
- * themselves (play button, skip button), not a background for the whole row.
+ * Solid, full-width mini player bar — same opaque background as the app's
+ * dark surface, flush edges, square corners, no side margins. Sits directly
+ * above [FloatingTabBar] with no gap so the two read as one continuous
+ * footer, matching the reference layout exactly.
  */
 @Composable
 fun MiniPlayer(
@@ -59,8 +53,9 @@ fun MiniPlayer(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -86,9 +81,10 @@ fun MiniPlayer(
             )
         }
 
+        // Play/pause: filled squircle background, kept as-is.
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(44.dp)
                 .clip(PillShape)
                 .background(MaterialTheme.colorScheme.primary)
                 .clickable(onClick = onTogglePlayPause),
@@ -98,30 +94,29 @@ fun MiniPlayer(
                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                 contentDescription = if (isPlaying) "Pause" else "Play",
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.fillMaxSize(0.55f)
+                modifier = Modifier.fillMaxSize(0.5f)
             )
         }
+        // Skip next: plain icon, no background, right-aligned next to play/pause.
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .clip(PillShape)
                 .clickable(onClick = onSkipNext),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Filled.SkipNext,
                 contentDescription = "Skip next",
-                modifier = Modifier.fillMaxSize(0.6f)
+                modifier = Modifier.fillMaxSize(0.7f)
             )
         }
     }
 }
 
 /**
- * Circular album art with a thin ring traced around its edge that fills in
- * as the song plays and completes exactly when the song ends — the "time
- * remaining" indicator. Track color is a faint tonal ring; the progress arc
- * is drawn in the primary color on top of it.
+ * Square album art thumbnail (not circular) with a thin progress line
+ * beneath it showing time remaining — fills left to right as the song
+ * plays and completes exactly when it ends.
  */
 @Composable
 private fun MiniPlayerArt(
@@ -138,14 +133,11 @@ private fun MiniPlayerArt(
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val progressColor = MaterialTheme.colorScheme.primary
 
-    Box(
-        modifier = modifier.size(48.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
+                .size(44.dp)
+                .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
@@ -159,37 +151,25 @@ private fun MiniPlayerArt(
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(3.dp)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(8.dp))
             )
         }
-
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 2.5.dp.toPx()
-            val diameter = min(size.width, size.height) - strokeWidth
-            val topLeft = Offset(
-                (size.width - diameter) / 2f,
-                (size.height - diameter) / 2f
-            )
-            val arcSize = Size(diameter, diameter)
-
-            drawArc(
+        Canvas(
+            modifier = Modifier
+                .padding(top = 3.dp)
+                .size(width = 44.dp, height = 2.dp)
+        ) {
+            drawLine(
                 color = trackColor,
-                startAngle = -90f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
+                end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f),
+                strokeWidth = size.height
             )
-            drawArc(
+            drawLine(
                 color = progressColor,
-                startAngle = -90f,
-                sweepAngle = 360f * progress,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
+                end = androidx.compose.ui.geometry.Offset(size.width * progress, size.height / 2f),
+                strokeWidth = size.height
             )
         }
     }
