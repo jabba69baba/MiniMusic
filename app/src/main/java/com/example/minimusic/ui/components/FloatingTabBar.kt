@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -28,12 +29,13 @@ data class TabBarItem<T>(
 )
 
 /**
- * Compact icon+label switcher for Songs/Albums/Artists. Each destination is
- * its own small pill, sized to its content rather than stretched to fill —
- * the active one gets a tinted pill fill behind the icon and label together;
- * inactive ones are transparent with just the icon+label shown in a muted
- * tone. Modeled on the reference bottom nav: small pills, not full-width
- * segments, each carrying its own title next to the icon.
+ * Solid, full-width nav bar — same opaque background as the app's dark
+ * surface, flush edges, square corners, no side margins, sitting directly
+ * beneath [MiniPlayer] with no gap so the two read as one continuous
+ * footer. Destinations are evenly spaced across the full width; only the
+ * active one gets a pill-shaped highlight behind its icon+label, sized to
+ * fit just that icon+label. Inactive destinations are plain icon+label in a
+ * muted tone with no background at all.
  */
 @Composable
 fun <T> FloatingTabBar(
@@ -43,8 +45,11 @@ fun <T> FloatingTabBar(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         items.forEach { item ->
