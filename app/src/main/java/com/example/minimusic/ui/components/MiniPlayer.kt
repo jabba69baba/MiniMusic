@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -76,11 +75,15 @@ fun MiniPlayer(
     ) {
         // Progress fill: a plain colored box sized to the played fraction,
         // behind the row's content — this IS the progress indicator, not a
-        // separate bar drawn on top of it.
+        // separate bar drawn on top of it. matchParentSize() ties this to
+        // the Box's own resolved size (driven by the Row below), instead of
+        // fillMaxHeight() which — with no bounded height on this Box itself —
+        // was expanding to fill all available space up the tree and covering
+        // the whole screen.
         if (song != null) {
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
+                    .matchParentSize()
                     .fillMaxWidth(progress.coerceIn(0f, 1f))
                     .background(MaterialTheme.colorScheme.primaryContainer)
             )
