@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -216,12 +215,14 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left pill: current view (Songs/Artists/Albums) with a
-                        // chevron that opens a dropdown to switch between them —
-                        // replaces the old 3-tab row entirely.
+                        // Left selector: current view (Songs/Artists/Albums) as
+                        // its own pill, plus a separate small chevron pill next
+                        // to it that opens a dropdown to switch between them —
+                        // two distinct buttons with a real gap between them,
+                        // not one pill with a divider line inside it.
                         Box {
-                            DividedPill {
-                                PillSegment(
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                PillButton(
                                     onClick = { tabMenuExpanded = true },
                                     horizontalPadding = 16.dp
                                 ) {
@@ -237,7 +238,7 @@ fun LibraryScreen(
                                         style = MaterialTheme.typography.labelLarge
                                     )
                                 }
-                                PillSegment(
+                                PillButton(
                                     onClick = { tabMenuExpanded = true },
                                     horizontalPadding = 12.dp
                                 ) {
@@ -268,12 +269,12 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Right pill: Shuffle, then Locate, then Sort — icon-only,
-                        // same pill shape and height as the left one, with clear
-                        // dividers between each control.
+                        // Right controls: Shuffle, Locate, Sort as three
+                        // separate pills with real gaps between them, same
+                        // shape/height as the left selector's pills.
                         Box {
-                            DividedPill {
-                                PillSegment(
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                PillButton(
                                     onClick = {
                                         if (uiState.filteredSongs.isNotEmpty()) {
                                             val startSong = uiState.filteredSongs.random()
@@ -285,29 +286,29 @@ fun LibraryScreen(
                                     Icon(
                                         Icons.Filled.Shuffle,
                                         contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
-                                PillSegment(
+                                PillButton(
                                     onClick = { jumpToCurrentRequest++ },
                                     horizontalPadding = 12.dp
                                 ) {
                                     Icon(
                                         Icons.Filled.MyLocation,
                                         contentDescription = "Jump to current song",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
-                                PillSegment(
+                                PillButton(
                                     onClick = { sortMenuExpanded = true },
                                     horizontalPadding = 12.dp
                                 ) {
                                     Icon(
                                         Icons.Filled.FilterList,
                                         contentDescription = "Sort songs",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -481,58 +482,32 @@ private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
 }
 
 /**
- * A pill-shaped container holding a row of [PillSegment]s with a thin
- * vertical divider between each one — used for both the Songs/Artists/
- * Albums selector and the Shuffle/Locate/Sort controls, so the two pills
- * share the exact same shape, height, and divider treatment and read as a
- * matched pair on opposite sides of the row.
+ * A single standalone rounded pill button — one per control, with real
+ * space between adjacent pills (via the caller's Arrangement.spacedBy),
+ * not internal divider lines inside one shared container. Used for both
+ * the Songs/Artists/Albums selector segments and the Shuffle/Locate/Sort
+ * controls, so every pill in the row shares the same shape and height.
  */
 @Composable
-private fun DividedPill(content: @Composable PillSegmentScope.() -> Unit) {
-    Surface(
-        shape = PillShape,
-        color = MaterialTheme.colorScheme.secondaryContainer
-    ) {
-        Row(
-            modifier = Modifier.height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val dividerColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.25f)
-            PillSegmentScope(dividerColor).content()
-        }
-    }
-}
-
-/** Receiver scope for [DividedPill] — each [PillSegment] call automatically
- *  gets a divider placed before it, except the first one. */
-private class PillSegmentScope(val dividerColor: androidx.compose.ui.graphics.Color) {
-    var isFirst = true
-}
-
-@Composable
-private fun PillSegmentScope.PillSegment(
+private fun PillButton(
     onClick: () -> Unit,
     horizontalPadding: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit
 ) {
-    if (!isFirst) {
-        Box(
-            modifier = Modifier
-                .padding(vertical = 10.dp)
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(dividerColor)
+    Surface(
+        onClick = onClick,
+        shape = PillShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
         )
     }
-    isFirst = false
-    Row(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = horizontalPadding, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content
-    )
 }
 
 @Composable
