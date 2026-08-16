@@ -170,8 +170,22 @@ fun LibraryScreen(
                     text = "MiniMusic",
                     style = MaterialTheme.typography.headlineSmall
                 )
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                // Filled tonal circle behind the settings icon so it reads
+                // as a distinct tappable button/overlay rather than a bare
+                // icon — the circle and icon both use Monet-derived
+                // colorScheme tokens (secondaryContainer / onSecondaryContainer),
+                // same as the rest of the app's dynamic theming.
+                Surface(
+                    onClick = onOpenSettings,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(10.dp)
+                    )
                 }
             }
 
@@ -536,7 +550,7 @@ private fun PillButton(
  *  visually disconnected rather than like two pieces of one pill. */
 private object PillGroupShapes {
     private val Full = 50.dp
-    private val Meeting = 10.dp
+    private val Meeting = 5.dp
     val First = RoundedCornerShape(topStart = Full, topEnd = Meeting, bottomEnd = Meeting, bottomStart = Full)
     val Middle = RoundedCornerShape(Meeting)
     val Last = RoundedCornerShape(topStart = Meeting, topEnd = Full, bottomEnd = Full, bottomStart = Meeting)
