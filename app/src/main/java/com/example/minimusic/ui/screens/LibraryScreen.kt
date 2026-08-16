@@ -231,12 +231,13 @@ fun LibraryScreen(
                                         selectedTab.icon,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                     Text(
                                         selectedTab.label,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        style = MaterialTheme.typography.labelLarge
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                                 PillButton(
@@ -248,7 +249,7 @@ fun LibraryScreen(
                                         Icons.Filled.ExpandMore,
                                         contentDescription = "Switch view",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
@@ -290,7 +291,7 @@ fun LibraryScreen(
                                         Icons.Filled.Shuffle,
                                         contentDescription = "Shuffle",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 PillButton(
@@ -302,7 +303,7 @@ fun LibraryScreen(
                                         Icons.Filled.MyLocation,
                                         contentDescription = "Jump to current song",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 PillButton(
@@ -314,7 +315,7 @@ fun LibraryScreen(
                                         Icons.Filled.FilterList,
                                         contentDescription = "Sort songs",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
@@ -484,6 +485,14 @@ private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
     }
 }
 
+/** Fixed height shared by every [PillButton] segment across both control
+ *  groups — without this, a segment with a text label (taller intrinsic
+ *  line-height) and an icon-only segment can each size their own Row
+ *  slightly differently even with identical vertical padding, which is
+ *  exactly what made the Songs/chevron pill and the Shuffle/Locate/Sort
+ *  pill sit at visibly different heights before. */
+private val PillButtonHeight = 44.dp
+
 /**
  * A single segment of a multi-part pill control — several of these sit in a
  * row with a hairline gap between them and per-segment corner shapes (see
@@ -491,7 +500,7 @@ private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
  * not a row of fully separate buttons and not one pill with divider lines
  * drawn inside it. Used for both the Songs/Artists/Albums selector and the
  * Shuffle/Locate/Sort controls, so every segment across both groups shares
- * the same height and fill color.
+ * the same height, fill color, and content weight.
  */
 @Composable
 private fun PillButton(
@@ -505,10 +514,12 @@ private fun PillButton(
         onClick = onClick,
         shape = shape,
         color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = modifier
+        modifier = modifier.height(PillButtonHeight)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content
@@ -519,16 +530,16 @@ private fun PillButton(
 /** Corner shapes for a group of [PillButton]s meant to read as one
  *  continuous pill split into segments — full stadium radius (a corner
  *  size larger than the pill's own height always clamps to a perfect
- *  half-circle) on the outer side of each end segment, square on every
- *  side where two segments meet, so the group's silhouette is
- *  indistinguishable from a single pill once the small gap between
- *  segments is accounted for. */
+ *  half-circle) on the outer side of each end segment. Where two segments
+ *  meet, a small (not zero) radius on both facing corners gives the soft
+ *  inward curve the design calls for — a hard square edge there read as
+ *  visually disconnected rather than like two pieces of one pill. */
 private object PillGroupShapes {
     private val Full = 50.dp
-    private val None = 0.dp
-    val First = RoundedCornerShape(topStart = Full, topEnd = None, bottomEnd = None, bottomStart = Full)
-    val Middle = RoundedCornerShape(0.dp)
-    val Last = RoundedCornerShape(topStart = None, topEnd = Full, bottomEnd = Full, bottomStart = None)
+    private val Meeting = 10.dp
+    val First = RoundedCornerShape(topStart = Full, topEnd = Meeting, bottomEnd = Meeting, bottomStart = Full)
+    val Middle = RoundedCornerShape(Meeting)
+    val Last = RoundedCornerShape(topStart = Meeting, topEnd = Full, bottomEnd = Full, bottomStart = Meeting)
 }
 
 @Composable
