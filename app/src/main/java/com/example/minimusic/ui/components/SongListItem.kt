@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -111,11 +112,20 @@ fun SongListItem(
             }
 
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                // Subtle round background behind the overflow icon, matching
+                // the reference — a faint tonal circle rather than a bare
+                // icon floating on the row, but light enough not to compete
+                // with the row's own highlight when a song is playing.
+                Surface(
+                    onClick = { menuExpanded = true },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f)
+                ) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
                         contentDescription = "More options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(6.dp)
                     )
                 }
                 SongContextMenu(

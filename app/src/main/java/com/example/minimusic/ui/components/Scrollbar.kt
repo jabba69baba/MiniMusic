@@ -4,8 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
@@ -104,20 +105,25 @@ fun AlphabetScrollbar(
             .fillMaxHeight()
             .width(32.dp)
             .onSizeChangedHeight { trackHeightPx = it }
+            // A single pointerInput block handles both gestures so there is
+            // only one detector claiming the pointer stream. Two separate
+            // detectDragGestures/detectTapGestures blocks on the same Box
+            // were racing each other for the same touch — the drag detector
+            // could get its stream interrupted by the tap detector's own
+            // press tracking, firing onDragCancel mid-gesture and flipping
+            // isDraggingThumb (and therefore the bubble) off and back on
+            // while the finger never actually left the screen.
             .pointerInput(itemCount) {
-                detectDragGestures(
-                    onDragStart = { offset -> isDraggingThumb = true; updateFromOffsetY(offset.y) },
-                    onDragEnd = { isDraggingThumb = false },
-                    onDragCancel = { isDraggingThumb = false }
-                ) { change, _ -> updateFromOffsetY(change.position.y) }
-            }
-            .pointerInput(itemCount) {
-                detectTapGestures(onPress = { offset ->
+                awaitEachGesture {
+                    val down = awaitFirstDown()
                     isDraggingThumb = true
-                    updateFromOffsetY(offset.y)
-                    tryAwaitRelease()
+                    updateFromOffsetY(down.position.y)
+                    drag(down.id) { change ->
+                        updateFromOffsetY(change.position.y)
+                        change.consume()
+                    }
                     isDraggingThumb = false
-                })
+                }
             }
     ) {
         // Thinner plain track than the thumb, centered in the touch target —
