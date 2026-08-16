@@ -168,24 +168,16 @@ fun LibraryScreen(
             ) {
                 Text(
                     text = "MiniMusic",
-                    style = MaterialTheme.typography.headlineSmall
+                    style = MaterialTheme.typography.headlineSmall,
+                    // Softer wallpaper-tinted tone than the default near-white
+                    // onSurface (Material's legibility-first default for
+                    // titles/body text) — secondary carries hue from the
+                    // Monet palette without the higher-saturation punch of
+                    // primary, which read as too loud for a page title.
+                    color = MaterialTheme.colorScheme.secondary
                 )
-                // Filled tonal circle behind the settings icon so it reads
-                // as a distinct tappable button/overlay rather than a bare
-                // icon — the circle and icon both use Monet-derived
-                // colorScheme tokens (secondaryContainer / onSecondaryContainer),
-                // same as the rest of the app's dynamic theming.
-                Surface(
-                    onClick = onOpenSettings,
-                    shape = androidx.compose.foundation.shape.CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(10.dp)
-                    )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
                 }
             }
 
