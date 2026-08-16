@@ -1,5 +1,8 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,32 +24,40 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * A plain Material-style fast-scroll thumb pinned to the right edge — just a
- * thicker track with a pill-shaped handle that tracks scroll position. No
- * popup, no letters shown anywhere on this component; dragging or tapping
- * the track scrolls the list via [onLetterSelected].
+ * A fast-scroll thumb pinned to the right edge whose position reflects true
+ * scroll progress through [itemCount] items — not which letter section is
+ * currently visible. With a large, unevenly-distributed library (e.g. many
+ * more songs under "S" than "X"), a letter-indexed thumb sits frozen for
+ * long scrolls within one heavy letter and then jumps at the boundary —
+ * driving it by raw list position instead makes it move continuously and
+ * proportionally no matter how songs are distributed across letters.
+ *
+ * Dragging or tapping the track scrolls the list via [onScrollToIndex],
+ * called with a target item index. While dragging, a small bubble shows
+ * the letter for whatever index the finger is currently over (resolved via
+ * [letterForIndex]), the way contact lists / Spotify show a letter preview
+ * during a fast-scroll drag — released, it disappears and the thumb goes
+ * back to tracking [currentIndex] passively.
  *
  * The caller is responsible for sizing this to exactly match the scrollable
  * list's own bounds (same height, same vertical position) — this component
  * simply fills whatever height its modifier gives it.
- *
- * [letters] should be the distinct, sorted set of section letters actually
- * present in the list (so users never land on an empty letter) — used only
- * to map drag position to a section, never rendered.
  */
 @Composable
 fun AlphabetScrollbar(
-    letters: List<Char>,
-    currentLetter: Char?,
-    onLetterSelected: (Char) -> Unit,
+    itemCount: Int,
+    currentIndex: Int,
+    letterForIndex: (Int) -> Char?,
+    onScrollToIndex: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (letters.isEmpty()) return
+    if (itemCount <= 0) return
 
     var isDraggingThumb by remember { mutableStateOf(false) }
     var dragIndex by remember { mutableStateOf(0) }
@@ -53,37 +65,31 @@ fun AlphabetScrollbar(
 
     fun updateFromOffsetY(y: Float) {
         if (trackHeightPx <= 0f) return
-        val fraction = (y / trackHeightPx).coerceIn(0f, 0.9999f)
-        val index = (fraction * letters.size).toInt().coerceIn(0, letters.size - 1)
-        if (index != dragIndex || !isDraggingThumb) {
-            dragIndex = index
-            onLetterSelected(letters[index])
-        }
+        val fraction = (y / trackHeightPx).coerceIn(0f, 1f)
+        val index = (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
+        dragIndex = index
+        onScrollToIndex(index)
     }
 
-    // The thumb always tracks real scroll position via currentLetter (kept in
-    // sync with the list by the caller), except mid-drag where it follows the
+    // The thumb tracks real scroll position via currentIndex (kept in sync
+    // with the list by the caller), except mid-drag where it follows the
     // finger directly for immediate, glitch-free feedback.
-    val thumbIndex = if (isDraggingThumb) {
-        dragIndex
-    } else {
-        currentLetter?.let { letters.indexOf(it).takeIf { i -> i >= 0 } } ?: dragIndex
-    }
-    val thumbFraction = (thumbIndex + 0.5f) / letters.size
+    val thumbIndex = if (isDraggingThumb) dragIndex else currentIndex
+    val thumbFraction = if (itemCount <= 1) 0f else thumbIndex.toFloat() / (itemCount - 1).toFloat()
 
     Box(
         modifier = modifier
             .fillMaxHeight()
             .width(32.dp)
             .onSizeChangedHeight { trackHeightPx = it }
-            .pointerInput(letters) {
+            .pointerInput(itemCount) {
                 detectDragGestures(
                     onDragStart = { offset -> isDraggingThumb = true; updateFromOffsetY(offset.y) },
                     onDragEnd = { isDraggingThumb = false },
                     onDragCancel = { isDraggingThumb = false }
                 ) { change, _ -> updateFromOffsetY(change.position.y) }
             }
-            .pointerInput(letters) {
+            .pointerInput(itemCount) {
                 detectTapGestures(onPress = { offset ->
                     isDraggingThumb = true
                     updateFromOffsetY(offset.y)
@@ -92,36 +98,84 @@ fun AlphabetScrollbar(
                 })
             }
     ) {
-        // Thicker plain track, centered in the touch target.
+        // Thinner plain track than the thumb, centered in the touch target —
+        // narrower than the thumb on purpose so the thumb visibly sticks out
+        // past it on both edges, making the active/inactive split obvious at
+        // a glance rather than the two blending into one uniform width.
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxHeight()
-                .width(8.dp)
+                .width(7.dp)
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
         )
 
-        // Pill-shaped thumb that tracks scroll position, Material fast-scroll style.
-        val thumbHeight = 52.dp
+        // Pill-shaped thumb that tracks scroll position, Material fast-scroll
+        // style. Shorter than before (roughly 65% of the old height) so it
+        // reads as a proportionally smaller, more precise indicator — with
+        // very large libraries the old height made it look like it barely
+        // moved as you scrolled. Wider than the track so it visibly stands
+        // proud of it on both sides.
+        val thumbWidth = 9.dp
+        val thumbHeight = 34.dp
+        val density = LocalDensity.current
+        val thumbOffsetY = remember(trackHeightPx, thumbFraction, thumbHeight, density) {
+            val thumbHeightPx = with(density) { thumbHeight.roundToPx() }
+            val rawY = (trackHeightPx * thumbFraction).roundToInt() - thumbHeightPx / 2
+            rawY.coerceIn(0, (trackHeightPx.roundToInt() - thumbHeightPx).coerceAtLeast(0))
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset {
-                    val thumbHeightPx = thumbHeight.roundToPx()
-                    // Center the thumb on the section's midpoint, but clamp so
-                    // it never renders above the track's top or past its
-                    // bottom — without this, the first section's midpoint
-                    // minus half the thumb height can go negative, pushing the
-                    // thumb visibly above the top of the list it's tracking.
-                    val rawY = (trackHeightPx * thumbFraction).roundToInt() - thumbHeightPx / 2
-                    val clampedY = rawY.coerceIn(0, (trackHeightPx.roundToInt() - thumbHeightPx).coerceAtLeast(0))
-                    IntOffset(x = 0, y = clampedY)
+                    // Center the thumb on its target position, but clamp so it
+                    // never renders above the track's top or past its bottom —
+                    // without this, a position near either end minus half the
+                    // thumb height can push it outside the track's own bounds.
+                    IntOffset(x = 0, y = thumbOffsetY)
                 }
-                .size(width = 8.dp, height = thumbHeight)
+                .size(width = thumbWidth, height = thumbHeight)
                 .clip(RoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.primary)
         )
+
+        // Letter bubble: only shown while actively dragging, floating to the
+        // left of the thumb at the same vertical position, previewing which
+        // letter section the finger is currently over — like contact lists
+        // or Spotify's fast-scroll. Disappears the instant the drag ends.
+        val bubbleSize = 48.dp
+        AnimatedVisibility(
+            visible = isDraggingThumb,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset {
+                    val gap = 12.dp.roundToPx()
+                    IntOffset(
+                        x = -(thumbWidth.roundToPx() + gap),
+                        y = thumbOffsetY - (bubbleSize - thumbHeight).roundToPx() / 2
+                    )
+                }
+        ) {
+            val letter = letterForIndex(thumbIndex)
+            if (letter != null) {
+                Box(
+                    modifier = Modifier
+                        .size(bubbleSize)
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = letter.toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
     }
 }
 
