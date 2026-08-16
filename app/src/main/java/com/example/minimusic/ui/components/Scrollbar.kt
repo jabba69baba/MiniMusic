@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /**
@@ -39,11 +41,13 @@ import kotlin.math.roundToInt
  * proportionally no matter how songs are distributed across letters.
  *
  * Dragging or tapping the track scrolls the list via [onScrollToIndex],
- * called with a target item index. While dragging, a small bubble shows
- * the letter for whatever index the finger is currently over (resolved via
- * [letterForIndex]), the way contact lists / Spotify show a letter preview
- * during a fast-scroll drag — released, it disappears and the thumb goes
- * back to tracking [currentIndex] passively.
+ * called with a target item index. A small bubble shows the letter for
+ * whatever index is currently visible (resolved via [letterForIndex]),
+ * the way contact lists / Spotify show a letter preview during fast-scroll
+ * — it appears both while dragging the thumb directly AND while the list
+ * itself is being scrolled by a normal swipe ([isListScrolling]), so it's
+ * useful during ordinary scrolling and not just a scrollbar-drag gesture;
+ * it disappears shortly after either kind of scrolling stops.
  *
  * The caller is responsible for sizing this to exactly match the scrollable
  * list's own bounds (same height, same vertical position) — this component
@@ -53,6 +57,7 @@ import kotlin.math.roundToInt
 fun AlphabetScrollbar(
     itemCount: Int,
     currentIndex: Int,
+    isListScrolling: Boolean,
     letterForIndex: (Int) -> Char?,
     onScrollToIndex: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -76,6 +81,19 @@ fun AlphabetScrollbar(
     // finger directly for immediate, glitch-free feedback.
     val thumbIndex = if (isDraggingThumb) dragIndex else currentIndex
     val thumbFraction = if (itemCount <= 1) 0f else thumbIndex.toFloat() / (itemCount - 1).toFloat()
+
+    // Bubble should be visible for a brief moment after scrolling stops too
+    // (matches how Spotify/contact lists linger before fading), not cut off
+    // the instant a fling's isScrollInProgress flips back to false.
+    var showBubble by remember { mutableStateOf(false) }
+    LaunchedEffect(isDraggingThumb, isListScrolling) {
+        if (isDraggingThumb || isListScrolling) {
+            showBubble = true
+        } else {
+            delay(400)
+            showBubble = false
+        }
+    }
 
     Box(
         modifier = modifier
@@ -140,19 +158,21 @@ fun AlphabetScrollbar(
                 .background(MaterialTheme.colorScheme.primary)
         )
 
-        // Letter bubble: only shown while actively dragging, floating to the
-        // left of the thumb at the same vertical position, previewing which
-        // letter section the finger is currently over — like contact lists
-        // or Spotify's fast-scroll. Disappears the instant the drag ends.
+        // Letter bubble: shown while actively dragging the thumb OR while
+        // the list itself is being scrolled normally, floating to the left
+        // of the thumb — with a clear gap so it doesn't crowd the track —
+        // at the same vertical position, previewing which letter section is
+        // current. Lingers briefly after scrolling stops rather than
+        // vanishing the instant motion ends.
         val bubbleSize = 48.dp
         AnimatedVisibility(
-            visible = isDraggingThumb,
+            visible = showBubble,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .offset {
-                    val gap = 12.dp.roundToPx()
+                    val gap = 20.dp.roundToPx()
                     IntOffset(
                         x = -(thumbWidth.roundToPx() + gap),
                         y = thumbOffsetY - (bubbleSize - thumbHeight).roundToPx() / 2

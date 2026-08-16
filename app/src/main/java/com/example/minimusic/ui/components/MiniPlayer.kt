@@ -1,5 +1,8 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,10 +26,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -90,13 +95,30 @@ fun MiniPlayer(
         // matchParentSize's parent-data sizing overrides fillMaxWidth's
         // fraction rather than combining with it.
         if (song != null) {
-            Box(modifier = Modifier.matchParentSize()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress.coerceIn(0f, 1f))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+            // Keyed on the song's id so the animation resets fresh for each
+            // track — without this, animateFloatAsState would try to glide
+            // from the previous song's leftover progress to the new one's
+            // starting position, causing a visible slide on track change
+            // instead of the fill just appearing at the right spot.
+            key(song.id) {
+                // Position updates arrive in discrete steps (about once a
+                // second from the player), so snapping the fill straight to
+                // each new value makes it visibly tick forward instead of
+                // flowing. Animating linearly between updates smooths that
+                // into continuous motion.
+                val animatedProgress by animateFloatAsState(
+                    targetValue = progress,
+                    animationSpec = tween(durationMillis = 900, easing = LinearEasing),
+                    label = "miniPlayerProgress"
                 )
+                Box(modifier = Modifier.matchParentSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                    )
+                }
             }
         }
 
@@ -113,6 +135,7 @@ fun MiniPlayer(
                 Text(
                     text = song?.title ?: "What's the vibe?",
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
