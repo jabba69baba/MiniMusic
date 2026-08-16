@@ -215,16 +215,17 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left selector: current view (Songs/Artists/Albums) as
-                        // its own pill, plus a separate small chevron pill next
-                        // to it that opens a dropdown to switch between them —
-                        // two distinct buttons with a real gap between them,
-                        // not one pill with a divider line inside it.
+                        // Left selector: current view (Songs/Artists/Albums)
+                        // and the chevron next to it — two segments of one
+                        // continuous pill silhouette (rounded on the outer
+                        // ends, square where they meet), separated by a
+                        // hairline gap rather than genuinely separate pills.
                         Box {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
                                     onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 16.dp
+                                    horizontalPadding = 16.dp,
+                                    shape = PillGroupShapes.First
                                 ) {
                                     Icon(
                                         selectedTab.icon,
@@ -240,7 +241,8 @@ fun LibraryScreen(
                                 }
                                 PillButton(
                                     onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 12.dp
+                                    horizontalPadding = 12.dp,
+                                    shape = PillGroupShapes.Last
                                 ) {
                                     Icon(
                                         Icons.Filled.ExpandMore,
@@ -269,11 +271,11 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Right controls: Shuffle, Locate, Sort as three
-                        // separate pills with real gaps between them, same
-                        // shape/height as the left selector's pills.
+                        // Right controls: Shuffle, Locate, Sort — three
+                        // segments of one continuous pill silhouette, same
+                        // treatment as the left selector.
                         Box {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
                                     onClick = {
                                         if (uiState.filteredSongs.isNotEmpty()) {
@@ -281,7 +283,8 @@ fun LibraryScreen(
                                             onShufflePlayFrom(startSong, uiState.filteredSongs)
                                         }
                                     },
-                                    horizontalPadding = 12.dp
+                                    horizontalPadding = 12.dp,
+                                    shape = PillGroupShapes.First
                                 ) {
                                     Icon(
                                         Icons.Filled.Shuffle,
@@ -292,7 +295,8 @@ fun LibraryScreen(
                                 }
                                 PillButton(
                                     onClick = { jumpToCurrentRequest++ },
-                                    horizontalPadding = 12.dp
+                                    horizontalPadding = 12.dp,
+                                    shape = PillGroupShapes.Middle
                                 ) {
                                     Icon(
                                         Icons.Filled.MyLocation,
@@ -303,7 +307,8 @@ fun LibraryScreen(
                                 }
                                 PillButton(
                                     onClick = { sortMenuExpanded = true },
-                                    horizontalPadding = 12.dp
+                                    horizontalPadding = 12.dp,
+                                    shape = PillGroupShapes.Last
                                 ) {
                                     Icon(
                                         Icons.Filled.FilterList,
@@ -391,8 +396,11 @@ private fun SongsTab(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // First list index for each distinct starting letter, so the scrollbar only
-    // ever offers letters that actually exist and always lands on the right spot.
+    // First list index for each distinct starting letter — no longer used to
+    // drive the thumb's position (that's now raw scroll progress through the
+    // whole list, so it moves smoothly regardless of how unevenly songs are
+    // spread across letters), but still used to resolve which letter to show
+    // in the preview bubble while actively dragging the thumb.
     val firstIndexByLetter = remember(songs) {
         val map = LinkedHashMap<Char, Int>()
         songs.forEachIndexed { index, song ->
@@ -401,17 +409,13 @@ private fun SongsTab(
         }
         map
     }
-    val letters = remember(firstIndexByLetter) { firstIndexByLetter.keys.sorted() }
-
-    // Sorted (startIndex -> letter) pairs, used below to turn the currently-visible
-    // list index into a section letter so the popup sticker tracks real scroll position.
+    // Sorted (startIndex -> letter) pairs, used to turn any list index (the
+    // one currently under the finger while dragging) into its section letter.
     val sortedLetterEntries = remember(firstIndexByLetter) {
         firstIndexByLetter.entries.map { it.value to it.key }.sortedBy { it.first }
     }
-    val currentLetter = remember(sortedLetterEntries, listState.firstVisibleItemIndex) {
-        val visibleIndex = listState.firstVisibleItemIndex
-        sortedLetterEntries.lastOrNull { it.first <= visibleIndex }?.second
-            ?: sortedLetterEntries.firstOrNull()?.second
+    val letterForIndex: (Int) -> Char? = remember(sortedLetterEntries) {
+        { index -> sortedLetterEntries.lastOrNull { it.first <= index }?.second ?: sortedLetterEntries.firstOrNull()?.second }
     }
 
     LaunchedEffect(jumpToCurrentRequest) {
@@ -442,12 +446,11 @@ private fun SongsTab(
         }
 
         AlphabetScrollbar(
-            letters = letters,
-            currentLetter = currentLetter,
-            onLetterSelected = { letter ->
-                firstIndexByLetter[letter]?.let { index ->
-                    scope.launch { listState.scrollToItem(index) }
-                }
+            itemCount = songs.size,
+            currentIndex = listState.firstVisibleItemIndex,
+            letterForIndex = letterForIndex,
+            onScrollToIndex = { index ->
+                scope.launch { listState.scrollToItem(index) }
             },
             // Matches the song list's own top/bottom content padding exactly
             // so the track starts level with the first song container and
@@ -482,22 +485,25 @@ private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
 }
 
 /**
- * A single standalone rounded pill button — one per control, with real
- * space between adjacent pills (via the caller's Arrangement.spacedBy),
- * not internal divider lines inside one shared container. Used for both
- * the Songs/Artists/Albums selector segments and the Shuffle/Locate/Sort
- * controls, so every pill in the row shares the same shape and height.
+ * A single segment of a multi-part pill control — several of these sit in a
+ * row with a hairline gap between them and per-segment corner shapes (see
+ * [PillGroupShapes]) so the group reads as one continuous pill silhouette,
+ * not a row of fully separate buttons and not one pill with divider lines
+ * drawn inside it. Used for both the Songs/Artists/Albums selector and the
+ * Shuffle/Locate/Sort controls, so every segment across both groups shares
+ * the same height and fill color.
  */
 @Composable
 private fun PillButton(
     onClick: () -> Unit,
     horizontalPadding: androidx.compose.ui.unit.Dp,
+    shape: androidx.compose.ui.graphics.Shape,
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit
 ) {
     Surface(
         onClick = onClick,
-        shape = PillShape,
+        shape = shape,
         color = MaterialTheme.colorScheme.secondaryContainer,
         modifier = modifier
     ) {
@@ -508,6 +514,21 @@ private fun PillButton(
             content = content
         )
     }
+}
+
+/** Corner shapes for a group of [PillButton]s meant to read as one
+ *  continuous pill split into segments — full stadium radius (a corner
+ *  size larger than the pill's own height always clamps to a perfect
+ *  half-circle) on the outer side of each end segment, square on every
+ *  side where two segments meet, so the group's silhouette is
+ *  indistinguishable from a single pill once the small gap between
+ *  segments is accounted for. */
+private object PillGroupShapes {
+    private val Full = 50.dp
+    private val None = 0.dp
+    val First = RoundedCornerShape(topStart = Full, topEnd = None, bottomEnd = None, bottomStart = Full)
+    val Middle = RoundedCornerShape(0.dp)
+    val Last = RoundedCornerShape(topStart = None, topEnd = Full, bottomEnd = Full, bottomStart = None)
 }
 
 @Composable
