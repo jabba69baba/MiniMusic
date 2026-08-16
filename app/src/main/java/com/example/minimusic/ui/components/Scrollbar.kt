@@ -42,12 +42,13 @@ import kotlin.math.roundToInt
  *
  * Dragging or tapping the track scrolls the list via [onScrollToIndex],
  * called with a target item index. A small bubble shows the letter for
- * whatever index is currently visible (resolved via [letterForIndex]),
- * the way contact lists / Spotify show a letter preview during fast-scroll
- * — it appears both while dragging the thumb directly AND while the list
- * itself is being scrolled by a normal swipe ([isListScrolling]), so it's
- * useful during ordinary scrolling and not just a scrollbar-drag gesture;
- * it disappears shortly after either kind of scrolling stops.
+ * whatever index the finger is currently over (resolved via
+ * [letterForIndex]), the way contact lists / Spotify show a letter preview
+ * during a fast-scroll drag on the scrollbar itself — it only appears while
+ * the user is directly touching the scrollbar (drag or press-hold on the
+ * track/thumb), never from an ordinary swipe on the list content, and
+ * lingers briefly after release before fading rather than vanishing the
+ * instant the finger lifts.
  *
  * The caller is responsible for sizing this to exactly match the scrollable
  * list's own bounds (same height, same vertical position) — this component
@@ -57,7 +58,6 @@ import kotlin.math.roundToInt
 fun AlphabetScrollbar(
     itemCount: Int,
     currentIndex: Int,
-    isListScrolling: Boolean,
     letterForIndex: (Int) -> Char?,
     onScrollToIndex: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -82,12 +82,16 @@ fun AlphabetScrollbar(
     val thumbIndex = if (isDraggingThumb) dragIndex else currentIndex
     val thumbFraction = if (itemCount <= 1) 0f else thumbIndex.toFloat() / (itemCount - 1).toFloat()
 
-    // Bubble should be visible for a brief moment after scrolling stops too
-    // (matches how Spotify/contact lists linger before fading), not cut off
-    // the instant a fling's isScrollInProgress flips back to false.
+    // Bubble stays visible for a brief moment after the finger lifts off the
+    // scrollbar (matches how Spotify/contact lists linger before fading)
+    // rather than disappearing the instant isDraggingThumb flips back to
+    // false — but it is driven ONLY by direct interaction with this
+    // scrollbar (drag/press on the track or thumb), never by the song
+    // list's own scroll state, so an ordinary swipe through the list never
+    // triggers it.
     var showBubble by remember { mutableStateOf(false) }
-    LaunchedEffect(isDraggingThumb, isListScrolling) {
-        if (isDraggingThumb || isListScrolling) {
+    LaunchedEffect(isDraggingThumb) {
+        if (isDraggingThumb) {
             showBubble = true
         } else {
             delay(400)
@@ -158,12 +162,13 @@ fun AlphabetScrollbar(
                 .background(MaterialTheme.colorScheme.primary)
         )
 
-        // Letter bubble: shown while actively dragging the thumb OR while
-        // the list itself is being scrolled normally, floating to the left
-        // of the thumb — with a clear gap so it doesn't crowd the track —
+        // Letter bubble: shown only while directly interacting with this
+        // scrollbar (drag or press-hold on the track/thumb) — never
+        // triggered by scrolling the list content itself. Floats to the
+        // left of the thumb with a clear gap so it doesn't crowd the track,
         // at the same vertical position, previewing which letter section is
-        // current. Lingers briefly after scrolling stops rather than
-        // vanishing the instant motion ends.
+        // current. Lingers briefly after release rather than vanishing the
+        // instant the finger lifts.
         val bubbleSize = 48.dp
         AnimatedVisibility(
             visible = showBubble,
@@ -172,7 +177,7 @@ fun AlphabetScrollbar(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .offset {
-                    val gap = 20.dp.roundToPx()
+                    val gap = 16.dp.roundToPx()
                     IntOffset(
                         x = -(thumbWidth.roundToPx() + gap),
                         y = thumbOffsetY - (bubbleSize - thumbHeight).roundToPx() / 2
