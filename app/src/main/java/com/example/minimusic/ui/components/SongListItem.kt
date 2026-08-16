@@ -112,19 +112,31 @@ fun SongListItem(
             }
 
             Box {
-                // Subtle round background behind the overflow icon, matching
-                // the reference — a faint tonal circle rather than a bare
-                // icon floating on the row, but light enough not to compete
-                // with the row's own highlight when a song is playing.
+                // Subtle round background behind the overflow icon on normal
+                // rows; on the currently-playing row it switches to the same
+                // bright accent (colorScheme.primary) used by the scrollbar
+                // thumb and the mini player's play button, so it's actually
+                // visible against the row's own tinted highlight instead of
+                // nearly disappearing into it.
+                val menuButtonColor = if (isPlaying) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f)
+                }
+                val menuIconTint = if (isPlaying) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
                 Surface(
                     onClick = { menuExpanded = true },
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f)
+                    color = menuButtonColor
                 ) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
                         contentDescription = "More options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = menuIconTint,
                         modifier = Modifier.padding(6.dp)
                     )
                 }
