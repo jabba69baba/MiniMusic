@@ -49,6 +49,19 @@ private val MiniPlayerShape = RoundedCornerShape(
     bottomEnd = 0.dp
 )
 
+/** Corner shape for the progress fill's own leading (right) edge — rounded
+ *  on the top-right to match the bar's own top-right corner as the fill
+ *  advances into it, flat on the bottom-right to match the bar's flat
+ *  bottom. The left corners are left square here (0dp) because the fill's
+ *  left edge is already clipped correctly by the outer bar's own shape —
+ *  this shape only needs to handle the fill's own free-floating right edge. */
+private val MiniPlayerFillShape = RoundedCornerShape(
+    topStart = 0.dp,
+    topEnd = 20.dp,
+    bottomStart = 0.dp,
+    bottomEnd = 0.dp
+)
+
 /**
  * Permanent mini player bar — always present at the bottom regardless of
  * whether a song is currently loaded. When [song] is null (nothing has
@@ -116,6 +129,7 @@ fun MiniPlayer(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
+                            .clip(MiniPlayerFillShape)
                             .background(MaterialTheme.colorScheme.primaryContainer)
                     )
                 }
