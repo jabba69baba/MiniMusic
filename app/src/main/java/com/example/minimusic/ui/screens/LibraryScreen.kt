@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
@@ -177,7 +179,11 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.secondary
                 )
                 IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
                 }
             }
 
@@ -231,7 +237,13 @@ fun LibraryScreen(
                                 PillButton(
                                     onClick = { tabMenuExpanded = true },
                                     horizontalPadding = 16.dp,
-                                    shape = PillGroupShapes.First
+                                    shape = PillGroupShapes.First,
+                                    // Fixed width sized to the longest label
+                                    // ("ARTISTS") so the pill never resizes when
+                                    // switching tabs — without this, "SONGS" and
+                                    // "ALBUMS" (shorter/different width) made the
+                                    // whole pill shrink and grow between taps.
+                                    modifier = Modifier.width(SelectorLabelWidth)
                                 ) {
                                     Icon(
                                         selectedTab.icon,
@@ -243,7 +255,9 @@ fun LibraryScreen(
                                         selectedTab.label,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                                         style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 PillButton(
@@ -280,7 +294,11 @@ fun LibraryScreen(
 
                         // Right controls: Shuffle, Locate, Sort — three
                         // segments of one continuous pill silhouette, same
-                        // treatment as the left selector.
+                        // shape/height treatment as the left selector, but a
+                        // more neutral fill: these are one-off action taps,
+                        // not a persistent view-state toggle like the left
+                        // selector, so they shouldn't carry the same
+                        // saturated accent tone.
                         Box {
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
@@ -291,36 +309,39 @@ fun LibraryScreen(
                                         }
                                     },
                                     horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.First
+                                    shape = PillGroupShapes.First,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Icon(
                                         Icons.Filled.Shuffle,
                                         contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 PillButton(
                                     onClick = { jumpToCurrentRequest++ },
                                     horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Middle
+                                    shape = PillGroupShapes.Middle,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Icon(
                                         Icons.Filled.MyLocation,
                                         contentDescription = "Jump to current song",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 PillButton(
                                     onClick = { sortMenuExpanded = true },
                                     horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Last
+                                    shape = PillGroupShapes.Last,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Icon(
                                         Icons.Filled.FilterList,
                                         contentDescription = "Sort songs",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -350,8 +371,16 @@ fun LibraryScreen(
                                     onShufflePlayFrom = { song -> onShufflePlayFrom(song, uiState.filteredSongs) },
                                     onDelete = onDeleteSong
                                 )
-                                LibraryTab.ALBUMS -> AlbumsTab(albums = uiState.albums, onAlbumClick = onAlbumClick)
-                                LibraryTab.ARTISTS -> ArtistsTab(artists = uiState.artists, onArtistClick = onArtistClick)
+                                LibraryTab.ALBUMS -> AlbumsTab(
+                                    albums = uiState.albums,
+                                    bottomContentPadding = footerHeight,
+                                    onAlbumClick = onAlbumClick
+                                )
+                                LibraryTab.ARTISTS -> ArtistsTab(
+                                    artists = uiState.artists,
+                                    bottomContentPadding = footerHeight,
+                                    onArtistClick = onArtistClick
+                                )
                             }
                         }
                     }
@@ -388,6 +417,28 @@ fun LibraryScreen(
 }
 
 
+/**
+ * Builds the "which letter does this index fall under" lookup used to drive
+ * [AlphabetScrollbar]'s preview bubble — shared by all three tabs (Songs,
+ * Artists, Albums) so each gets identical letter-jump behavior keyed off
+ * whatever text the caller extracts a label from (song title, artist name,
+ * or album title).
+ */
+@Composable
+private fun <T> rememberLetterIndex(items: List<T>, labelOf: (T) -> String): (Int) -> Char? {
+    val sortedLetterEntries = remember(items) {
+        val map = LinkedHashMap<Char, Int>()
+        items.forEachIndexed { index, item ->
+            val letter = labelOf(item).firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
+            map.putIfAbsent(letter, index)
+        }
+        map.entries.map { it.value to it.key }.sortedBy { it.first }
+    }
+    return remember(sortedLetterEntries) {
+        { index -> sortedLetterEntries.lastOrNull { it.first <= index }?.second ?: sortedLetterEntries.firstOrNull()?.second }
+    }
+}
+
 @Composable
 private fun SongsTab(
     songs: List<Song>,
@@ -402,28 +453,7 @@ private fun SongsTab(
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-
-    // First list index for each distinct starting letter — no longer used to
-    // drive the thumb's position (that's now raw scroll progress through the
-    // whole list, so it moves smoothly regardless of how unevenly songs are
-    // spread across letters), but still used to resolve which letter to show
-    // in the preview bubble while actively dragging the thumb.
-    val firstIndexByLetter = remember(songs) {
-        val map = LinkedHashMap<Char, Int>()
-        songs.forEachIndexed { index, song ->
-            val letter = song.title.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
-            map.putIfAbsent(letter, index)
-        }
-        map
-    }
-    // Sorted (startIndex -> letter) pairs, used to turn any list index (the
-    // one currently under the finger while dragging) into its section letter.
-    val sortedLetterEntries = remember(firstIndexByLetter) {
-        firstIndexByLetter.entries.map { it.value to it.key }.sortedBy { it.first }
-    }
-    val letterForIndex: (Int) -> Char? = remember(sortedLetterEntries) {
-        { index -> sortedLetterEntries.lastOrNull { it.first <= index }?.second ?: sortedLetterEntries.firstOrNull()?.second }
-    }
+    val letterForIndex = rememberLetterIndex(songs) { it.title }
 
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
@@ -471,23 +501,78 @@ private fun SongsTab(
 }
 
 @Composable
-private fun AlbumsTab(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(12.dp)
-    ) {
-        gridItems(albums, key = { it.id }) { album ->
-            AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
+private fun AlbumsTab(
+    albums: List<Album>,
+    bottomContentPadding: androidx.compose.ui.unit.Dp,
+    onAlbumClick: (Album) -> Unit
+) {
+    val gridState = rememberLazyGridState()
+    val scope = rememberCoroutineScope()
+    val letterForIndex = rememberLetterIndex(albums) { it.title }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                top = 12.dp,
+                end = 12.dp + 28.dp,
+                bottom = bottomContentPadding + 12.dp
+            )
+        ) {
+            gridItems(albums, key = { it.id }) { album ->
+                AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
+            }
         }
+
+        AlphabetScrollbar(
+            itemCount = albums.size,
+            currentIndex = gridState.firstVisibleItemIndex,
+            letterForIndex = letterForIndex,
+            onScrollToIndex = { index ->
+                scope.launch { gridState.scrollToItem(index) }
+            },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .padding(top = 12.dp, bottom = bottomContentPadding + 12.dp)
+        )
     }
 }
 
 @Composable
-private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
-    LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-        items(artists, key = { it.name }) { artist ->
-            ArtistListItem(artist = artist, onClick = { onArtistClick(artist) })
+private fun ArtistsTab(
+    artists: List<Artist>,
+    bottomContentPadding: androidx.compose.ui.unit.Dp,
+    onArtistClick: (Artist) -> Unit
+) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val letterForIndex = rememberLetterIndex(artists) { it.name }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(top = 8.dp, bottom = bottomContentPadding + 8.dp, end = 28.dp)
+        ) {
+            items(artists, key = { it.name }) { artist ->
+                ArtistListItem(artist = artist, onClick = { onArtistClick(artist) })
+            }
         }
+
+        AlphabetScrollbar(
+            itemCount = artists.size,
+            currentIndex = listState.firstVisibleItemIndex,
+            letterForIndex = letterForIndex,
+            onScrollToIndex = { index ->
+                scope.launch { listState.scrollToItem(index) }
+            },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+        )
     }
 }
 
@@ -498,6 +583,11 @@ private fun ArtistsTab(artists: List<Artist>, onArtistClick: (Artist) -> Unit) {
  *  exactly what made the Songs/chevron pill and the Shuffle/Locate/Sort
  *  pill sit at visibly different heights before. */
 private val PillButtonHeight = 44.dp
+
+/** Fixed width for the Songs/Artists/Albums label segment (icon + text),
+ *  sized to comfortably fit "Artists" — the longest of the three labels —
+ *  so the pill's overall width never changes when switching tabs. */
+private val SelectorLabelWidth = 128.dp
 
 /**
  * A single segment of a multi-part pill control — several of these sit in a
@@ -514,12 +604,13 @@ private fun PillButton(
     horizontalPadding: androidx.compose.ui.unit.Dp,
     shape: androidx.compose.ui.graphics.Shape,
     modifier: Modifier = Modifier,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.secondaryContainer,
     content: @Composable RowScope.() -> Unit
 ) {
     Surface(
         onClick = onClick,
         shape = shape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = containerColor,
         modifier = modifier.height(PillButtonHeight)
     ) {
         Row(
