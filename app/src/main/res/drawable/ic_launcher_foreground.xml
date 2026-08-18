@@ -1,78 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Cast shadow remains behind the record and exits toward the bottom-left. -->
-    <path android:pathData="M33,39 L78,63 L58,101 L15,73 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="28"
-                android:startY="43"
-                android:endX="63"
-                android:endY="94"
-                android:startColor="#68000000"
-                android:centerColor="#36000000"
-                android:endColor="#00000000" />
-        </aapt:attr>
-    </path>
-
-    <!-- Smaller outer rim: kept inside the adaptive-icon safe zone. -->
-    <path android:fillColor="#080808" android:pathData="M54,54 m-28,0 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" />
-
-    <!-- Neutral charcoal record face. -->
-    <path android:pathData="M54,54 m-26,0 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="46"
-                android:centerY="45"
-                android:gradientRadius="32"
-                android:startColor="#505050"
-                android:centerColor="#303030"
-                android:endColor="#171717" />
-        </aapt:attr>
-    </path>
-
-    <!-- Two monochrome disc sections with a vertical tonal divide. -->
-    <path android:fillColor="#14FFFFFF" android:pathData="M54,28 A26,26 0 0 0 54,80 L54,28 Z" />
-    <path android:fillColor="#1C000000" android:pathData="M54,28 A26,26 0 0 1 54,80 L54,28 Z" />
-
-    <!-- Concentric groove shadows. -->
-    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
-        android:pathData="M54,54 m-23,0 a23,23 0 1,0 46,0 a23,23 0 1,0 -46,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
-        android:pathData="M54,54 m-19,0 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
-        android:pathData="M54,54 m-15,0 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
-        android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z" />
-
-    <!-- Small upper-left groove highlights, all grayscale. -->
-    <path android:fillColor="#00000000" android:strokeColor="#24FFFFFF" android:strokeWidth="0.55"
-        android:pathData="M32,47 A23,23 0 0 1 48,32" />
-    <path android:fillColor="#00000000" android:strokeColor="#20FFFFFF" android:strokeWidth="0.55"
-        android:pathData="M36,49 A19,19 0 0 1 50,36" />
-    <path android:fillColor="#00000000" android:strokeColor="#1CFFFFFF" android:strokeWidth="0.55"
-        android:pathData="M40,51 A15,15 0 0 1 51,40" />
-
-    <!-- Center label and spindle hole. -->
-    <path android:fillColor="#090909" android:pathData="M54,54 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z" />
-    <path android:pathData="M54,54 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="51"
-                android:centerY="50"
-                android:gradientRadius="12"
-                android:startColor="#BDBDBD"
-                android:centerColor="#888888"
-                android:endColor="#555555" />
-        </aapt:attr>
-    </path>
-    <path android:fillColor="#FAFAFA" android:pathData="M54,54 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0 Z" />
+    <!-- Five rounded waveform bars, kept inside the adaptive-icon safe zone. -->
+    <path
+        android:fillColor="#5A5A5A"
+        android:pathData="M25,43h4a4,4 0 0 1 4,4v14a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V47a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#5A5A5A"
+        android:pathData="M38,29h4a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V33a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#5A5A5A"
+        android:pathData="M52,47h4a4,4 0 0 1 4,4v10a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V51a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#5A5A5A"
+        android:pathData="M66,29h4a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V33a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#5A5A5A"
+        android:pathData="M79,43h4a4,4 0 0 1 4,4v14a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V47a4,4 0 0 1 4,-4z" />
 </vector>
