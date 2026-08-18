@@ -11,6 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
+import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
@@ -20,6 +21,7 @@ import com.example.minimusic.ui.viewmodel.SettingsViewModel
 private object Routes {
     const val LIBRARY = "library"
     const val PLAYER = "player"
+    const val LYRICS = "lyrics"
     const val SETTINGS = "settings"
     const val ALBUM = "album/{albumId}"
     const val ARTIST = "artist/{artistName}"
@@ -36,6 +38,7 @@ fun MiniMusicNavGraph(
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
     val playbackState by playerViewModel.uiState.collectAsState()
+    val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
 
     NavHost(navController = navController, startDestination = Routes.LIBRARY) {
@@ -116,11 +119,9 @@ fun MiniMusicNavGraph(
         }
 
         composable(Routes.PLAYER) {
-            val lyricsState by playerViewModel.lyricsState.collectAsState()
             val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
             PlayerScreen(
                 playbackState = playbackState,
-                lyricsState = lyricsState,
                 showLyricsInitially = appSettings.autoShowLyrics,
                 sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
@@ -130,10 +131,19 @@ fun MiniMusicNavGraph(
                 onSeekTo = playerViewModel::seekTo,
                 onToggleShuffle = playerViewModel::toggleShuffle,
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
+                onOpenLyrics = { navController.navigate(Routes.LYRICS) },
                 onQueueItemClick = playerViewModel::playFromQueue,
                 onMoveQueueItem = playerViewModel::moveQueueItem,
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
+            )
+        }
+
+        composable(Routes.LYRICS) {
+            LyricsScreen(
+                playbackState = playbackState,
+                lyricsState = lyricsState,
+                onBack = { navController.popBackStack() }
             )
         }
     }

@@ -81,13 +81,9 @@ import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
-import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.theme.rememberArtAccentColor
-import com.example.minimusic.ui.viewmodel.LyricsState
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
-
-private enum class PlayerPanel { NOW_PLAYING, LYRICS }
 
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
@@ -130,7 +126,6 @@ private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 @Composable
 fun PlayerScreen(
     playbackState: PlaybackUiState,
-    lyricsState: LyricsState,
     showLyricsInitially: Boolean,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
@@ -140,17 +135,23 @@ fun PlayerScreen(
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
+    onOpenLyrics: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
     onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
-    var panel by remember(song.id) {
-        mutableStateOf(if (showLyricsInitially) PlayerPanel.LYRICS else PlayerPanel.NOW_PLAYING)
-    }
+    var autoOpenedLyrics by remember(song.id) { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
     val accent = rememberArtAccentColor(song.albumArtUri)
+
+    LaunchedEffect(song.id, showLyricsInitially) {
+        if (showLyricsInitially && !autoOpenedLyrics) {
+            autoOpenedLyrics = true
+            onOpenLyrics()
+        }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -186,29 +187,18 @@ fun PlayerScreen(
             }
 
             Box(modifier = Modifier.weight(1f)) {
-                when (panel) {
-                    PlayerPanel.NOW_PLAYING -> NowPlayingPanel(
-                        song = song,
-                        playbackState = playbackState,
-                        accent = accent,
-                        onSeekTo = onSeekTo,
-                        onToggleShuffle = onToggleShuffle,
-                        onSkipPrevious = onSkipPrevious,
-                        onTogglePlayPause = onTogglePlayPause,
-                        onSkipNext = onSkipNext,
-                        onCycleRepeat = onCycleRepeat,
-                        onOpenLyrics = { panel = PlayerPanel.LYRICS }
-                    )
-                    PlayerPanel.LYRICS -> LyricsPanel(
-                        song = song,
-                        lyricsState = lyricsState,
-                        playbackState = playbackState,
-                        accent = accent,
-                        onSeekTo = onSeekTo,
-                        onTogglePlayPause = onTogglePlayPause,
-                        onBackToPlayer = { panel = PlayerPanel.NOW_PLAYING }
-                    )
-                }
+                NowPlayingPanel(
+                    song = song,
+                    playbackState = playbackState,
+                    accent = accent,
+                    onSeekTo = onSeekTo,
+                    onToggleShuffle = onToggleShuffle,
+                    onSkipPrevious = onSkipPrevious,
+                    onTogglePlayPause = onTogglePlayPause,
+                    onSkipNext = onSkipNext,
+                    onCycleRepeat = onCycleRepeat,
+                    onOpenLyrics = onOpenLyrics
+                )
             }
         }
 
@@ -562,412 +552,6 @@ private fun CapsuleSegment(
         )
     }
 }
-
-private enum class LyricsDisplayMode { SYNCED, STATIC }
-
-private data class DisplayLyricLine(
-    val text: String,
-    val startMs: Long? = null
-)
-
-private val LrcTimestampRegex = Regex(
-    "^\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?](.*)$"
-)
-
-private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
-    val sourceLines = text.lines().filter { it.isNotBlank() }
-    val parsed = sourceLines.flatMap { rawLine ->
-        val match = LrcTimestampRegex.matchEntire(rawLine.trim())
-        if (match == null) {
-            listOf(DisplayLyricLine(rawLine.trim()))
-        } else {
-            val minutes = match.groupValues[1].toLong()
-            val seconds = match.groupValues[2].toLong()
-            val fractionText = match.groupValues[3]
-            val fractionMs = when (fractionText.length) {
-                1 -> fractionText.toLong() * 100L
-                2 -> fractionText.toLong() * 10L
-                3 -> fractionText.toLong()
-                else -> 0L
-            }
-            listOf(
-                DisplayLyricLine(
-                    text = match.groupValues[4].trim().ifBlank { "…" },
-                    startMs = minutes * 60_000L + seconds * 1_000L + fractionMs
-                )
-            )
-        }
-    }
-    return parsed.sortedWith(compareBy<DisplayLyricLine> { it.startMs == null }.thenBy { it.startMs ?: Long.MAX_VALUE })
-}
-
-@Composable
-private fun LyricsPanel(
-    song: Song,
-    lyricsState: LyricsState,
-    playbackState: PlaybackUiState,
-    accent: Color,
-    onSeekTo: (Long) -> Unit,
-    onTogglePlayPause: () -> Unit,
-    onBackToPlayer: () -> Unit
-) {
-    val listState = rememberLazyListState()
-    var displayMode by remember(song.id) { mutableStateOf(LyricsDisplayMode.SYNCED) }
-    val lines = remember(lyricsState) {
-        if (lyricsState is LyricsState.Found) parseDisplayLyrics(lyricsState.text) else emptyList()
-    }
-    val hasTimedLines = remember(lines) { lines.any { it.startMs != null } }
-    val activeIndex by remember(lines, playbackState.positionMs, displayMode) {
-        derivedStateOf {
-            if (displayMode != LyricsDisplayMode.SYNCED || !hasTimedLines) {
-                -1
-            } else {
-                lines.withIndex()
-                    .filter { it.value.startMs != null }
-                    .lastOrNull { it.value.startMs!! <= playbackState.positionMs }
-                    ?.index ?: -1
-            }
-        }
-    }
-
-    LaunchedEffect(activeIndex, displayMode, hasTimedLines) {
-        if (displayMode == LyricsDisplayMode.SYNCED && activeIndex >= 0) {
-            val targetIndex = (activeIndex - 2).coerceAtLeast(0)
-            if (targetIndex != listState.firstVisibleItemIndex) {
-                listState.animateScrollToItem(targetIndex)
-            }
-        }
-    }
-
-    val background = MaterialTheme.colorScheme.background
-    val lyricBrush = Brush.verticalGradient(
-        colors = listOf(
-            accent.copy(alpha = 0.14f),
-            background.copy(alpha = 0.98f),
-            background
-        )
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(lyricBrush)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBackToPlayer) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Back to player")
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Lyrics",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (hasTimedLines) "Synced from embedded metadata" else "Embedded lyrics",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
-                border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                    )
-                    Column {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = song.artist,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
-
-        when (lyricsState) {
-            is LyricsState.Loading, LyricsState.Idle -> Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator(color = accent) }
-
-            LyricsState.NotFound -> Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "No embedded lyrics found",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Add lyrics to the file metadata to see them here. MiniMusic stays offline and reads the track’s own tags.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 10.dp, end = 32.dp)
-                )
-            }
-
-            is LyricsState.Found -> {
-                if (lines.isEmpty()) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "Lyrics could not be displayed",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "The embedded lyrics tag was found, but it did not contain readable lyric lines.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 10.dp, end = 32.dp)
-                        )
-                    }
-                } else Box(modifier = Modifier.weight(1f)) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemsIndexed(
-                            items = lines,
-                            key = { index, line -> "${line.startMs ?: -1L}-$index" }
-                        ) { index, line ->
-                            val isActive = index == activeIndex
-                            val activeBounce by animateFloatAsState(
-                                targetValue = if (isActive) 1f else 0f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.58f,
-                                    stiffness = 420f
-                                ),
-                                label = "lyricsActiveLineBounce"
-                            )
-                            val activeScale = 1f + (0.035f * activeBounce)
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .graphicsLayer {
-                                        scaleX = activeScale
-                                        scaleY = activeScale
-                                        translationY = -2f * activeBounce
-                                    }
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .clickable(enabled = line.startMs != null) {
-                                        line.startMs?.let {
-                                            onSeekTo(it)
-                                            displayMode = LyricsDisplayMode.SYNCED
-                                        }
-                                    },
-                                shape = RoundedCornerShape(24.dp),
-                                color = if (isActive) accent.copy(alpha = 0.13f + (0.04f * activeBounce)) else Color.Transparent,
-                                border = if (isActive) {
-                                    BorderStroke(1.dp, accent.copy(alpha = 0.18f + (0.10f * activeBounce)))
-                                } else null
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(if (isActive) 4.dp else 0.dp)
-                                            .heightIn(min = if (isActive) 34.dp else 0.dp)
-                                            .clip(PillShape)
-                                            .background(if (isActive) accent.copy(alpha = 0.82f + (0.18f * activeBounce)) else Color.Transparent)
-                                    )
-                                    Text(
-                                        text = line.text,
-                                        style = if (isActive) {
-                                            MaterialTheme.typography.headlineSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                lineHeight = 36.sp
-                                            )
-                                        } else {
-                                            MaterialTheme.typography.titleLarge.copy(
-                                                fontWeight = FontWeight.Normal,
-                                                lineHeight = 34.sp
-                                            )
-                                        },
-                                        color = if (isActive) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
-                                        textAlign = TextAlign.Start,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(background.copy(alpha = 0.96f), Color.Transparent)
-                                )
-                            )
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(64.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, background.copy(alpha = 0.98f))
-                                )
-                            )
-                    )
-                }
-            }
-        }
-
-        Surface(
-            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
-            tonalElevation = 3.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(accent)
-                            .clickable(onClick = onTogglePlayPause),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        FlatMusicSlider(
-                            value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
-                            valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
-                            onValueChange = { onSeekTo(it.toLong()) },
-                            activeColor = accent
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(formatDuration(playbackState.positionMs), style = MaterialTheme.typography.labelSmall)
-                            Text(formatDuration(playbackState.durationMs), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBackToPlayer) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Back to player")
-                    }
-                    LyricsModeSegment(
-                        text = "Synced",
-                        selected = displayMode == LyricsDisplayMode.SYNCED,
-                        accent = accent,
-                        enabled = hasTimedLines,
-                        onClick = { displayMode = LyricsDisplayMode.SYNCED },
-                        modifier = Modifier.weight(1f)
-                    )
-                    LyricsModeSegment(
-                        text = "Static",
-                        selected = displayMode == LyricsDisplayMode.STATIC,
-                        accent = accent,
-                        enabled = true,
-                        onClick = { displayMode = LyricsDisplayMode.STATIC },
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = { displayMode = LyricsDisplayMode.SYNCED }) {
-                        Icon(Icons.Filled.Subtitles, contentDescription = "Lyrics mode")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LyricsModeSegment(
-    text: String,
-    selected: Boolean,
-    accent: Color,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        color = when {
-            !enabled -> Color.Transparent
-            selected -> accent.copy(alpha = 0.22f)
-            else -> Color.Transparent
-        }
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = when {
-                    !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
-                    selected -> accent
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            )
-        }
-    }
-}
-
 
 private fun formatDuration(ms: Long): String {
     val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(ms.coerceAtLeast(0L))
