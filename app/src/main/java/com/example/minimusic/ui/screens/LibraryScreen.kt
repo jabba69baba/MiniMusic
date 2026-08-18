@@ -57,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,7 +81,6 @@ import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import com.example.minimusic.ui.viewmodel.SongSortOrder
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     SONGS("Songs", Icons.Filled.MusicNote),
@@ -462,13 +460,17 @@ private fun SongsTab(
     onDelete: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val letterForIndex = rememberLetterIndex(songs) { it.title }
 
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
         val index = songs.indexOfFirst { it.id == currentSongId }
-        if (index >= 0) listState.animateScrollToItem(index)
+        if (index >= 0) {
+            // Locate is an explicit position reset, not a smooth navigation gesture. A
+            // zero-offset request makes the selected row share the exact same leading
+            // edge as item zero and eliminates the previous-row sliver.
+            listState.scrollToItem(index = index, scrollOffset = 0)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -477,7 +479,7 @@ private fun SongsTab(
             // Bottom padding matches the footer's actual measured height, so
             // the last song is never hidden underneath the now-opaque mini
             // player + nav bar, without reserving more space than needed.
-            contentPadding = PaddingValues(top = 8.dp, bottom = bottomContentPadding + 8.dp, end = 28.dp)
+            contentPadding = PaddingValues(bottom = bottomContentPadding + 8.dp, end = 28.dp)
         ) {
             items(songs, key = { it.id }) { song ->
                 SongListItem(
@@ -497,7 +499,7 @@ private fun SongsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                scope.launch { listState.scrollToItem(index) }
+                listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             // Matches the song list's own top/bottom content padding exactly
             // so the track starts level with the first song container and
@@ -517,7 +519,6 @@ private fun AlbumsTab(
     onAlbumClick: (Album) -> Unit
 ) {
     val gridState = rememberLazyGridState()
-    val scope = rememberCoroutineScope()
     val letterForIndex = rememberLetterIndex(albums) { it.title }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -541,7 +542,7 @@ private fun AlbumsTab(
             currentIndex = gridState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                scope.launch { gridState.scrollToItem(index) }
+                gridState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -558,13 +559,12 @@ private fun ArtistsTab(
     onArtistClick: (Artist) -> Unit
 ) {
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val letterForIndex = rememberLetterIndex(artists) { it.name }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = 8.dp, bottom = bottomContentPadding + 8.dp, end = 28.dp)
+            contentPadding = PaddingValues(bottom = bottomContentPadding + 8.dp, end = 28.dp)
         ) {
             items(artists, key = { it.name }) { artist ->
                 ArtistListItem(artist = artist, onClick = { onArtistClick(artist) })
@@ -576,7 +576,7 @@ private fun ArtistsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                scope.launch { listState.scrollToItem(index) }
+                listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
