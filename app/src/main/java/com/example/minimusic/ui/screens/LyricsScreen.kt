@@ -3,12 +3,13 @@ package com.example.minimusic.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsets.Companion.systemBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -125,7 +126,7 @@ fun LyricsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
-                .windowInsetsPadding(WindowInsets.systemBars)
+                .windowInsetsPadding(systemBars)
                 .padding(horizontal = 40.dp, vertical = 48.dp)
         )
 
@@ -139,7 +140,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .windowInsetsPadding(WindowInsets.systemBars)
+                        .windowInsetsPadding(systemBars)
                         .padding(horizontal = 40.dp, vertical = 48.dp)
                 )
             } else {
@@ -148,7 +149,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .windowInsetsPadding(WindowInsets.systemBars),
+                        .windowInsetsPadding(systemBars),
                     contentPadding = PaddingValues(
                         start = 40.dp,
                         end = 32.dp,
