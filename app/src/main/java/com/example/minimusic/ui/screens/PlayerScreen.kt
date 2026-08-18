@@ -114,10 +114,7 @@ private val TransportButtonSize = 96.dp
 /** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
 private val CapsuleSegmentHeight = 56.dp
 
-/** Equal vertical gap used between each of the panel's major sections (art block,
- *  transport row, action capsule) so the layout reads as evenly spaced/symmetrical
- *  rather than leaving unconstrained slack for Compose to distribute unevenly. */
-private val SectionGap = 20.dp
+
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -151,7 +148,6 @@ fun PlayerScreen(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
-    onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
@@ -191,14 +187,14 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
-                .padding(top = 4.dp, bottom = 12.dp)
-                // Reserve real space for the drawer's collapsed bar sitting on top
+                .padding(top = 4.dp)
+                // Reserve only the actual collapsed bar height for the overlaid queue.
                 // as a separate overlay below — it isn't part of this Column's
                 // layout flow, so padding on the last child here has no effect on
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
                     bottom = if (playbackState.queue.size > 1) {
-                        QueueDrawerCollapsedHeight + SectionGap
+                        QueueDrawerCollapsedHeight
                     } else {
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
                     }
@@ -254,8 +250,7 @@ fun PlayerScreen(
                 artColors = artColors,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
-                onSongClick = onQueueItemClick,
-                onMove = onMoveQueueItem
+                onSongClick = onQueueItemClick
             )
         }
     }
@@ -374,8 +369,8 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 18.dp)) {
-                            Text(
+        Column(modifier = Modifier.padding(top = 14.dp)) {
+            Text(
                     text = song.title,
                     style = MaterialTheme.typography.headlineSmall,
                     color = artColors.onBackground,
@@ -390,8 +385,8 @@ private fun NowPlayingPanel(
                     )
                 )
 
-                            Text(
-                    text = song.artist,
+            Text(
+                text = song.artist,
                     style = MaterialTheme.typography.bodyLarge,
                     color = artColors.onSurfaceVariant,
                     maxLines = 1,
@@ -399,7 +394,7 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 12.dp)) {
+        Column(modifier = Modifier.padding(top = 8.dp)) {
             FlatMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
@@ -410,8 +405,8 @@ private fun NowPlayingPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 24.dp)
-                    .padding(top = 12.dp),
+                    .height(28.dp)
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -455,7 +450,7 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(TransportButtonSize)
-                .padding(top = SectionGap),
+                .padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -490,7 +485,7 @@ private fun NowPlayingPanel(
         // it while inactive; when active, that segment gets its own filled
         // rounded-pill highlight that visually pops out from the shared
         // background — independently, so more than one can be active at once.
-        Column(modifier = Modifier.padding(top = SectionGap)) {
+        Column(modifier = Modifier.padding(top = 12.dp)) {
             Surface(
                 shape = RoundedCornerShape(50),
                 color = artColors.surfaceVariant,
@@ -648,8 +643,8 @@ private fun CapsuleSegment(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-                            tint = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant
-
+            tint = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant,
+            modifier = Modifier.size(30.dp)
         )
     }
 }

@@ -56,6 +56,7 @@ fun FlatMusicSlider(
             .pointerInput(valueRange) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    down.consume()
                     val startX = 4.dp.toPx()
                     val endX = (size.width - 4.dp.toPx()).coerceAtLeast(startX)
                     val updateFromX: (Float) -> Unit = { x ->
