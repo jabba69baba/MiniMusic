@@ -3,6 +3,7 @@ package com.example.minimusic.ui.screens
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -443,6 +444,7 @@ private fun NowPlayingPanel(
             ) {
                 Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
                     CapsuleSegment(
+                        artColors = artColors,
                         icon = Icons.Filled.Shuffle,
                         active = playbackState.isShuffled,
                         contentDescription = "Shuffle",
@@ -450,6 +452,7 @@ private fun NowPlayingPanel(
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
+                        artColors = artColors,
                         icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
@@ -457,6 +460,7 @@ private fun NowPlayingPanel(
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
+                        artColors = artColors,
                         icon = Icons.Filled.Subtitles,
                         active = false,
                         contentDescription = "Lyrics",
@@ -575,6 +579,7 @@ private fun PlayPauseButton(
  */
 @Composable
 private fun CapsuleSegment(
+    artColors: ArtColorRoles,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     active: Boolean,
     contentDescription: String,
