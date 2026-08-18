@@ -243,6 +243,28 @@ private fun CircularProgressPlayButton(
     }
 }
 
+private fun readableProgressColor(
+    accent: Color,
+    background: Color,
+    primary: Color,
+    onSurface: Color
+): Color {
+    val minimumContrast = 2.4f
+    return when {
+        contrastRatio(accent, background) >= minimumContrast -> accent
+        contrastRatio(primary, background) >= minimumContrast -> primary
+        else -> onSurface
+    }
+}
+
+private fun contrastRatio(foreground: Color, background: Color): Float {
+    val foregroundLuminance = foreground.luminance()
+    val backgroundLuminance = background.luminance()
+    val lighter = maxOf(foregroundLuminance, backgroundLuminance)
+    val darker = minOf(foregroundLuminance, backgroundLuminance)
+    return (lighter + 0.05f) / (darker + 0.05f)
+}
+
 /** Square album art thumbnail (not circular). Shows a muted music-note
  *  placeholder tile when there's no art (or no song at all). */
 @Composable
