@@ -102,8 +102,9 @@ private fun tonalSpotScheme(seed: Color, isDark: Boolean): DynamicScheme =
 @Composable
 fun rememberArtAccentColor(albumArtUri: Uri?): Color {
     val seed = rememberArtworkSeedColor(albumArtUri)
-    val scheme = remember(seed, isSystemInDarkTheme()) {
-        tonalSpotScheme(seed, isSystemInDarkTheme())
+    val isDark = isSystemInDarkTheme()
+    val scheme = remember(seed, isDark) {
+        tonalSpotScheme(seed, isDark)
     }
     return Color(scheme.getPrimary())
 }
