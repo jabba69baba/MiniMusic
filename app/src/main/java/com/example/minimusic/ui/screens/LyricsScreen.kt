@@ -8,8 +8,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsets.Companion.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,7 +27,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.windowInsetsPadding
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.viewmodel.LyricsState
 
@@ -126,7 +123,7 @@ fun LyricsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
-                .windowInsetsPadding(statusBars)
+                .padding(top = 24.dp)
                 .padding(horizontal = 40.dp, vertical = 48.dp)
         )
 
@@ -140,7 +137,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .windowInsetsPadding(statusBars)
+                        .padding(top = 24.dp)
                         .padding(horizontal = 40.dp, vertical = 48.dp)
                 )
             } else {
@@ -149,7 +146,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .windowInsetsPadding(statusBars),
+                        .padding(top = 24.dp),
                     contentPadding = PaddingValues(
                         start = 40.dp,
                         end = 32.dp,
