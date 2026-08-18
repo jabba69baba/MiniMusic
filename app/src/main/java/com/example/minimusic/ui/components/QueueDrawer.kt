@@ -151,6 +151,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(bottom = 8.dp)
             ) {
                 // Collapsed bar: drag handle + icon + "Queue" label, always visible

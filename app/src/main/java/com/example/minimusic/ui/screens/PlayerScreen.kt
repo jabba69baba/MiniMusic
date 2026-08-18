@@ -197,7 +197,8 @@ fun PlayerScreen(
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
                     bottom = if (playbackState.queue.size > 1) {
-                        QueueDrawerCollapsedHeight + SectionGap
+                        QueueDrawerCollapsedHeight + SectionGap +
+                            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                     } else {
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
                     }
