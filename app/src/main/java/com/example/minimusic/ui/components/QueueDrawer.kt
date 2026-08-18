@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,7 +152,6 @@ fun BoxWithConstraintsScope.QueueDrawer(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(bottom = 8.dp)
             ) {
                 // Collapsed bar: drag handle + icon + "Queue" label, always visible
@@ -224,6 +224,15 @@ private fun QueueDrawerList(
 
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffsetPx by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(queue, currentIndex) {
+        if (draggingIndex == null && currentIndex in queue.indices) {
+            val currentVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == currentIndex }
+            if (!currentVisible) {
+                listState.animateScrollToItem(currentIndex)
+            }
+        }
+    }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         itemsIndexed(queue, key = { _, song -> song.id }) { index, song ->

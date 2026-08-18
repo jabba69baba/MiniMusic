@@ -82,6 +82,7 @@ fun MiniMusicNavGraph(
                 onThemeModeChange = settingsViewModel::setThemeMode,
                 onAutoShowLyricsChange = settingsViewModel::setAutoShowLyrics,
                 onResumeOnLaunchChange = settingsViewModel::setResumeOnLaunch,
+                onShowAudioQualityBadgeChange = settingsViewModel::setShowAudioQualityBadge,
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
                 onRescanLibrary = libraryViewModel::rescanLibrary
             )
@@ -123,6 +124,7 @@ fun MiniMusicNavGraph(
             PlayerScreen(
                 playbackState = playbackState,
                 showLyricsInitially = appSettings.autoShowLyrics,
+                showAudioQualityBadge = appSettings.showAudioQualityBadge,
                 sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
                 onTogglePlayPause = playerViewModel::togglePlayPause,

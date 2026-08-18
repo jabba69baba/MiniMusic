@@ -40,7 +40,14 @@ suspend fun readAudioFormatInfo(context: Context, contentUri: Uri): AudioFormatI
         val bitrateKbps = bitrateBps?.let { it / 1000 }
 
         val mime = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
-        val mimeLabel = mime?.substringAfterLast('/')?.uppercase()?.takeIf { it.isNotBlank() }
+        val mimeLabel = when (mime?.lowercase()) {
+            "audio/mpeg", "audio/mp3" -> "MP3"
+            "audio/mp4", "audio/aac" -> "AAC"
+            "audio/flac" -> "FLAC"
+            "audio/ogg", "application/ogg" -> "OGG"
+            "audio/wav", "audio/x-wav" -> "WAV"
+            else -> mime?.substringAfterLast('/')?.uppercase()?.takeIf { it.isNotBlank() }
+        }
 
         if (sampleRate == null && bitrateKbps == null && mimeLabel == null) {
             null

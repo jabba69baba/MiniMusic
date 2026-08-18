@@ -47,6 +47,7 @@ fun SettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     onAutoShowLyricsChange: (Boolean) -> Unit,
     onResumeOnLaunchChange: (Boolean) -> Unit,
+    onShowAudioQualityBadgeChange: (Boolean) -> Unit,
     onMinDurationChange: (Int) -> Unit,
     onRescanLibrary: () -> Unit
 ) {
@@ -108,6 +109,14 @@ fun SettingsScreen(
                     subtitle = "Reopen your last queue when you start the app",
                     checked = settings.resumeOnLaunch,
                     onCheckedChange = onResumeOnLaunchChange
+                )
+            }
+            item {
+                SettingsSwitchRow(
+                    title = "Audio quality badge",
+                    subtitle = "Show sample rate, bitrate, and format on the player",
+                    checked = settings.showAudioQualityBadge,
+                    onCheckedChange = onShowAudioQualityBadgeChange
                 )
             }
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp)) }

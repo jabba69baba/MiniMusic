@@ -140,6 +140,7 @@ private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 fun PlayerScreen(
     playbackState: PlaybackUiState,
     showLyricsInitially: Boolean,
+    showAudioQualityBadge: Boolean = true,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -197,8 +198,7 @@ fun PlayerScreen(
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
                     bottom = if (playbackState.queue.size > 1) {
-                        QueueDrawerCollapsedHeight + SectionGap +
-                            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        QueueDrawerCollapsedHeight + SectionGap
                     } else {
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
                     }
@@ -232,6 +232,7 @@ fun PlayerScreen(
                     song = song,
                     playbackState = playbackState,
                     artColors = artColors,
+                    showAudioQualityBadge = showAudioQualityBadge,
                     onSeekTo = onSeekTo,
                     onToggleShuffle = onToggleShuffle,
                     onSkipPrevious = onSkipPrevious,
@@ -331,6 +332,7 @@ private fun NowPlayingPanel(
     song: Song,
     playbackState: PlaybackUiState,
     artColors: ArtColorRoles,
+    showAudioQualityBadge: Boolean,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -419,18 +421,25 @@ private fun NowPlayingPanel(
                     color = artColors.onSurfaceVariant
                 )
 
-                val badgeText = formatInfo?.toBadgeText()
-                if (badgeText != null) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = artColors.surfaceVariant
-                    ) {
-                        Text(
-                            text = badgeText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = artColors.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                Box(
+                    modifier = Modifier
+                        .width(150.dp)
+                        .height(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val badgeText = formatInfo?.toBadgeText()
+                    if (showAudioQualityBadge && badgeText != null) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = artColors.surfaceVariant
+                        ) {
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = artColors.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
 

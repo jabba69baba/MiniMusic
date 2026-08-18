@@ -164,6 +164,7 @@ class PlayerController(private val context: Context) {
         val c = controller ?: return
         c.shuffleModeEnabled = !c.shuffleModeEnabled
         _uiState.value = _uiState.value.copy(isShuffled = c.shuffleModeEnabled)
+        syncQueueFromController()
     }
 
     fun cycleRepeatMode() {
@@ -179,6 +180,7 @@ class PlayerController(private val context: Context) {
             RepeatMode.ONE -> Player.REPEAT_MODE_ONE
         }
         _uiState.value = _uiState.value.copy(repeatMode = next)
+        syncQueueFromController()
     }
 
     private val playerListener = object : Player.Listener {
@@ -189,11 +191,26 @@ class PlayerController(private val context: Context) {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             holdPlaybackStateAcrossTransition()
-            refreshCurrentItem()
+            syncQueueFromController()
         }
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
-            refreshCurrentItem()
+            syncQueueFromController()
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            _uiState.value = _uiState.value.copy(isShuffled = shuffleModeEnabled)
+            syncQueueFromController()
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            val mode = when (repeatMode) {
+                Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                else -> RepeatMode.OFF
+            }
+            _uiState.value = _uiState.value.copy(repeatMode = mode)
+            syncQueueFromController()
         }
     }
 
@@ -210,14 +227,34 @@ class PlayerController(private val context: Context) {
         }
     }
 
+    private fun syncQueueFromController() {
+        val c = controller ?: return
+        if (c.mediaItemCount > 0 && currentQueue.isNotEmpty()) {
+            val songsByMediaId = currentQueue.associateBy { it.id.toString() }
+            val timelineQueue = (0 until c.mediaItemCount).mapNotNull { itemIndex ->
+                songsByMediaId[c.getMediaItemAt(itemIndex).mediaId]
+            }
+            if (timelineQueue.size == c.mediaItemCount) {
+                currentQueue = timelineQueue
+            }
+        }
+        refreshCurrentItem()
+    }
+
     private fun refreshCurrentItem() {
         val c = controller ?: return
         val index = c.currentMediaItemIndex
         val song = currentQueue.getOrNull(index)
         _uiState.value = _uiState.value.copy(
             currentSong = song,
-            queue = currentQueue,
+            queue = currentQueue.toList(),
             currentIndex = index,
+            isShuffled = c.shuffleModeEnabled,
+            repeatMode = when (c.repeatMode) {
+                Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                else -> RepeatMode.OFF
+            },
             durationMs = c.duration.coerceAtLeast(0L)
         )
     }

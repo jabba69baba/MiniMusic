@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
@@ -43,8 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
-import com.example.minimusic.ui.theme.ArtColorRoles
-import com.example.minimusic.ui.theme.rememberArtColorRoles
+import com.example.minimusic.ui.theme.rememberArtAccentColor
 
 /** Corner shape for the mini player bar — rounded on top to match the app's
  *  Material Expressive shape scale, but square on the bottom two corners so
@@ -84,10 +85,21 @@ fun MiniPlayer(
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
         }
     }
-    val artColors = rememberArtColorRoles(song?.albumArtUri)
-    val miniPlayerColor = artColors.surfaceVariant
-    val controlTint = artColors.onSurface
-    val progressRingColor = artColors.primary
+    val artAccent = rememberArtAccentColor(song?.albumArtUri)
+    val miniPlayerColor = artAccent
+        .copy(alpha = 0.30f)
+        .compositeOver(MaterialTheme.colorScheme.surface)
+    val controlTint = if (song != null) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val progressRingColor = readableProgressColor(
+        accent = artAccent,
+        background = miniPlayerColor,
+        primary = MaterialTheme.colorScheme.primary,
+        onSurface = controlTint
+    )
 
     Box(
         modifier = modifier
@@ -103,22 +115,29 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MiniPlayerArt(artUri = song?.albumArtUri, artColors = artColors)
+            MiniPlayerArt(artUri = song?.albumArtUri)
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song?.title ?: "What's the vibe?",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal,
-                    color = artColors.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        initialDelayMillis = 900,
+                        repeatDelayMillis = 1_100,
+                        velocity = 34.dp
+                    )
                 )
                 Text(
                     text = song?.artist ?: "Tap a song to listen",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = artColors.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -229,20 +248,19 @@ private fun CircularProgressPlayButton(
 @Composable
 private fun MiniPlayerArt(
     artUri: android.net.Uri?,
-    artColors: ArtColorRoles,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .size(44.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(artColors.secondaryContainer),
+            .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.Filled.MusicNote,
             contentDescription = null,
-            tint = artColors.onSecondaryContainer
+            tint = MaterialTheme.colorScheme.onPrimaryContainer
         )
         if (artUri != null) {
             AsyncImage(
