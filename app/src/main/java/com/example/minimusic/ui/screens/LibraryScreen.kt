@@ -236,13 +236,19 @@ fun LibraryScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
                                     onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 16.dp,
+                                    horizontalPadding = 10.dp,
                                     shape = PillGroupShapes.First,
                                     // Fixed width sized to the longest label
-                                    // ("ARTISTS") so the pill never resizes when
-                                    // switching tabs — without this, "SONGS" and
-                                    // "ALBUMS" (shorter/different width) made the
+                                    // ("Artists") so the pill never resizes when
+                                    // switching tabs — without this, "Songs" and
+                                    // "Albums" (shorter/different width) made the
                                     // whole pill shrink and grow between taps.
+                                    // Padding trimmed from the shared 16.dp down
+                                    // to 10.dp here specifically so the fixed
+                                    // width can stay compact (matching the
+                                    // right-side group's total width) while
+                                    // still leaving enough room for the text
+                                    // to render without truncating.
                                     modifier = Modifier.width(SelectorLabelWidth)
                                 ) {
                                     Icon(
@@ -263,7 +269,8 @@ fun LibraryScreen(
                                 PillButton(
                                     onClick = { tabMenuExpanded = true },
                                     horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Last
+                                    shape = PillGroupShapes.Last,
+                                    modifier = Modifier.width(SelectorChevronWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.ExpandMore,
@@ -310,7 +317,8 @@ fun LibraryScreen(
                                     },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.First,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.Shuffle,
@@ -323,7 +331,8 @@ fun LibraryScreen(
                                     onClick = { jumpToCurrentRequest++ },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.Middle,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.MyLocation,
@@ -336,7 +345,8 @@ fun LibraryScreen(
                                     onClick = { sortMenuExpanded = true },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.Last,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.FilterList,
@@ -587,7 +597,19 @@ private val PillButtonHeight = 44.dp
 /** Fixed width for the Songs/Artists/Albums label segment (icon + text),
  *  sized to comfortably fit "Artists" — the longest of the three labels —
  *  so the pill's overall width never changes when switching tabs. */
-private val SelectorLabelWidth = 128.dp
+private val SelectorLabelWidth = 96.dp
+
+/** Fixed width for the chevron segment next to the label, and for each of
+ *  the three Shuffle/Locate/Sort segments — chosen so the left group
+ *  (label + chevron) and the right group (3 icon segments) add up to the
+ *  same total width, including the 2.dp gaps between segments in each
+ *  group. Right group (unchanged icon-only sizing): 3 segments of 46.dp +
+ *  2 gaps of 2.dp = 142.dp. Left group needs label + chevron + 1 gap to
+ *  also total 142.dp, so with chevron kept at 46.dp: 142 - 2 - 46 = 94.dp
+ *  for the label segment — see [SelectorLabelWidth] above, rounded to
+ *  96.dp for comfortable text fit (144.dp total, 2.dp over — negligible). */
+private val SelectorChevronWidth = 46.dp
+private val ControlSegmentWidth = 46.dp
 
 /**
  * A single segment of a multi-part pill control — several of these sit in a
