@@ -39,25 +39,25 @@
     </path>
 
     <!-- Two monochrome disc sections with a vertical tonal divide. -->
-    <path android:fillColor="#FFFFFF14" android:pathData="M54,28 A26,26 0 0 0 54,80 L54,28 Z" />
-    <path android:fillColor="#0000001C" android:pathData="M54,28 A26,26 0 0 1 54,80 L54,28 Z" />
+    <path android:fillColor="#14FFFFFF" android:pathData="M54,28 A26,26 0 0 0 54,80 L54,28 Z" />
+    <path android:fillColor="#1C000000" android:pathData="M54,28 A26,26 0 0 1 54,80 L54,28 Z" />
 
     <!-- Concentric groove shadows. -->
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
         android:pathData="M54,54 m-23,0 a23,23 0 1,0 46,0 a23,23 0 1,0 -46,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
         android:pathData="M54,54 m-19,0 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
         android:pathData="M54,54 m-15,0 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+    <path android:fillColor="#00000000" android:strokeColor="#C0080808" android:strokeWidth="1.25"
         android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z" />
 
     <!-- Small upper-left groove highlights, all grayscale. -->
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF24" android:strokeWidth="0.55"
+    <path android:fillColor="#00000000" android:strokeColor="#24FFFFFF" android:strokeWidth="0.55"
         android:pathData="M32,47 A23,23 0 0 1 48,32" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF20" android:strokeWidth="0.55"
+    <path android:fillColor="#00000000" android:strokeColor="#20FFFFFF" android:strokeWidth="0.55"
         android:pathData="M36,49 A19,19 0 0 1 50,36" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF1C" android:strokeWidth="0.55"
+    <path android:fillColor="#00000000" android:strokeColor="#1CFFFFFF" android:strokeWidth="0.55"
         android:pathData="M40,51 A15,15 0 0 1 51,40" />
 
     <!-- Center label and spindle hole. -->
