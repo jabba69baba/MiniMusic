@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
@@ -44,7 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
-import com.example.minimusic.ui.theme.rememberArtAccentColor
+import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 
 /** Corner shape for the mini player bar — rounded on top to match the app's
  *  Material Expressive shape scale, but square on the bottom two corners so
@@ -84,21 +84,10 @@ fun MiniPlayer(
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
         }
     }
-    val artAccent = rememberArtAccentColor(song?.albumArtUri)
-    val miniPlayerColor = artAccent
-        .copy(alpha = 0.30f)
-        .compositeOver(MaterialTheme.colorScheme.surface)
-    val controlTint = if (song != null) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val progressRingColor = readableProgressColor(
-        accent = artAccent,
-        background = miniPlayerColor,
-        primary = MaterialTheme.colorScheme.primary,
-        onSurface = controlTint
-    )
+    val artColors = rememberArtColorRoles(song?.albumArtUri)
+    val miniPlayerColor = artColors.surfaceVariant
+    val controlTint = artColors.onSurface
+    val progressRingColor = artColors.primary
 
     Box(
         modifier = modifier
@@ -114,13 +103,14 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MiniPlayerArt(artUri = song?.albumArtUri)
+            MiniPlayerArt(artUri = song?.albumArtUri, artColors = artColors)
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song?.title ?: "What's the vibe?",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal,
+                    color = artColors.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -128,7 +118,7 @@ fun MiniPlayer(
                     text = song?.artist ?: "Tap a song to listen",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = artColors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -185,7 +175,7 @@ private fun CircularProgressPlayButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (enabled) controlTint.copy(alpha = 0.28f)
+    val trackColor = if (enabled) controlTint.copy(alpha = 0.24f)
     else MaterialTheme.colorScheme.outlineVariant
     val resolvedProgressColor = if (enabled) progressColor else MaterialTheme.colorScheme.outlineVariant
 
@@ -234,46 +224,25 @@ private fun CircularProgressPlayButton(
     }
 }
 
-private fun readableProgressColor(
-    accent: Color,
-    background: Color,
-    primary: Color,
-    onSurface: Color
-): Color {
-    val minimumContrast = 2.4f
-    return when {
-        contrastRatio(accent, background) >= minimumContrast -> accent
-        contrastRatio(primary, background) >= minimumContrast -> primary
-        else -> onSurface
-    }
-}
-
-private fun contrastRatio(foreground: Color, background: Color): Float {
-    val foregroundLuminance = foreground.luminance()
-    val backgroundLuminance = background.luminance()
-    val lighter = maxOf(foregroundLuminance, backgroundLuminance)
-    val darker = minOf(foregroundLuminance, backgroundLuminance)
-    return (lighter + 0.05f) / (darker + 0.05f)
-}
-
 /** Square album art thumbnail (not circular). Shows a muted music-note
  *  placeholder tile when there's no art (or no song at all). */
 @Composable
 private fun MiniPlayerArt(
     artUri: android.net.Uri?,
+    artColors: ArtColorRoles,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .size(44.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(artColors.secondaryContainer),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.Filled.MusicNote,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer
+            tint = artColors.onSecondaryContainer
         )
         if (artUri != null) {
             AsyncImage(

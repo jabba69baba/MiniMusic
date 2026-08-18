@@ -117,7 +117,8 @@ fun BoxWithConstraintsScope.QueueDrawer(
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             color = artColors.surfaceVariant,
-            tonalElevation = 4.dp,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxSize()

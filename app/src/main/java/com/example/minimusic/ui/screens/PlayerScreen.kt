@@ -122,12 +122,6 @@ private val SectionGap = 20.dp
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 
-private enum class TransportControl {
-    PREVIOUS,
-    PLAY_PAUSE,
-    NEXT
-}
-
 /**
  * Player screen. Header: chevron-down collapse (left), centered "Now Playing"
  * label, sleep timer button (right). Large rounded album art; a flat solid-fill
@@ -166,15 +160,15 @@ fun PlayerScreen(
     val artColors = rememberArtColorRoles(song.albumArtUri)
     val view = LocalView.current
 
-    DisposableEffect(view, artColors.background) {
+    val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
+    DisposableEffect(view, artColors.background, visibleNavigationSurface) {
         val window = (view.context as? Activity)?.window
         if (window != null) {
             val controller = WindowCompat.getInsetsController(window, view)
             window.statusBarColor = artColors.background.toArgb()
-            window.navigationBarColor = artColors.background.toArgb()
-            val useDarkIcons = artColors.background.luminance() > 0.52f
-            controller.isAppearanceLightStatusBars = useDarkIcons
-            controller.isAppearanceLightNavigationBars = useDarkIcons
+            window.navigationBarColor = visibleNavigationSurface.toArgb()
+            controller.isAppearanceLightStatusBars = artColors.background.luminance() > 0.52f
+            controller.isAppearanceLightNavigationBars = visibleNavigationSurface.luminance() > 0.52f
         }
         onDispose { }
     }
@@ -346,7 +340,6 @@ private fun NowPlayingPanel(
 ) {
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
-    var heldTransport by remember(song.id) { mutableStateOf<TransportControl?>(null) }
 
     LaunchedEffect(song.id) {
         formatInfo = readAudioFormatInfo(context, song.contentUri)
@@ -448,25 +441,6 @@ private fun NowPlayingPanel(
             }
         }
 
-        val previousWeightTarget = when (heldTransport) {
-            TransportControl.PREVIOUS -> 1.24f
-            null -> 1f
-            else -> 0.82f
-        }
-        val playWeightTarget = when (heldTransport) {
-            TransportControl.PLAY_PAUSE -> 1.42f
-            null -> 1f
-            else -> 0.82f
-        }
-        val nextWeightTarget = when (heldTransport) {
-            TransportControl.NEXT -> 1.24f
-            null -> 1f
-            else -> 0.82f
-        }
-        val previousWeight by animateFloatAsState(previousWeightTarget, tween(220), label = "previousTransportWeight")
-        val playWeight by animateFloatAsState(playWeightTarget, tween(220), label = "playTransportWeight")
-        val nextWeight by animateFloatAsState(nextWeightTarget, tween(220), label = "nextTransportWeight")
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -481,24 +455,15 @@ private fun NowPlayingPanel(
                 shape = CircleShape,
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
-                onPressedChanged = { pressed ->
-                    heldTransport = if (pressed) TransportControl.PREVIOUS
-                    else if (heldTransport == TransportControl.PREVIOUS) null else heldTransport
-                },
-                onClick = onSkipPrevious,
-                modifier = Modifier.weight(previousWeight)
+                onClick = onSkipPrevious
             )
             PlayPauseButton(
                 isPlaying = playbackState.isPlaying,
                 containerColor = artColors.primary,
                 contentColor = artColors.onPrimary,
-                onPressedChanged = { pressed ->
-                    heldTransport = if (pressed) TransportControl.PLAY_PAUSE
-                    else if (heldTransport == TransportControl.PLAY_PAUSE) null else heldTransport
-                },
                 onClick = onTogglePlayPause,
                 modifier = Modifier
-                    .weight(playWeight)
+                    .weight(1f)
                     .fillMaxHeight()
             )
             TransportButton(
@@ -507,12 +472,7 @@ private fun NowPlayingPanel(
                 shape = CircleShape,
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
-                onPressedChanged = { pressed ->
-                    heldTransport = if (pressed) TransportControl.NEXT
-                    else if (heldTransport == TransportControl.NEXT) null else heldTransport
-                },
-                onClick = onSkipNext,
-                modifier = Modifier.weight(nextWeight)
+                onClick = onSkipNext
             )
         }
 
@@ -566,41 +526,27 @@ private fun TransportButton(
     shape: androidx.compose.ui.graphics.Shape,
     containerColor: Color,
     contentColor: Color,
-    onPressedChanged: (Boolean) -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    LaunchedEffect(isPressed) {
-        onPressedChanged(isPressed)
-    }
-
-    BoxWithConstraints(
-        modifier = modifier.fillMaxHeight(),
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+            .clip(shape)
+            .background(containerColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
-        val buttonSize = minOf(maxWidth, maxHeight)
-        Box(
-            modifier = Modifier
-                .size(buttonSize)
-                .clip(shape)
-                .background(containerColor)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = contentColor,
-                modifier = Modifier.fillMaxSize(0.45f)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = contentColor,
+            modifier = Modifier.fillMaxSize(0.45f)
+        )
     }
 }
 
@@ -609,17 +555,9 @@ private fun PlayPauseButton(
     isPlaying: Boolean,
     containerColor: Color,
     contentColor: Color,
-    onPressedChanged: (Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    LaunchedEffect(isPressed) {
-        onPressedChanged(isPressed)
-    }
-
     Row(
         modifier = modifier
             .fillMaxHeight()

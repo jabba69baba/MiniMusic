@@ -53,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,8 +63,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +81,7 @@ import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.theme.PillShape
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import com.example.minimusic.ui.viewmodel.SongSortOrder
@@ -118,6 +123,18 @@ fun LibraryScreen(
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     val density = LocalDensity.current
+    val view = LocalView.current
+    val miniPlayerColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
+    DisposableEffect(view, miniPlayerColors.surfaceVariant) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            window.navigationBarColor = miniPlayerColors.surfaceVariant.toArgb()
+            val useDarkIcons = miniPlayerColors.surfaceVariant.luminance() > 0.52f
+            controller.isAppearanceLightNavigationBars = useDarkIcons
+        }
+        onDispose { }
+    }
     var footerHeight by remember { mutableStateOf(0.dp) }
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
