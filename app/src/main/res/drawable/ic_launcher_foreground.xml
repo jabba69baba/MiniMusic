@@ -6,80 +6,73 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Long cast shadow from the record toward the bottom-left. -->
-    <path android:pathData="M30,35 L84,64 L58,108 L5,70 Z">
+    <!-- Cast shadow remains behind the record and exits toward the bottom-left. -->
+    <path android:pathData="M33,39 L78,63 L58,101 L15,73 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="21"
-                android:startY="41"
-                android:endX="65"
-                android:endY="98"
-                android:startColor="#72000000"
-                android:centerColor="#3D000000"
+                android:startX="28"
+                android:startY="43"
+                android:endX="63"
+                android:endY="94"
+                android:startColor="#68000000"
+                android:centerColor="#36000000"
                 android:endColor="#00000000" />
         </aapt:attr>
     </path>
 
-    <!-- Soft inner edge of the cast shadow. -->
-    <path android:fillColor="#26000000" android:pathData="M29,40 L78,67 L55,105 L10,73 Z" />
+    <!-- Smaller outer rim: kept inside the adaptive-icon safe zone. -->
+    <path android:fillColor="#080808" android:pathData="M54,54 m-28,0 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" />
 
-    <!-- Heavy outer rim. -->
-    <path android:fillColor="#080808" android:pathData="M54,54 m-34,0 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0 Z" />
-
-    <!-- Main record surface with a subtle radial highlight. -->
-    <path android:pathData="M54,54 m-32,0 a32,32 0 1,0 64,0 a32,32 0 1,0 -64,0 Z">
+    <!-- Neutral charcoal record face. -->
+    <path android:pathData="M54,54 m-26,0 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="radial"
-                android:centerX="43"
-                android:centerY="40"
-                android:gradientRadius="39"
-                android:startColor="#4B4B4B"
+                android:centerX="46"
+                android:centerY="45"
+                android:gradientRadius="32"
+                android:startColor="#505050"
                 android:centerColor="#303030"
-                android:endColor="#161616" />
+                android:endColor="#171717" />
         </aapt:attr>
     </path>
 
-    <!-- Two tonal sections: a lifted left/top face and a deeper right/bottom face. -->
-    <path android:fillColor="#FFFFFF16" android:pathData="M54,22 A32,32 0 0 0 54,86 L54,22 Z" />
-    <path android:fillColor="#00000020" android:pathData="M54,22 A32,32 0 0 1 54,86 L54,22 Z" />
+    <!-- Two monochrome disc sections with a vertical tonal divide. -->
+    <path android:fillColor="#FFFFFF14" android:pathData="M54,28 A26,26 0 0 0 54,80 L54,28 Z" />
+    <path android:fillColor="#0000001C" android:pathData="M54,28 A26,26 0 0 1 54,80 L54,28 Z" />
 
     <!-- Concentric groove shadows. -->
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.35"
-        android:pathData="M54,54 m-28,0 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.35"
-        android:pathData="M54,54 m-24,0 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.35"
-        android:pathData="M54,54 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.35"
-        android:pathData="M54,54 m-16,0 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+        android:pathData="M54,54 m-23,0 a23,23 0 1,0 46,0 a23,23 0 1,0 -46,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+        android:pathData="M54,54 m-19,0 a19,19 0 1,0 38,0 a19,19 0 1,0 -38,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+        android:pathData="M54,54 m-15,0 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#080808C0" android:strokeWidth="1.25"
+        android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z" />
 
-    <!-- Fine groove highlights on the upper-left face. -->
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF26" android:strokeWidth="0.65"
-        android:pathData="M29,48 A28,28 0 0 1 48,26" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF22" android:strokeWidth="0.65"
-        android:pathData="M33,51 A24,24 0 0 1 50,30" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF1E" android:strokeWidth="0.65"
-        android:pathData="M37,53 A20,20 0 0 1 51,34" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF1A" android:strokeWidth="0.65"
-        android:pathData="M41,54 A16,16 0 0 1 52,38" />
+    <!-- Small upper-left groove highlights, all grayscale. -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF24" android:strokeWidth="0.55"
+        android:pathData="M32,47 A23,23 0 0 1 48,32" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF20" android:strokeWidth="0.55"
+        android:pathData="M36,49 A19,19 0 0 1 50,36" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF1C" android:strokeWidth="0.55"
+        android:pathData="M40,51 A15,15 0 0 1 51,40" />
 
-    <!-- Center label ring and matte label. -->
-    <path android:fillColor="#090909" android:pathData="M54,54 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
-    <path android:pathData="M54,54 m-10.5,0 a10.5,10.5 0 1,0 21,0 a10.5,10.5 0 1,0 -21,0 Z">
+    <!-- Center label and spindle hole. -->
+    <path android:fillColor="#090909" android:pathData="M54,54 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z" />
+    <path android:pathData="M54,54 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="radial"
-                android:centerX="50"
-                android:centerY="49"
-                android:gradientRadius="15"
+                android:centerX="51"
+                android:centerY="50"
+                android:gradientRadius="12"
                 android:startColor="#BDBDBD"
                 android:centerColor="#888888"
                 android:endColor="#555555" />
         </aapt:attr>
     </path>
-
-    <!-- White spindle hole. -->
-    <path android:fillColor="#FAFAFA" android:pathData="M54,54 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0 Z" />
+    <path android:fillColor="#FAFAFA" android:pathData="M54,54 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0 Z" />
 </vector>

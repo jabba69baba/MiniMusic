@@ -101,9 +101,15 @@ fun LyricsScreen(
 
     LaunchedEffect(activeIndex, hasTimedLines) {
         if (hasTimedLines && activeIndex >= 0) {
-            val targetIndex = (activeIndex - 2).coerceAtLeast(0)
-            if (targetIndex != listState.firstVisibleItemIndex) {
-                listState.animateScrollToItem(targetIndex)
+            val visibleItems = listState.layoutInfo.visibleItemsInfo
+            val firstVisible = visibleItems.firstOrNull()?.index ?: 0
+            val lastVisible = visibleItems.lastOrNull()?.index ?: 0
+            val activeNeedsContext = activeIndex < firstVisible + 1 || activeIndex > lastVisible - 2
+            if (activeNeedsContext) {
+                val targetIndex = (activeIndex - 3).coerceAtLeast(0)
+                if (targetIndex != listState.firstVisibleItemIndex) {
+                    listState.animateScrollToItem(targetIndex)
+                }
             }
         }
     }
@@ -156,8 +162,8 @@ fun LyricsScreen(
                     contentPadding = PaddingValues(
                         start = 40.dp,
                         end = 32.dp,
-                        top = 72.dp,
-                        bottom = 96.dp
+                        top = 112.dp,
+                        bottom = 128.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
