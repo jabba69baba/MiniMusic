@@ -30,6 +30,8 @@ class PlayerController(private val context: Context) {
     private var controller: MediaController? = null
     private var currentQueue: List<Song> = emptyList()
     private var positionTicker: Job? = null
+    private var playbackTransitionToken = 0L
+    private var suppressIsPlayingUntilMs = 0L
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -65,11 +67,20 @@ class PlayerController(private val context: Context) {
 
     fun togglePlayPause() {
         val c = controller ?: return
-        if (c.isPlaying) c.pause() else c.play()
+        val shouldPlay = !c.isPlaying
+        // An explicit user click always wins over a transient Media3 transition.
+        suppressIsPlayingUntilMs = 0L
+        _uiState.value = _uiState.value.copy(isPlaying = shouldPlay)
+        if (shouldPlay) c.play() else c.pause()
     }
 
     fun skipToNext() {
-        controller?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() }
+        controller?.let {
+            if (it.hasNextMediaItem()) {
+                holdPlaybackStateAcrossTransition()
+                it.seekToNextMediaItem()
+            }
+        }
     }
 
     fun skipToPrevious() {
@@ -78,6 +89,7 @@ class PlayerController(private val context: Context) {
         if (c.currentPosition > 3000L || !c.hasPreviousMediaItem()) {
             c.seekTo(0L)
         } else {
+            holdPlaybackStateAcrossTransition()
             c.seekToPreviousMediaItem()
         }
     }
@@ -87,6 +99,8 @@ class PlayerController(private val context: Context) {
     }
 
     fun playFromQueue(index: Int) {
+        holdPlaybackStateAcrossTransition()
+        _uiState.value = _uiState.value.copy(isPlaying = true)
         controller?.seekTo(index, 0L)
         controller?.play()
     }
@@ -165,15 +179,30 @@ class PlayerController(private val context: Context) {
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (System.currentTimeMillis() < suppressIsPlayingUntilMs) return
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            holdPlaybackStateAcrossTransition()
             refreshCurrentItem()
         }
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             refreshCurrentItem()
+        }
+    }
+
+    private fun holdPlaybackStateAcrossTransition() {
+        val token = ++playbackTransitionToken
+        suppressIsPlayingUntilMs = System.currentTimeMillis() + 280L
+        scope.launch {
+            delay(300L)
+            if (token == playbackTransitionToken) {
+                controller?.let { c ->
+                    _uiState.value = _uiState.value.copy(isPlaying = c.isPlaying)
+                }
+            }
         }
     }
 

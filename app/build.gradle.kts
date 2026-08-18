@@ -58,6 +58,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     // Material 3, including the Expressive APIs (MaterialExpressiveTheme, expressive shapes/typography)
     implementation("androidx.compose.material3:material3:1.4.0")
+    implementation("com.google.android.material:material:1.14.0")
     implementation("androidx.compose.material:material-icons-extended")
 
     // Navigation
