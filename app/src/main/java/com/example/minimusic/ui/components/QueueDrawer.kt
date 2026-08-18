@@ -43,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -53,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.ui.theme.ArtColorRoles
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -81,7 +81,7 @@ private const val ROW_HEIGHT_DP = 64
 fun BoxWithConstraintsScope.QueueDrawer(
     queue: List<Song>,
     currentIndex: Int,
-    accent: Color,
+    artColors: ArtColorRoles,
     isOpen: Boolean,
     onOpenChange: (Boolean) -> Unit,
     onSongClick: (Int) -> Unit,
@@ -116,7 +116,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = artColors.surfaceVariant,
             tonalElevation = 4.dp,
             modifier = Modifier
                 .fillMaxWidth()
@@ -169,19 +169,19 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             .padding(top = 4.dp, bottom = 8.dp)
                             .size(width = 36.dp, height = 4.dp)
                             .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f))
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Filled.QueueMusic,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = artColors.onSurface
                         )
                         Text(
                             text = "Queue",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = artColors.onSurface,
                             modifier = Modifier.padding(start = 6.dp)
                         )
                     }
@@ -195,7 +195,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     QueueDrawerList(
                         queue = queue,
                         currentIndex = currentIndex,
-                        accent = accent,
+                        artColors = artColors,
                         onSongClick = { index ->
                             onSongClick(index)
                             onOpenChange(false)
@@ -212,7 +212,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
 private fun QueueDrawerList(
     queue: List<Song>,
     currentIndex: Int,
-    accent: Color,
+    artColors: ArtColorRoles,
     onSongClick: (Int) -> Unit,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit
 ) {
@@ -229,7 +229,7 @@ private fun QueueDrawerList(
             QueueDrawerRow(
                 song = song,
                 isCurrent = index == currentIndex,
-                accent = accent,
+                artColors = artColors,
                 rowModifier = Modifier.graphicsLayer {
                     translationY = if (isDraggingThis) dragOffsetPx else 0f
                 },
@@ -274,15 +274,15 @@ private fun QueueDrawerList(
 private fun QueueDrawerRow(
     song: Song,
     isCurrent: Boolean,
-    accent: Color,
+    artColors: ArtColorRoles,
     rowModifier: Modifier,
     onClick: () -> Unit,
     dragModifier: Modifier
 ) {
     val containerColor = if (isCurrent) {
-        accent.copy(alpha = 0.18f)
+        artColors.primaryContainer
     } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+        artColors.surface.copy(alpha = 0.72f)
     }
 
     Surface(
@@ -303,13 +303,13 @@ private fun QueueDrawerRow(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(artColors.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.MusicNote,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = artColors.onSecondaryContainer
                 )
                 AsyncImage(
                     model = song.albumArtUri,
@@ -324,14 +324,14 @@ private fun QueueDrawerRow(
                 Text(
                     text = song.title,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = artColors.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = song.artist,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = artColors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -346,7 +346,7 @@ private fun QueueDrawerRow(
                 Icon(
                     imageVector = Icons.Filled.DragHandle,
                     contentDescription = "Drag to reorder",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = artColors.onSurfaceVariant
                 )
             }
         }

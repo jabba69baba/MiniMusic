@@ -214,7 +214,7 @@ fun PlayerScreen(
             QueueDrawer(
                 queue = playbackState.queue,
                 currentIndex = playbackState.currentIndex,
-                accent = artColors.primary,
+                artColors = artColors,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
                 onSongClick = onQueueItemClick,
@@ -364,7 +364,8 @@ private fun NowPlayingPanel(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
                 onValueChange = { onSeekTo(it.toLong()) },
-                activeColor = artColors.primary
+                activeColor = artColors.primary,
+                inactiveColor = artColors.onSurface.copy(alpha = 0.34f)
             )
             Row(
                 modifier = Modifier
@@ -482,9 +483,21 @@ private fun TransportButton(
     contentColor: Color,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 1.10f else 1f,
+        animationSpec = tween(durationMillis = 180),
+        label = "transportPressScale"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxHeight()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             // Width is locked to height (not a fixed size), so this stays a
             // perfect circle no matter how the row's available width changes —
             // only ever adjusts horizontally, never distorts vertically.
@@ -518,8 +531,8 @@ private fun PlayPauseButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = tween(durationMillis = 120),
+        targetValue = if (isPressed) 1.10f else 1f,
+        animationSpec = tween(durationMillis = 180),
         label = "playPausePressScale"
     )
 

@@ -37,7 +37,8 @@ fun FlatMusicSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    activeColor: Color? = null
+    activeColor: Color? = null,
+    inactiveColor: Color? = null
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
@@ -45,7 +46,7 @@ fun FlatMusicSlider(
     val range = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
     val committedFraction = ((value - valueRange.start) / range).coerceIn(0f, 1f)
     val fraction = if (isDragging) dragFraction else committedFraction
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val trackColor = inactiveColor ?: MaterialTheme.colorScheme.surfaceVariant
     val resolvedActiveColor = activeColor ?: MaterialTheme.colorScheme.primary
 
     Canvas(
@@ -75,13 +76,13 @@ fun FlatMusicSlider(
             }
     ) {
         val centerY = size.height / 2f
-        val strokeWidth = 6.dp.toPx()
+        val strokeWidth = 8.dp.toPx()
         val startX = 4.dp.toPx()
         val endX = (size.width - 4.dp.toPx()).coerceAtLeast(startX)
-        val stopRadius = 2.dp.toPx()
+        val stopRadius = strokeWidth / 2f
         val stopCenterX = endX
         val progressX = startX + (endX - startX) * fraction
-        val inactiveStartX = (progressX + 8.dp.toPx()).coerceAtMost(endX - stopRadius)
+        val inactiveStartX = (progressX + 12.dp.toPx()).coerceAtMost(endX)
 
         if (fraction > 0f) {
             drawLine(
@@ -93,20 +94,21 @@ fun FlatMusicSlider(
             )
         }
 
-        if (inactiveStartX < endX - stopRadius) {
+        if (inactiveStartX < endX) {
             drawLine(
                 color = trackColor,
                 start = Offset(inactiveStartX, centerY),
-                end = Offset(endX - stopRadius, centerY),
+                end = Offset(endX, centerY),
                 strokeWidth = strokeWidth,
                 cap = StrokeCap.Round
             )
         }
 
-        // Material 3's determinate linear stop indicator is a 4dp circle at
-        // the end of the track, retained here for clear completion affordance.
+        // The terminal stop is the same color, diameter, and round-cap radius
+        // as the inactive track, so it reads as its natural end rather than a
+        // pasted-on thumb.
         drawCircle(
-            color = resolvedActiveColor,
+            color = trackColor,
             radius = stopRadius,
             center = Offset(stopCenterX, centerY)
         )

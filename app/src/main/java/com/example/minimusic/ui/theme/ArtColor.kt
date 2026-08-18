@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,7 +12,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.ColorUtils
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.CachePolicy
@@ -49,11 +52,12 @@ private const val ACCENT_CACHE_MAX_SIZE = 64
 @Composable
 fun rememberArtAccentColor(albumArtUri: Uri?): Color {
     val context = LocalContext.current
-    val fallback = MaterialTheme.colorScheme.primary
+    val wallpaperPrimary = MaterialTheme.colorScheme.primary
+    val isDark = isSystemInDarkTheme()
 
-    val target by produceState(initialValue = accentColorCache[albumArtUri] ?: fallback, key1 = albumArtUri) {
+    val target by produceState(initialValue = accentColorCache[albumArtUri] ?: wallpaperPrimary, key1 = albumArtUri) {
         if (albumArtUri == null) {
-            value = fallback
+            value = wallpaperPrimary
             return@produceState
         }
 
@@ -62,7 +66,7 @@ fun rememberArtAccentColor(albumArtUri: Uri?): Color {
             return@produceState
         }
 
-        value = fallback
+        value = wallpaperPrimary
         val request = ImageRequest.Builder(context)
             .data(albumArtUri)
             .allowHardware(false)
@@ -89,51 +93,68 @@ fun rememberArtAccentColor(albumArtUri: Uri?): Color {
         }
     }
 
-    val animated by animateColorAsState(
-        targetValue = target,
+    val normalizedTarget = if (albumArtUri == null) {
+        wallpaperPrimary
+    } else {
+        normalizeAccent(target, wallpaperPrimary, isDark)
+    }
+
+    return animateColorAsState(
+        targetValue = normalizedTarget,
         animationSpec = tween(durationMillis = 220),
         label = "artAccentColor"
-    )
-    return animated
+    ).value
 }
 
 @Composable
 fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
     val wallpaper = MaterialTheme.colorScheme
     val accent = rememberArtAccentColor(albumArtUri)
+    val primaryContainer = blend(wallpaper.surface, accent, 0.24f)
+    val secondary = blend(wallpaper.secondary, accent, 0.24f)
+    val secondaryContainer = blend(wallpaper.secondaryContainer, accent, 0.22f)
+    val tertiary = blend(wallpaper.tertiary, accent, 0.24f)
+    val tertiaryContainer = blend(wallpaper.tertiaryContainer, accent, 0.20f)
 
     return ArtColorRoles(
         primary = accent,
         onPrimary = contrastingOn(accent),
-        primaryContainer = accent.copy(alpha = 0.34f).compositeOver(wallpaper.surface),
-        onPrimaryContainer = contrastingOn(accent.copy(alpha = 0.34f).compositeOver(wallpaper.surface)),
-        secondary = blend(accent, wallpaper.secondary, 0.38f),
-        onSecondary = contrastingOn(blend(accent, wallpaper.secondary, 0.38f)),
-        secondaryContainer = blend(
-            accent.copy(alpha = 0.25f).compositeOver(wallpaper.surface),
-            wallpaper.secondaryContainer,
-            0.42f
-        ),
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = wallpaper.onSurface,
+        secondary = secondary,
+        onSecondary = contrastingOn(secondary),
+        secondaryContainer = secondaryContainer,
         onSecondaryContainer = wallpaper.onSurface,
-        tertiary = blend(accent, wallpaper.tertiary, 0.55f),
-        onTertiary = contrastingOn(blend(accent, wallpaper.tertiary, 0.55f)),
-        tertiaryContainer = blend(
-            accent.copy(alpha = 0.22f).compositeOver(wallpaper.surface),
-            wallpaper.tertiaryContainer,
-            0.48f
-        ),
+        tertiary = tertiary,
+        onTertiary = contrastingOn(tertiary),
+        tertiaryContainer = tertiaryContainer,
         onTertiaryContainer = wallpaper.onSurface,
-        background = accent.copy(alpha = 0.14f).compositeOver(wallpaper.background),
+        background = blend(wallpaper.background, accent, 0.08f),
         onBackground = wallpaper.onBackground,
-        surface = accent.copy(alpha = 0.20f).compositeOver(wallpaper.surface),
+        surface = blend(wallpaper.surface, accent, 0.12f),
         onSurface = wallpaper.onSurface,
-        surfaceVariant = blend(
-            accent.copy(alpha = 0.18f).compositeOver(wallpaper.surface),
-            wallpaper.surfaceVariant,
-            0.50f
-        ),
+        surfaceVariant = blend(wallpaper.surfaceVariant, accent, 0.18f),
         onSurfaceVariant = wallpaper.onSurfaceVariant
     )
+}
+
+private fun normalizeAccent(raw: Color, wallpaperPrimary: Color, isDark: Boolean): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(raw.toArgb(), hsl)
+    val isNearNeutral = hsl[1] < 0.08f
+    if (isNearNeutral) {
+        // Neutral art needs a small amount of the wallpaper primary to remain
+        // legible without inventing a saturated hue unrelated to the artwork.
+        return blend(raw, wallpaperPrimary, 0.34f)
+    }
+
+    hsl[1] = hsl[1].coerceAtMost(0.54f)
+    hsl[2] = if (isDark) {
+        hsl[2].coerceIn(0.48f, 0.70f)
+    } else {
+        hsl[2].coerceIn(0.30f, 0.56f)
+    }
+    return Color(ColorUtils.HSLToColor(hsl))
 }
 
 private fun contrastingOn(color: Color): Color =
