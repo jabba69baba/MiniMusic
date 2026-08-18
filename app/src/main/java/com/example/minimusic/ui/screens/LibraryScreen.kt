@@ -502,18 +502,18 @@ private fun SongsTab(
                 listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             // The top remains aligned with the first song container. The bottom
-            // stops exactly at the list/mini-player boundary, without the
-            // extra 8dp gap that made the lower end float above the rows.
+            // is inset by the list boundary plus the row's final outer 5dp,
+            // so it ends at the last card surface rather than the viewport edge.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding)
+                .padding(top = 8.dp, bottom = bottomContentPadding + 13.dp)
         )
     }
 }
-
 @Composable
 private fun AlbumsTab(
+
     albums: List<Album>,
     bottomContentPadding: androidx.compose.ui.unit.Dp,
     onAlbumClick: (Album) -> Unit

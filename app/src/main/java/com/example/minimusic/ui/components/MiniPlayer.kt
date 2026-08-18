@@ -32,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
@@ -40,7 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
-import com.example.minimusic.ui.theme.PillShape
+import com.example.minimusic.ui.theme.rememberArtAccentColor
 
 /** Corner shape for the mini player bar — rounded on top to match the app's
  *  Material Expressive shape scale, but square on the bottom two corners so
@@ -80,12 +82,16 @@ fun MiniPlayer(
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
         }
     }
+    val artAccent = rememberArtAccentColor(song?.albumArtUri)
+    val miniPlayerColor = artAccent
+        .copy(alpha = 0.30f)
+        .compositeOver(MaterialTheme.colorScheme.surface)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(MiniPlayerShape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(miniPlayerColor)
             .clickable(enabled = song != null, onClick = onClick)
     ) {
         Row(
@@ -101,13 +107,14 @@ fun MiniPlayer(
                 Text(
                     text = song?.title ?: "What's the vibe?",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = song?.artist ?: "Tap a song to listen",
                     style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -127,6 +134,7 @@ fun MiniPlayer(
                     progress = animatedProgress,
                     enabled = song != null,
                     isPlaying = isPlaying,
+                    progressColor = artAccent,
                     onClick = onTogglePlayPause
                 )
             }
@@ -153,17 +161,14 @@ private fun CircularProgressPlayButton(
     progress: Float,
     enabled: Boolean,
     isPlaying: Boolean,
+    progressColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (enabled) MaterialTheme.colorScheme.surfaceVariant
-    else MaterialTheme.colorScheme.surfaceContainerHighest
-    val progressColor = if (enabled) MaterialTheme.colorScheme.primary
+    val trackColor = if (enabled) Color.White.copy(alpha = 0.28f)
     else MaterialTheme.colorScheme.outlineVariant
-    val buttonColor = if (enabled) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.surfaceVariant
-    val iconColor = if (enabled) MaterialTheme.colorScheme.onPrimary
-    else MaterialTheme.colorScheme.onSurfaceVariant
+    val resolvedProgressColor = if (enabled) progressColor else MaterialTheme.colorScheme.outlineVariant
+    val iconColor = if (enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = modifier
@@ -186,7 +191,7 @@ private fun CircularProgressPlayButton(
             )
             if (progress > 0f) {
                 drawArc(
-                    color = progressColor,
+                    color = resolvedProgressColor,
                     startAngle = -90f,
                     sweepAngle = 360f * progress,
                     useCenter = false,
@@ -196,20 +201,12 @@ private fun CircularProgressPlayButton(
                 )
             }
         }
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(PillShape)
-                .background(buttonColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                tint = iconColor,
-                modifier = Modifier.fillMaxSize(0.5f)
-            )
-        }
+        Icon(
+            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            contentDescription = if (isPlaying) "Pause" else "Play",
+            tint = iconColor,
+            modifier = Modifier.fillMaxSize(0.5f)
+        )
     }
 }
 
