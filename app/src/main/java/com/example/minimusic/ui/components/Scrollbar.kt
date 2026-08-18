@@ -68,13 +68,17 @@ fun AlphabetScrollbar(
     var isDraggingThumb by remember { mutableStateOf(false) }
     var dragIndex by remember { mutableStateOf(0) }
     var trackHeightPx by remember { mutableStateOf(0f) }
+    var lastRequestedIndex by remember(itemCount) { mutableStateOf(-1) }
 
     fun updateFromOffsetY(y: Float) {
         if (trackHeightPx <= 0f) return
         val fraction = (y / trackHeightPx).coerceIn(0f, 1f)
         val index = (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
         dragIndex = index
-        onScrollToIndex(index)
+        if (index != lastRequestedIndex) {
+            lastRequestedIndex = index
+            onScrollToIndex(index)
+        }
     }
 
     // The thumb tracks real scroll position via currentIndex (kept in sync

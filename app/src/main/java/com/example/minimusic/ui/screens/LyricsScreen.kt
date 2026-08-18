@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -58,6 +59,7 @@ private val LrcTimestampRegex = Regex(
 )
 
 private const val READING_BAND_FRACTION = 0.36f
+private const val LYRIC_TARGET_TOLERANCE_PX = 2
 private const val SCROLL_ANIMATION_DURATION_MS = 520
 private val GramophoneMotionEasing = CubicBezierEasing(0.4f, 0.2f, 0f, 1f)
 
@@ -178,28 +180,29 @@ fun LyricsScreen(
                         val readingBand = (maxHeight * READING_BAND_FRACTION)
                             .coerceIn(160.dp, 280.dp)
                         val readingBandPx = with(density) { readingBand.roundToPx() }
-
                         LaunchedEffect(activeIndex, hasTimedLines, readingBandPx) {
                             scrollJob?.cancel()
                             if (!hasTimedLines || activeIndex < 0) return@LaunchedEffect
 
                             val targetLineIndex = activeIndex + 1 // account for the top spacer
-                            val layoutInfo = listState.layoutInfo
-                            val visibleItems = layoutInfo.visibleItemsInfo
-                            val activeItem = visibleItems.firstOrNull { it.index == targetLineIndex }
-                            val bandTop = layoutInfo.viewportStartOffset + readingBandPx
-                            val bandBottom = bandTop + (activeItem?.size ?: 0)
-                            val needsScroll = activeItem == null ||
-                                activeItem.offset < bandTop - with(density) { 8.dp.roundToPx() } ||
-                                activeItem.offset > bandBottom + with(density) { 8.dp.roundToPx() }
-
-                            if (!needsScroll) return@LaunchedEffect
+                            val bandCenter = listState.layoutInfo.viewportStartOffset + readingBandPx
 
                             scrollJob = scrollScope.launch {
-                                if (activeItem != null) {
-                                    // When the line is measurable, animate the exact pixel delta
-                                    // into the reading band using Gramophone's easing curve.
-                                    val delta = activeItem.offset - bandTop
+                                // First resolve a distant target into the viewport. The second
+                                // pass below is deliberately measured after layout so a variable
+                                // title height or device font scale cannot leave a one-line drift.
+                                if (listState.layoutInfo.visibleItemsInfo.none { it.index == targetLineIndex }) {
+                                    listState.animateScrollToItem(targetLineIndex)
+                                    withFrameNanos { }
+                                }
+
+                                val activeItem = listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull { it.index == targetLineIndex }
+                                    ?: return@launch
+                                val measuredLineCenter = activeItem.offset + activeItem.size / 2
+                                val delta = measuredLineCenter - bandCenter
+
+                                if (abs(delta) > LYRIC_TARGET_TOLERANCE_PX) {
                                     listState.animateScrollBy(
                                         value = delta.toFloat(),
                                         animationSpec = tween(
@@ -207,13 +210,19 @@ fun LyricsScreen(
                                             easing = GramophoneMotionEasing
                                         )
                                     )
-                                } else {
-                                    // For a seek or a large jump, LazyListState resolves the
-                                    // destination while remaining cancellable by the next tick.
-                                    listState.animateScrollToItem(
-                                        index = targetLineIndex,
-                                        scrollOffset = -readingBandPx
-                                    )
+                                }
+
+                                // Correct the final sub-pixel/layout-rounding residue without a
+                                // visible second animation. This keeps the active line centered
+                                // at the same physical pixel on every lyric transition.
+                                withFrameNanos { }
+                                val settledItem = listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull { it.index == targetLineIndex }
+                                if (settledItem != null) {
+                                    val settledDelta = settledItem.offset + settledItem.size / 2 - bandCenter
+                                    if (abs(settledDelta) > LYRIC_TARGET_TOLERANCE_PX) {
+                                        listState.scrollBy(settledDelta.toFloat())
+                                    }
                                 }
                             }
                         }

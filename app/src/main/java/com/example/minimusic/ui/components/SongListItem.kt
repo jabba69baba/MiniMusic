@@ -84,13 +84,13 @@ fun SongListItem(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                AsyncImage(
-                    model = song.albumArtUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
+                if (song.albumArtUri != null) {
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {
@@ -140,16 +140,18 @@ fun SongListItem(
                         modifier = Modifier.padding(6.dp)
                     )
                 }
-                SongContextMenu(
-                    song = song,
-                    expanded = menuExpanded,
-                    onDismiss = { menuExpanded = false },
-                    onPlayNow = { onClick() },
-                    onPlayNext = onPlayNext,
-                    onAddToQueue = onAddToQueue,
-                    onShufflePlayFrom = onShufflePlayFrom,
-                    onDelete = onDelete
-                )
+                if (menuExpanded) {
+                    SongContextMenu(
+                        song = song,
+                        expanded = true,
+                        onDismiss = { menuExpanded = false },
+                        onPlayNow = { onClick() },
+                        onPlayNext = onPlayNext,
+                        onAddToQueue = onAddToQueue,
+                        onShufflePlayFrom = onShufflePlayFrom,
+                        onDelete = onDelete
+                    )
+                }
             }
         }
     }
