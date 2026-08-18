@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
@@ -49,8 +51,8 @@ import com.example.minimusic.ui.theme.rememberArtAccentColor
  *  it sits flush against the bottom of the screen instead of floating with
  *  a gap on either side. */
 private val MiniPlayerShape = RoundedCornerShape(
-    topStart = 20.dp,
-    topEnd = 20.dp,
+    topStart = 18.dp,
+    topEnd = 18.dp,
     bottomStart = 0.dp,
     bottomEnd = 0.dp
 )
@@ -86,6 +88,17 @@ fun MiniPlayer(
     val miniPlayerColor = artAccent
         .copy(alpha = 0.30f)
         .compositeOver(MaterialTheme.colorScheme.surface)
+    val controlTint = if (song != null) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val progressRingColor = readableProgressColor(
+        accent = artAccent,
+        background = miniPlayerColor,
+        primary = MaterialTheme.colorScheme.primary,
+        onSurface = controlTint
+    )
 
     Box(
         modifier = modifier
@@ -134,7 +147,8 @@ fun MiniPlayer(
                     progress = animatedProgress,
                     enabled = song != null,
                     isPlaying = isPlaying,
-                    progressColor = artAccent,
+                    progressColor = progressRingColor,
+                    controlTint = controlTint,
                     onClick = onTogglePlayPause
                 )
             }
@@ -142,13 +156,18 @@ fun MiniPlayer(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clickable(enabled = song != null, onClick = onSkipNext),
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = song != null,
+                        onClick = onSkipNext
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.SkipNext,
                     contentDescription = "Skip next",
-                    tint = if (song != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = controlTint,
                     modifier = Modifier.fillMaxSize(0.7f)
                 )
             }
@@ -162,18 +181,23 @@ private fun CircularProgressPlayButton(
     enabled: Boolean,
     isPlaying: Boolean,
     progressColor: Color,
+    controlTint: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val trackColor = if (enabled) Color.White.copy(alpha = 0.28f)
+    val trackColor = if (enabled) controlTint.copy(alpha = 0.28f)
     else MaterialTheme.colorScheme.outlineVariant
     val resolvedProgressColor = if (enabled) progressColor else MaterialTheme.colorScheme.outlineVariant
-    val iconColor = if (enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = modifier
             .size(44.dp)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -204,10 +228,32 @@ private fun CircularProgressPlayButton(
         Icon(
             imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             contentDescription = if (isPlaying) "Pause" else "Play",
-            tint = iconColor,
+            tint = controlTint,
             modifier = Modifier.fillMaxSize(0.5f)
         )
     }
+}
+
+private fun readableProgressColor(
+    accent: Color,
+    background: Color,
+    primary: Color,
+    onSurface: Color
+): Color {
+    val minimumContrast = 2.4f
+    return when {
+        contrastRatio(accent, background) >= minimumContrast -> accent
+        contrastRatio(primary, background) >= minimumContrast -> primary
+        else -> onSurface
+    }
+}
+
+private fun contrastRatio(foreground: Color, background: Color): Float {
+    val foregroundLuminance = foreground.luminance()
+    val backgroundLuminance = background.luminance()
+    val lighter = maxOf(foregroundLuminance, backgroundLuminance)
+    val darker = minOf(foregroundLuminance, backgroundLuminance)
+    return (lighter + 0.05f) / (darker + 0.05f)
 }
 
 /** Square album art thumbnail (not circular). Shows a muted music-note
