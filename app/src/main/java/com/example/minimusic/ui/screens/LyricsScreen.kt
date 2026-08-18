@@ -9,7 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsets.Companion.systemBars
+import androidx.compose.foundation.layout.WindowInsets.Companion.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -126,7 +126,7 @@ fun LyricsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
-                .windowInsetsPadding(systemBars)
+                .windowInsetsPadding(statusBars)
                 .padding(horizontal = 40.dp, vertical = 48.dp)
         )
 
@@ -140,7 +140,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .windowInsetsPadding(systemBars)
+                        .windowInsetsPadding(statusBars)
                         .padding(horizontal = 40.dp, vertical = 48.dp)
                 )
             } else {
@@ -149,7 +149,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .windowInsetsPadding(systemBars),
+                        .windowInsetsPadding(statusBars),
                     contentPadding = PaddingValues(
                         start = 40.dp,
                         end = 32.dp,
