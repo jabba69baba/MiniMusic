@@ -200,7 +200,8 @@ class PlayerController(private val context: Context) {
                         durationMs = c.duration.coerceAtLeast(0L)
                     )
                 }
-                delay(500L)
+                // Keep lyric highlighting responsive while avoiding a busy loop when paused.
+                delay(if (c?.isPlaying == true) 50L else 250L)
             }
         }
     }
