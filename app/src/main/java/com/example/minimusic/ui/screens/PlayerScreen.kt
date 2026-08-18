@@ -1,11 +1,12 @@
 package com.example.minimusic.ui.screens
 
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
@@ -53,10 +54,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -81,7 +83,8 @@ import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
-import com.example.minimusic.ui.theme.rememberArtAccentColor
+import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
 
@@ -144,7 +147,7 @@ fun PlayerScreen(
     val song = playbackState.currentSong ?: return
     var autoOpenedLyrics by remember(song.id) { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
-    val accent = rememberArtAccentColor(song.albumArtUri)
+    val artColors = rememberArtColorRoles(song.albumArtUri)
 
     LaunchedEffect(song.id, showLyricsInitially) {
         if (showLyricsInitially && !autoOpenedLyrics) {
@@ -156,6 +159,7 @@ fun PlayerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .background(artColors.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(
@@ -190,7 +194,7 @@ fun PlayerScreen(
                 NowPlayingPanel(
                     song = song,
                     playbackState = playbackState,
-                    accent = accent,
+                    artColors = artColors,
                     onSeekTo = onSeekTo,
                     onToggleShuffle = onToggleShuffle,
                     onSkipPrevious = onSkipPrevious,
@@ -209,7 +213,7 @@ fun PlayerScreen(
             QueueDrawer(
                 queue = playbackState.queue,
                 currentIndex = playbackState.currentIndex,
-                accent = accent,
+                accent = artColors.primary,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
                 onSongClick = onQueueItemClick,
@@ -288,7 +292,7 @@ private fun formatRemaining(ms: Long): String {
 private fun NowPlayingPanel(
     song: Song,
     playbackState: PlaybackUiState,
-    accent: Color,
+    artColors: ArtColorRoles,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -311,14 +315,14 @@ private fun NowPlayingPanel(
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Filled.MusicNote,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(0.3f),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                tint = artColors.onPrimaryContainer
             )
             AsyncImage(
                 model = song.albumArtUri,
@@ -331,16 +335,24 @@ private fun NowPlayingPanel(
         }
 
         Column(modifier = Modifier.padding(top = 18.dp)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                            Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        initialDelayMillis = 900,
+                        repeatDelayMillis = 1_100,
+                        velocity = 34.dp
+                    )
+                )
+
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = artColors.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -351,7 +363,7 @@ private fun NowPlayingPanel(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
                 onValueChange = { onSeekTo(it.toLong()) },
-                activeColor = accent
+                activeColor = artColors.primary
             )
             Row(
                 modifier = Modifier
@@ -367,12 +379,12 @@ private fun NowPlayingPanel(
                 if (badgeText != null) {
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        color = artColors.surfaceVariant
                     ) {
                         Text(
                             text = badgeText,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = artColors.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -394,14 +406,14 @@ private fun NowPlayingPanel(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous",
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
                 onClick = onSkipPrevious
             )
             PlayPauseButton(
                 isPlaying = playbackState.isPlaying,
-                containerColor = accent,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = artColors.primary,
+                contentColor = artColors.onPrimary,
                 onClick = onTogglePlayPause,
                 modifier = Modifier
                     .weight(1f)
@@ -411,8 +423,8 @@ private fun NowPlayingPanel(
                 icon = Icons.Filled.SkipNext,
                 contentDescription = "Next",
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
                 onClick = onSkipNext
             )
         }
@@ -424,7 +436,7 @@ private fun NowPlayingPanel(
         Column(modifier = Modifier.padding(top = SectionGap)) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = artColors.surfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(CapsuleSegmentHeight)
@@ -475,7 +487,11 @@ private fun TransportButton(
             .aspectRatio(1f, matchHeightConstraintsFirst = true)
             .clip(shape)
             .background(containerColor)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -495,27 +511,59 @@ private fun PlayPauseButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "playPausePressScale"
+    )
+
     Row(
         modifier = modifier
             .fillMaxHeight()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clip(PlayButtonShape)
             .background(containerColor)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(28.dp)
-        )
-        Text(
-            text = if (isPlaying) "Pause" else "Play",
-            style = MaterialTheme.typography.titleMedium,
-            color = contentColor,
-            modifier = Modifier.padding(start = 8.dp)
-        )
+        AnimatedContent(
+            targetState = isPlaying,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(animationSpec = tween(170)) +
+                    androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(220))) togetherWith
+                    (androidx.compose.animation.fadeOut(animationSpec = tween(120)) +
+                        androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(150)))
+            },
+            label = "playPauseMorph"
+        ) { playing ->
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing) "Pause" else "Play",
+                    tint = contentColor,
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = if (playing) "Pause" else "Play",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = contentColor,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
     }
 }
 
@@ -539,16 +587,21 @@ private fun CapsuleSegment(
             .padding(horizontal = 2.dp)
             .clip(ActiveSegmentShape)
             .background(
-                if (active) MaterialTheme.colorScheme.primaryContainer
+                if (active) artColors.primaryContainer
                 else Color.Transparent
             )
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant
+
         )
     }
 }

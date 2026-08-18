@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.windowInsetsPadding
 import com.example.minimusic.playback.PlaybackUiState
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LyricsState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -126,15 +127,15 @@ fun LyricsScreen(
         onDispose { scrollJob?.cancel() }
     }
 
-    val colorScheme = MaterialTheme.colorScheme
-    val inactiveColor = colorScheme.onBackground.copy(alpha = 0.42f)
-    val activeColor = colorScheme.primary
+    val artColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
+    val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
+    val activeColor = artColors.primary
 
     when (lyricsState) {
         LyricsState.Idle, LyricsState.Loading -> CircularProgressIndicator(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colorScheme.background)
+                .background(artColors.background)
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(32.dp),
             color = activeColor
@@ -142,12 +143,12 @@ fun LyricsScreen(
 
         LyricsState.NotFound -> Text(
             text = "No embedded lyrics found",
-            color = colorScheme.onBackground,
+            color = artColors.onBackground,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .fillMaxSize()
-                .background(colorScheme.background)
+                .background(artColors.background)
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(horizontal = 40.dp, vertical = 48.dp)
         )
@@ -156,12 +157,12 @@ fun LyricsScreen(
             if (lines.isEmpty()) {
                 Text(
                     text = "Lyrics could not be displayed",
-                    color = colorScheme.onBackground,
+                    color = artColors.onBackground,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(colorScheme.background)
+                        .background(artColors.background)
                         .windowInsetsPadding(WindowInsets.systemBars)
                         .padding(horizontal = 40.dp, vertical = 48.dp)
                 )
@@ -169,7 +170,7 @@ fun LyricsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(colorScheme.background)
+                        .background(artColors.background)
                 ) {
                     BoxWithConstraints(
                         modifier = Modifier
