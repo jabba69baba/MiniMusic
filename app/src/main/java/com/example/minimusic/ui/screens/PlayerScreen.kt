@@ -737,7 +737,25 @@ private fun LyricsPanel(
             }
 
             is LyricsState.Found -> {
-                Box(modifier = Modifier.weight(1f)) {
+                if (lines.isEmpty()) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Lyrics could not be displayed",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "The embedded lyrics tag was found, but it did not contain readable lyric lines.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 10.dp, end = 32.dp)
+                        )
+                    }
+                } else Box(modifier = Modifier.weight(1f)) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -848,14 +866,21 @@ private fun LyricsPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    TransportButton(
-                        icon = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                        shape = CircleShape,
-                        containerColor = accent,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        onClick = onTogglePlayPause
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(accent)
+                            .clickable(onClick = onTogglePlayPause),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         FlatMusicSlider(
                             value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
