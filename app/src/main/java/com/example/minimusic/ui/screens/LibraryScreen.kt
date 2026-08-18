@@ -502,12 +502,12 @@ private fun SongsTab(
                 listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             // The top remains aligned with the first song container. The bottom
-            // is inset by the list boundary plus the row's final outer 5dp,
-            // so it ends at the last card surface rather than the viewport edge.
+            // Keep the same 3dp visual inset at both ends: the top is 8dp
+            // versus the first card's 5dp, so the bottom is shortened by 3dp.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 13.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding + 16.dp)
         )
     }
 }
