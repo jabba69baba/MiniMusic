@@ -79,9 +79,5 @@ dependencies {
     // Settings persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Downloadable Google Fonts provider, used to fetch "Google Sans Flex" from
-    // Google Play services at runtime (no font binary bundled in the repo)
-    implementation("androidx.compose.ui:ui-text-google-fonts:1.7.6")
-
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

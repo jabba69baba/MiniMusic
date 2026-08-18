@@ -16,8 +16,24 @@ private val LightColors = lightColorScheme(
     primaryContainer = AmberPrimaryContainerLight,
     onPrimaryContainer = AmberOnPrimaryContainerLight,
     secondary = AmberSecondaryLight,
+    onSecondary = AmberOnSecondaryLight,
+    secondaryContainer = AmberSecondaryContainerLight,
+    onSecondaryContainer = AmberOnSecondaryContainerLight,
+    tertiary = AmberTertiaryLight,
+    onTertiary = AmberOnTertiaryLight,
+    tertiaryContainer = AmberTertiaryContainerLight,
+    onTertiaryContainer = AmberOnTertiaryContainerLight,
     background = AmberBackgroundLight,
-    surface = AmberSurfaceLight
+    onBackground = AmberOnBackgroundLight,
+    surface = AmberSurfaceLight,
+    onSurface = AmberOnSurfaceLight,
+    surfaceVariant = AmberSurfaceVariantLight,
+    onSurfaceVariant = AmberOnSurfaceVariantLight,
+    outline = AmberOutlineLight,
+    outlineVariant = AmberOutlineVariantLight,
+    inverseSurface = AmberInverseSurfaceLight,
+    inverseOnSurface = AmberInverseOnSurfaceLight,
+    inversePrimary = AmberInversePrimaryLight
 )
 
 private val DarkColors = darkColorScheme(
@@ -26,22 +42,31 @@ private val DarkColors = darkColorScheme(
     primaryContainer = AmberPrimaryContainerDark,
     onPrimaryContainer = AmberOnPrimaryContainerDark,
     secondary = AmberSecondaryDark,
+    onSecondary = AmberOnSecondaryDark,
+    secondaryContainer = AmberSecondaryContainerDark,
+    onSecondaryContainer = AmberOnSecondaryContainerDark,
+    tertiary = AmberTertiaryDark,
+    onTertiary = AmberOnTertiaryDark,
+    tertiaryContainer = AmberTertiaryContainerDark,
+    onTertiaryContainer = AmberOnTertiaryContainerDark,
     background = AmberBackgroundDark,
-    surface = AmberSurfaceDark
+    onBackground = AmberOnBackgroundDark,
+    surface = AmberSurfaceDark,
+    onSurface = AmberOnSurfaceDark,
+    surfaceVariant = AmberSurfaceVariantDark,
+    onSurfaceVariant = AmberOnSurfaceVariantDark,
+    outline = AmberOutlineDark,
+    outlineVariant = AmberOutlineVariantDark,
+    inverseSurface = AmberInverseSurfaceDark,
+    inverseOnSurface = AmberInverseOnSurfaceDark,
+    inversePrimary = AmberInversePrimaryDark
 )
 
 /**
- * App-wide theme.
- *
- * The app's shape language is intentionally flat — see Shape.kt: every corner
- * bucket collapses to a sharp rectangle, following Auxio's "no rounded corners"
- * design philosophy, so there's no dependency on Material 3 Expressive's
- * experimental shape/motion APIs here.
- *
- * Dynamic color (Monet) is preferred on Android 12+ and applies app-wide. The
- * one exception is the Player screen, which additionally tints itself with a
- * hue extracted from the current song's album art on top of this base theme
- * (see ArtColor.kt) — everywhere else in the app stays on pure system color.
+ * App-wide Material 3 Expressive theme. Android 12+ uses wallpaper-derived
+ * Monet roles; older devices use the complete warm-neutral fallback above.
+ * Every screen receives the same primary/secondary/tertiary and surface-role
+ * contract, while the player may add its album-art accent locally.
  */
 @Composable
 fun MiniMusicTheme(

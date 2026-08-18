@@ -501,13 +501,13 @@ private fun SongsTab(
             onScrollToIndex = { index ->
                 listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
-            // Matches the song list's own top/bottom content padding exactly
-            // so the track starts level with the first song container and
-            // ends level with the last one, never running behind the footer.
+            // The top remains aligned with the first song container. The bottom
+            // stops exactly at the list/mini-player boundary, without the
+            // extra 8dp gap that made the lower end float above the rows.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding)
         )
     }
 }
@@ -581,7 +581,7 @@ private fun ArtistsTab(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding)
         )
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,19 +53,6 @@ private val MiniPlayerShape = RoundedCornerShape(
     bottomEnd = 0.dp
 )
 
-/** Corner shape for the progress fill's own leading (right) edge — rounded
- *  on the top-right to match the bar's own top-right corner as the fill
- *  advances into it, flat on the bottom-right to match the bar's flat
- *  bottom. The left corners are left square here (0dp) because the fill's
- *  left edge is already clipped correctly by the outer bar's own shape —
- *  this shape only needs to handle the fill's own free-floating right edge. */
-private val MiniPlayerFillShape = RoundedCornerShape(
-    topStart = 0.dp,
-    topEnd = 20.dp,
-    bottomStart = 0.dp,
-    bottomEnd = 0.dp
-)
-
 /**
  * Permanent mini player bar — always present at the bottom regardless of
  * whether a song is currently loaded. When [song] is null (nothing has
@@ -69,10 +60,9 @@ private val MiniPlayerFillShape = RoundedCornerShape(
  * instead of hiding the bar, so its height never changes and the layout
  * around it stays stable.
  *
- * The bar's own background doubles as the progress indicator: the played
- * portion (left) is tinted with the primary color, the remaining portion
- * (right) is the plain surface color, and the split moves left-to-right as
- * the song plays — rather than a separate progress line drawn on top.
+ * Playback progress is shown as a circular Material-style ring around the
+ * play/pause control, leaving the miniplayer surface visually stable while
+ * the arc advances clockwise.
  */
 @Composable
 fun MiniPlayer(
@@ -98,44 +88,6 @@ fun MiniPlayer(
             .background(MaterialTheme.colorScheme.surface)
             .clickable(enabled = song != null, onClick = onClick)
     ) {
-        // Progress fill: a plain colored box sized to the played fraction,
-        // behind the row's content — this IS the progress indicator, not a
-        // separate bar drawn on top of it. Height comes from matchParentSize
-        // (ties to the Box's own resolved height, driven by the Row below,
-        // instead of fillMaxHeight() expanding to fill the whole screen);
-        // width is driven separately by fillMaxWidth(progress) on an inner
-        // Box, since chaining both size modifiers on one Box doesn't work —
-        // matchParentSize's parent-data sizing overrides fillMaxWidth's
-        // fraction rather than combining with it.
-        if (song != null) {
-            // Keyed on the song's id so the animation resets fresh for each
-            // track — without this, animateFloatAsState would try to glide
-            // from the previous song's leftover progress to the new one's
-            // starting position, causing a visible slide on track change
-            // instead of the fill just appearing at the right spot.
-            key(song.id) {
-                // Position updates arrive in discrete steps (about once a
-                // second from the player), so snapping the fill straight to
-                // each new value makes it visibly tick forward instead of
-                // flowing. Animating linearly between updates smooths that
-                // into continuous motion.
-                val animatedProgress by animateFloatAsState(
-                    targetValue = progress,
-                    animationSpec = tween(durationMillis = 900, easing = LinearEasing),
-                    label = "miniPlayerProgress"
-                )
-                Box(modifier = Modifier.matchParentSize()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
-                            .clip(MiniPlayerFillShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                    )
-                }
-            }
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -162,30 +114,26 @@ fun MiniPlayer(
                 )
             }
 
-            // Play/pause: filled squircle background, kept as-is; disabled
-            // (muted, non-interactive) in the placeholder state.
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(PillShape)
-                    .background(
-                        if (song != null) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    .clickable(enabled = song != null, onClick = onTogglePlayPause),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = if (song != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxSize(0.5f)
+            // Play/pause control with a circular progress ring. The ring uses
+            // the same 44dp footprint as the next control so the mini-player
+            // remains optically symmetrical.
+            key(song?.id ?: -1L) {
+                val animatedProgress by animateFloatAsState(
+                    targetValue = progress,
+                    animationSpec = tween(durationMillis = 220, easing = LinearEasing),
+                    label = "miniPlayerCircularProgress"
+                )
+                CircularProgressPlayButton(
+                    progress = animatedProgress,
+                    enabled = song != null,
+                    isPlaying = isPlaying,
+                    onClick = onTogglePlayPause
                 )
             }
             // Skip next: plain icon, no background, right-aligned next to play/pause.
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(44.dp)
                     .clickable(enabled = song != null, onClick = onSkipNext),
                 contentAlignment = Alignment.Center
             ) {
@@ -196,6 +144,71 @@ fun MiniPlayer(
                     modifier = Modifier.fillMaxSize(0.7f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CircularProgressPlayButton(
+    progress: Float,
+    enabled: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val trackColor = if (enabled) MaterialTheme.colorScheme.surfaceVariant
+    else MaterialTheme.colorScheme.surfaceContainerHighest
+    val progressColor = if (enabled) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.outlineVariant
+    val buttonColor = if (enabled) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.surfaceVariant
+    val iconColor = if (enabled) MaterialTheme.colorScheme.onPrimary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 4.dp.toPx()
+            val inset = strokeWidth / 2f
+            val diameter = size.minDimension - strokeWidth
+            drawArc(
+                color = trackColor,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = androidx.compose.ui.geometry.Size(diameter, diameter),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            if (progress > 0f) {
+                drawArc(
+                    color = progressColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * progress,
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = androidx.compose.ui.geometry.Size(diameter, diameter),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(PillShape)
+                .background(buttonColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (isPlaying) "Pause" else "Play",
+                tint = iconColor,
+                modifier = Modifier.fillMaxSize(0.5f)
+            )
         }
     }
 }
