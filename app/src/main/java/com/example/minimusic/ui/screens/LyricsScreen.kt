@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -167,17 +168,14 @@ fun LyricsScreen(
                         val isActive = index == activeIndex
                         val color by animateColorAsState(
                             targetValue = if (isActive) activeColor else inactiveColor,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
+                            animationSpec = tween(durationMillis = 220),
                             label = "lyricsLineColor"
                         )
                         val bounce by animateFloatAsState(
                             targetValue = if (isActive) 1f else 0f,
                             animationSpec = spring(
-                                dampingRatio = 0.72f,
-                                stiffness = 380f
+                                dampingRatio = 0.88f,
+                                stiffness = 220f
                             ),
                             label = "lyricsLineBounce"
                         )
@@ -185,10 +183,10 @@ fun LyricsScreen(
                             text = line.text,
                             color = color,
                             style = if (isActive) {
-                                MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = (-0.3).sp,
-                                    lineHeight = 40.sp
+                                MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = (-0.1).sp,
+                                    lineHeight = 38.sp
                                 )
                             } else {
                                 MaterialTheme.typography.headlineSmall.copy(
@@ -202,10 +200,10 @@ fun LyricsScreen(
                                     line.startMs?.let(onSeekTo)
                                 }
                                 .graphicsLayer {
-                                    val scale = 1f + (0.025f * bounce)
+                                    val scale = 1f + (0.012f * bounce)
                                     scaleX = scale
                                     scaleY = scale
-                                    translationY = -1.5f * bounce
+                                    translationY = -0.75f * bounce
                                 }
                         )
                     }
