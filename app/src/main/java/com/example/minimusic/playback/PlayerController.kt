@@ -95,6 +95,10 @@ class PlayerController(private val context: Context) {
     }
 
     fun seekTo(positionMs: Long) {
+        // Seeking can briefly emit an intermediate paused/buffering callback
+        // even when playback resumes immediately. Keep the visible transport
+        // state stable until Media3 settles, exactly as for track transitions.
+        holdPlaybackStateAcrossTransition()
         controller?.seekTo(positionMs)
     }
 
