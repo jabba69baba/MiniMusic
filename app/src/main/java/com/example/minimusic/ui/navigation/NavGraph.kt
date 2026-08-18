@@ -143,6 +143,7 @@ fun MiniMusicNavGraph(
             LyricsScreen(
                 playbackState = playbackState,
                 lyricsState = lyricsState,
+                onSeekTo = playerViewModel::seekTo,
                 onBack = { navController.popBackStack() }
             )
         }

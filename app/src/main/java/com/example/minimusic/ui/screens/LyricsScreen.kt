@@ -6,11 +6,15 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -71,6 +75,7 @@ private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
 fun LyricsScreen(
     playbackState: PlaybackUiState,
     lyricsState: LyricsState,
+    onSeekTo: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
@@ -123,7 +128,7 @@ fun LyricsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colorScheme.background)
-                .padding(top = 24.dp)
+                .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(horizontal = 40.dp, vertical = 48.dp)
         )
 
@@ -137,7 +142,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .padding(top = 24.dp)
+                        .windowInsetsPadding(WindowInsets.systemBars)
                         .padding(horizontal = 40.dp, vertical = 48.dp)
                 )
             } else {
@@ -146,7 +151,7 @@ fun LyricsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(colorScheme.background)
-                        .padding(top = 24.dp),
+                        .windowInsetsPadding(WindowInsets.systemBars),
                     contentPadding = PaddingValues(
                         start = 40.dp,
                         end = 32.dp,
@@ -180,9 +185,10 @@ fun LyricsScreen(
                             text = line.text,
                             color = color,
                             style = if (isActive) {
-                                MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    lineHeight = 36.sp
+                                MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = (-0.3).sp,
+                                    lineHeight = 40.sp
                                 )
                             } else {
                                 MaterialTheme.typography.headlineSmall.copy(
@@ -192,6 +198,9 @@ fun LyricsScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clickable(enabled = line.startMs != null) {
+                                    line.startMs?.let(onSeekTo)
+                                }
                                 .graphicsLayer {
                                     val scale = 1f + (0.025f * bounce)
                                     scaleX = scale
