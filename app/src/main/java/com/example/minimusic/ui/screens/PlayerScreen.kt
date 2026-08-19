@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -492,7 +493,7 @@ private fun NowPlayingPanel(
                 onClick = onTogglePlayPause,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
+                    .requiredHeight(TransportButtonSize)
             )
             TransportButton(
                 icon = Icons.Filled.SkipNext,
@@ -511,7 +512,7 @@ private fun NowPlayingPanel(
         // background — independently, so more than one can be active at once.
         Column(
             modifier = Modifier
-                .padding(horizontal = 2.dp)
+                .padding(horizontal = 4.dp)
                 .padding(top = ControlSectionGap)
         ) {
             Surface(
