@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.screens
 
 import android.app.Activity
+import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
@@ -8,7 +9,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -71,6 +73,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -90,6 +93,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.minimusic.data.AudioFormatInfo
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.data.readAudioFormatInfo
@@ -102,6 +108,8 @@ import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
@@ -342,6 +350,15 @@ private fun formatRemaining(ms: Long): String {
     return "%02d:%02d".format(minutes, seconds)
 }
 
+private fun preloadAlbumArt(context: Context, song: Song) {
+    val artworkUri = song.albumArtUri ?: return
+    val request = ImageRequest.Builder(context)
+        .data(artworkUri)
+        .memoryCachePolicy(CachePolicy.ENABLED)
+        .build()
+    context.imageLoader.enqueue(request)
+}
+
 @Composable
 private fun NowPlayingPanel(
     song: Song,
@@ -358,9 +375,33 @@ private fun NowPlayingPanel(
 ) {
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
+    var displayedArtworkSong by remember { mutableStateOf(song) }
+    var transitionDirection by remember { mutableStateOf(1) }
+    val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
         formatInfo = readAudioFormatInfo(context, song.contentUri)
+
+        val artworkUri = song.albumArtUri
+        if (artworkUri == null) {
+            if (latestSong.id == song.id) displayedArtworkSong = song
+        } else {
+            val request = ImageRequest.Builder(context)
+                .data(artworkUri)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .build()
+            withContext(Dispatchers.IO) {
+                context.imageLoader.execute(request)
+            }
+            if (latestSong.id == song.id) displayedArtworkSong = song
+        }
+    }
+
+    LaunchedEffect(playbackState.queue) {
+        playbackState.queue
+            .drop((playbackState.currentIndex + 1).coerceAtLeast(1))
+            .take(2)
+            .forEach { preloadAlbumArt(context, it) }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -381,13 +422,19 @@ private fun NowPlayingPanel(
                 tint = artColors.onPrimaryContainer
             )
             AnimatedContent(
-                targetState = song,
+                targetState = displayedArtworkSong,
                 transitionSpec = {
-                    (fadeIn(animationSpec = tween(240, delayMillis = 40)) +
-                        scaleIn(initialScale = 0.96f, animationSpec = tween(280))) togetherWith
-                        fadeOut(animationSpec = tween(180))
+                    val direction = transitionDirection
+                    (slideInHorizontally(
+                        initialOffsetX = { fullWidth -> direction * fullWidth },
+                        animationSpec = tween(320)
+                    ) + fadeIn(animationSpec = tween(220))) togetherWith
+                        (slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> -direction * fullWidth },
+                            animationSpec = tween(260)
+                        ) + fadeOut(animationSpec = tween(180)))
                 },
-                label = "albumArtTransition"
+                label = "albumArtCarouselTransition"
             ) { displayedSong ->
                 AsyncImage(
                     model = displayedSong.albumArtUri,
@@ -499,7 +546,10 @@ private fun NowPlayingPanel(
                 shape = CircleShape,
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
-                onClick = onSkipPrevious,
+                onClick = {
+                    transitionDirection = -1
+                    onSkipPrevious()
+                },
                 modifier = Modifier.requiredSize(TransportCircleSize)
             )
             PlayPauseButton(
@@ -517,7 +567,10 @@ private fun NowPlayingPanel(
                 shape = CircleShape,
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
-                onClick = onSkipNext,
+                onClick = {
+                    transitionDirection = 1
+                    onSkipNext()
+                },
                 modifier = Modifier.requiredSize(TransportCircleSize)
             )
         }
