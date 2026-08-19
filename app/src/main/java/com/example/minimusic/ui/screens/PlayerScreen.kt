@@ -113,13 +113,13 @@ private val PlayButtonShape = RoundedCornerShape(percent = 50)
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
 /** Fixed height shared by all three transport controls. */
-private val TransportButtonSize = 80.dp
+private val TransportButtonSize = 72.dp
 
 /** Circular previous/next controls matching the play/pause control height. */
-private val TransportCircleSize = 80.dp
+private val TransportCircleSize = 72.dp
 
 /** Original function capsule height. */
-private val CapsuleSegmentHeight = 56.dp
+private val CapsuleSegmentHeight = 48.dp
 
 /** Gap from album art to the title/artist block and from title/artist to seekbar. */
 private val ContentSectionGap = 16.dp
