@@ -130,8 +130,11 @@ private val SeekbarToTimeGap = 6.dp
 /** Restored control-to-control spacing requested for the lower PlayerScreen. */
 private val ControlSectionGap = 20.dp
 
+/** Gap between the transport row and the function capsule. */
+private val FunctionSectionGap = 24.dp
+
 /** Extra reserved clearance before the bottom-anchored queue drawer. */
-private val CapsuleToQueueGap = 29.dp
+private val CapsuleToQueueGap = 25.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -525,8 +528,8 @@ private fun NowPlayingPanel(
         // background — independently, so more than one can be active at once.
         Column(
             modifier = Modifier
-                .padding(horizontal = 4.dp)
-                .padding(top = ControlSectionGap)
+                .padding(horizontal = 8.dp)
+                .padding(top = FunctionSectionGap)
         ) {
             Surface(
                 shape = RoundedCornerShape(50),

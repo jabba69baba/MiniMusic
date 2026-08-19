@@ -65,7 +65,7 @@ private const val OPEN_FRACTION = 0.82f
 /** Height of the always-visible collapsed bar (handle + "Queue" label). Public so
  *  callers (e.g. PlayerScreen) can reserve matching bottom clearance for their
  *  own content above the drawer. */
-val QueueDrawerCollapsedHeight = 56.dp
+val QueueDrawerCollapsedHeight = 48.dp
 
 private const val ROW_HEIGHT_DP = 64
 
