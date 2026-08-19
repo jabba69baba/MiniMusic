@@ -80,5 +80,7 @@ dependencies {
     // Settings persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    testImplementation(kotlin("test"))
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
