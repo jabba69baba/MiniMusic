@@ -1,3 +1,6 @@
 <resources>
-    <style name="Theme.MiniMusic" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.MiniMusic" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

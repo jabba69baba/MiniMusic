@@ -735,11 +735,35 @@ private fun SortMenuOption(
 @Composable
 private fun LoadingState() {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CircularProgressIndicator()
+        Icon(
+            imageVector = Icons.Filled.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Loading your library",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        CircularProgressIndicator(
+            modifier = Modifier.size(32.dp),
+            strokeWidth = 3.dp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Scanning music stored on this device…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
