@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -127,7 +128,7 @@ private val TransportButtonSize = 72.dp
 private val TransportCircleSize = 72.dp
 
 /** Original function capsule height. */
-private val CapsuleSegmentHeight = 48.dp
+private val CapsuleSegmentHeight = 52.dp
 
 /** Gap from album art to the title/artist block and from title/artist to seekbar. */
 private val ContentSectionGap = 16.dp
@@ -142,7 +143,7 @@ private val ControlSectionGap = 20.dp
 private val FunctionSectionGap = 26.dp
 
 /** Extra reserved clearance before the bottom-anchored queue drawer. */
-private val CapsuleToQueueGap = 23.dp
+private val CapsuleToQueueGap = 19.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -415,35 +416,38 @@ private fun NowPlayingPanel(
                 .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(0.3f),
-                tint = artColors.onPrimaryContainer
-            )
             AnimatedContent(
                 targetState = displayedArtworkSong,
                 transitionSpec = {
                     val direction = transitionDirection
                     (slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = tween(320)
-                    ) + fadeIn(animationSpec = tween(220))) togetherWith
+                        animationSpec = tween(480, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = tween(260)
-                        ) + fadeOut(animationSpec = tween(180)))
+                            animationSpec = tween(460, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)))
                 },
                 label = "albumArtCarouselTransition"
             ) { displayedSong ->
-                AsyncImage(
-                    model = displayedSong.albumArtUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(ArtCornerShape)
-                )
+                if (displayedSong.albumArtUri == null) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(0.3f),
+                        tint = artColors.onPrimaryContainer
+                    )
+                } else {
+                    AsyncImage(
+                        model = displayedSong.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(ArtCornerShape)
+                    )
+                }
             }
         }
 
