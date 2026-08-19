@@ -131,10 +131,10 @@ private val SeekbarToTimeGap = 6.dp
 private val ControlSectionGap = 20.dp
 
 /** Gap between the transport row and the function capsule. */
-private val FunctionSectionGap = 24.dp
+private val FunctionSectionGap = 26.dp
 
 /** Extra reserved clearance before the bottom-anchored queue drawer. */
-private val CapsuleToQueueGap = 25.dp
+private val CapsuleToQueueGap = 23.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
