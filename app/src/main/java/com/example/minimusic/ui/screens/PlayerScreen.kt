@@ -350,7 +350,7 @@ private fun NowPlayingPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp)
+                .padding(horizontal = 3.dp)
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
