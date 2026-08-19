@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,10 +43,26 @@ fun FlatMusicSlider(
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
+    var pendingFraction by remember { mutableStateOf<Float?>(null) }
 
     val range = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
     val committedFraction = ((value - valueRange.start) / range).coerceIn(0f, 1f)
-    val fraction = if (isDragging) dragFraction else committedFraction
+
+    LaunchedEffect(valueRange) {
+        pendingFraction = null
+    }
+    LaunchedEffect(committedFraction, pendingFraction) {
+        val pending = pendingFraction ?: return@LaunchedEffect
+        if (kotlin.math.abs(committedFraction - pending) <= 0.015f) {
+            pendingFraction = null
+        }
+    }
+
+    val fraction = when {
+        isDragging -> dragFraction
+        pendingFraction != null -> pendingFraction!!
+        else -> committedFraction
+    }
     val trackColor = inactiveColor ?: MaterialTheme.colorScheme.surfaceVariant
     val resolvedActiveColor = activeColor ?: MaterialTheme.colorScheme.primary
 
@@ -65,13 +82,16 @@ fun FlatMusicSlider(
                         dragFraction = nextFraction
                     }
 
+                    pendingFraction = null
                     isDragging = true
                     updateFromX(down.position.x)
                     drag(down.id) { change ->
                         updateFromX(change.position.x)
                         change.consume()
                     }
-                    onValueChange(valueRange.start + dragFraction * range)
+                    val committedValue = valueRange.start + dragFraction * range
+                    pendingFraction = dragFraction
+                    onValueChange(committedValue)
                     isDragging = false
                 }
             }

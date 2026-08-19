@@ -2,6 +2,7 @@ package com.example.minimusic.playback
 
 import android.content.ComponentName
 import android.content.Context
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -29,9 +30,15 @@ class PlayerController(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
     private var currentQueue: List<Song> = emptyList()
+    private val alphabeticalSongComparator = compareBy<Song> {
+        it.title.trim().lowercase()
+    }.thenBy { it.artist.trim().lowercase() }
+        .thenBy { it.id }
     private var positionTicker: Job? = null
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
+    private var normalizingTimeline = false
+    private var pendingSeekPositionMs: Long? = null
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -58,9 +65,18 @@ class PlayerController(private val context: Context) {
     /** Loads [songs] as the new queue and starts playback at [startIndex]. */
     fun playQueue(songs: List<Song>, startIndex: Int) {
         val c = controller ?: return
-        currentQueue = songs
-        val mediaItems = songs.map { it.toMediaItem() }
-        c.setMediaItems(mediaItems, startIndex, 0L)
+        if (songs.isEmpty()) return
+
+        val selectedId = songs.getOrNull(startIndex)?.id
+        val orderedSongs = songs.sortedWith(alphabeticalSongComparator)
+        val orderedStartIndex = selectedId?.let { id ->
+            orderedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+        } ?: 0
+
+        currentQueue = orderedSongs
+        pendingSeekPositionMs = null
+        val mediaItems = orderedSongs.map { it.toMediaItem() }
+        c.setMediaItems(mediaItems, orderedStartIndex, 0L)
         c.prepare()
         c.play()
     }
@@ -95,18 +111,26 @@ class PlayerController(private val context: Context) {
     }
 
     fun seekTo(positionMs: Long) {
-        // Seeking can briefly emit an intermediate paused/buffering callback
-        // even when playback resumes immediately. Keep the visible transport
-        // state stable until Media3 settles, exactly as for track transitions.
+        val c = controller ?: return
+        val target = positionMs.coerceAtLeast(0L)
+        // Keep the UI on the user's committed position until Media3 reports a
+        // nearby value; otherwise the 50ms ticker briefly paints the old
+        // position and the seekbar appears to snap backward.
+        pendingSeekPositionMs = target
         holdPlaybackStateAcrossTransition()
-        controller?.seekTo(positionMs)
+        c.seekTo(target)
     }
 
     fun playFromQueue(index: Int) {
+        val c = controller ?: return
+        val selectedSong = _uiState.value.queue.getOrNull(index) ?: return
+        val timelineIndex = currentQueue.indexOfFirst { it.id == selectedSong.id }
+        if (timelineIndex < 0) return
+
         holdPlaybackStateAcrossTransition()
         _uiState.value = _uiState.value.copy(isPlaying = true)
-        controller?.seekTo(index, 0L)
-        controller?.play()
+        c.seekTo(timelineIndex, 0L)
+        c.play()
     }
 
     /**
@@ -162,8 +186,9 @@ class PlayerController(private val context: Context) {
 
     fun toggleShuffle() {
         val c = controller ?: return
-        c.shuffleModeEnabled = !c.shuffleModeEnabled
-        _uiState.value = _uiState.value.copy(isShuffled = c.shuffleModeEnabled)
+        val enabled = !c.shuffleModeEnabled
+        c.shuffleModeEnabled = enabled
+        if (!enabled) normalizeTimelineAlphabetically(c)
         syncQueueFromController()
     }
 
@@ -190,6 +215,7 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            pendingSeekPositionMs = null
             holdPlaybackStateAcrossTransition()
             syncQueueFromController()
         }
@@ -199,7 +225,7 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            _uiState.value = _uiState.value.copy(isShuffled = shuffleModeEnabled)
+            if (!shuffleModeEnabled) normalizeTimelineAlphabetically(controller)
             syncQueueFromController()
         }
 
@@ -229,26 +255,89 @@ class PlayerController(private val context: Context) {
 
     private fun syncQueueFromController() {
         val c = controller ?: return
+        if (normalizingTimeline) {
+            refreshCurrentItem()
+            return
+        }
+
         if (c.mediaItemCount > 0 && currentQueue.isNotEmpty()) {
             val songsByMediaId = currentQueue.associateBy { it.id.toString() }
-            val timelineQueue = (0 until c.mediaItemCount).mapNotNull { itemIndex ->
+            val controllerSongs = (0 until c.mediaItemCount).mapNotNull { itemIndex ->
                 songsByMediaId[c.getMediaItemAt(itemIndex).mediaId]
             }
-            if (timelineQueue.size == c.mediaItemCount) {
-                currentQueue = timelineQueue
+            if (controllerSongs.size == c.mediaItemCount) {
+                val controllerIds = controllerSongs.map { it.id }.toSet()
+                currentQueue = currentQueue.filter { it.id in controllerIds } +
+                    controllerSongs.filterNot { song -> currentQueue.any { it.id == song.id } }
             }
         }
+
+        if (!c.shuffleModeEnabled) normalizeTimelineAlphabetically(c)
         refreshCurrentItem()
+    }
+
+    private fun normalizeTimelineAlphabetically(c: Player?) {
+        if (c == null || c.mediaItemCount < 2 || normalizingTimeline) return
+        val sortedSongs = currentQueue.sortedWith(alphabeticalSongComparator)
+        if (sortedSongs.size != c.mediaItemCount) return
+
+        val targetIds = sortedSongs.map { it.id.toString() }
+        val currentIds = (0 until c.mediaItemCount)
+            .map { index -> c.getMediaItemAt(index).mediaId }
+        if (currentIds == targetIds) {
+            currentQueue = sortedSongs
+            return
+        }
+
+        normalizingTimeline = true
+        try {
+            val workingIds = currentIds.toMutableList()
+            targetIds.forEachIndexed { targetIndex, targetId ->
+                val fromIndex = workingIds.indexOf(targetId)
+                if (fromIndex >= 0 && fromIndex != targetIndex) {
+                    c.moveMediaItem(fromIndex, targetIndex)
+                    workingIds.add(targetIndex, workingIds.removeAt(fromIndex))
+                }
+            }
+            currentQueue = sortedSongs
+        } finally {
+            normalizingTimeline = false
+        }
+    }
+
+    private fun playbackQueueForDisplay(c: Player): Pair<List<Song>, Int> {
+        if (currentQueue.isEmpty()) return emptyList<Song>() to -1
+        val currentTimelineIndex = c.currentMediaItemIndex
+        if (currentTimelineIndex !in 0 until c.mediaItemCount) {
+            return currentQueue to -1
+        }
+
+        val songsByMediaId = currentQueue.associateBy { it.id.toString() }
+        val displaySongs = mutableListOf<Song>()
+        val visitedTimelineIndices = mutableSetOf<Int>()
+        var timelineIndex = currentTimelineIndex
+
+        while (
+            timelineIndex != C.INDEX_UNSET &&
+            timelineIndex in 0 until c.mediaItemCount &&
+            visitedTimelineIndices.add(timelineIndex)
+        ) {
+            songsByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.let(displaySongs::add)
+            timelineIndex = c.getNextMediaItemIndex(timelineIndex)
+        }
+
+        return if (displaySongs.isEmpty()) currentQueue to -1 else displaySongs to 0
     }
 
     private fun refreshCurrentItem() {
         val c = controller ?: return
-        val index = c.currentMediaItemIndex
-        val song = currentQueue.getOrNull(index)
+        val currentTimelineIndex = c.currentMediaItemIndex
+        val currentSong = currentQueue.getOrNull(currentTimelineIndex)
+        val (displayQueue, displayIndex) = playbackQueueForDisplay(c)
         _uiState.value = _uiState.value.copy(
-            currentSong = song,
-            queue = currentQueue.toList(),
-            currentIndex = index,
+            currentSong = currentSong,
+            queue = displayQueue,
+            currentIndex = displayIndex,
             isShuffled = c.shuffleModeEnabled,
             repeatMode = when (c.repeatMode) {
                 Player.REPEAT_MODE_ALL -> RepeatMode.ALL
@@ -265,8 +354,20 @@ class PlayerController(private val context: Context) {
             while (true) {
                 val c = controller
                 if (c != null) {
+                    val actualPosition = c.currentPosition.coerceAtLeast(0L)
+                    val pendingPosition = pendingSeekPositionMs
+                    val displayPosition = if (pendingPosition != null) {
+                        if (kotlin.math.abs(actualPosition - pendingPosition) <= 750L) {
+                            pendingSeekPositionMs = null
+                            actualPosition
+                        } else {
+                            pendingPosition
+                        }
+                    } else {
+                        actualPosition
+                    }
                     _uiState.value = _uiState.value.copy(
-                        positionMs = c.currentPosition.coerceAtLeast(0L),
+                        positionMs = displayPosition,
                         durationMs = c.duration.coerceAtLeast(0L)
                     )
                 }

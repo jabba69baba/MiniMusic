@@ -56,9 +56,7 @@ fun MiniMusicNavGraph(
                 onPlayNext = playerViewModel::playNext,
                 onAddToQueue = playerViewModel::addToQueue,
                 onShufflePlayFrom = { song, songs ->
-                    val rest = (songs - song).shuffled()
-                    val shuffledQueue = listOf(song) + rest
-                    playerViewModel.playQueue(shuffledQueue, 0)
+                    playerViewModel.playQueue(songs, songs.indexOf(song))
                     if (!playbackState.isShuffled) playerViewModel.toggleShuffle()
                 },
                 onDeleteSong = libraryViewModel::deleteSong,
