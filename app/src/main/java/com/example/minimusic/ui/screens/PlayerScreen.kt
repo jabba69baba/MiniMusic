@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -482,7 +483,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = onSkipPrevious,
-                modifier = Modifier.size(TransportCircleSize)
+                modifier = Modifier.requiredSize(TransportCircleSize)
             )
             PlayPauseButton(
                 isPlaying = playbackState.isPlaying,
@@ -500,7 +501,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = onSkipNext,
-                modifier = Modifier.size(TransportCircleSize)
+                modifier = Modifier.requiredSize(TransportCircleSize)
             )
         }
 
