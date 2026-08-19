@@ -323,7 +323,11 @@ class PlayerController(private val context: Context) {
             visitedTimelineIndices.add(timelineIndex)
         ) {
             songsByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.let(displaySongs::add)
-            timelineIndex = c.getNextMediaItemIndex(timelineIndex)
+            timelineIndex = c.currentTimeline.getNextWindowIndex(
+                timelineIndex,
+                c.repeatMode,
+                c.shuffleModeEnabled
+            )
         }
 
         return if (displaySongs.isEmpty()) currentQueue to -1 else displaySongs to 0
