@@ -114,8 +114,10 @@ private val TransportButtonSize = 96.dp
 /** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
 private val CapsuleSegmentHeight = 56.dp
 
-/** Equal vertical gap used between each of the panel's major sections. */
-private val SectionGap = 20.dp
+/** Measured vertical gaps matching the image 1 reference composition. */
+private val MetadataToTransportGap = 16.dp
+private val TransportToFunctionGap = 18.dp
+private val CapsuleToQueueGap = 29.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -195,7 +197,7 @@ fun PlayerScreen(
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
                     bottom = if (playbackState.queue.size > 1) {
-                        QueueDrawerCollapsedHeight + SectionGap
+                        QueueDrawerCollapsedHeight + CapsuleToQueueGap
                     } else {
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
                     }
@@ -348,6 +350,7 @@ private fun NowPlayingPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 4.dp)
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
@@ -395,7 +398,7 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 12.dp)) {
+        Column(modifier = Modifier.padding(top = 3.dp)) {
             FlatMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
@@ -451,7 +454,7 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(TransportButtonSize)
-                .padding(top = SectionGap),
+                .padding(top = MetadataToTransportGap),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -486,7 +489,7 @@ private fun NowPlayingPanel(
         // it while inactive; when active, that segment gets its own filled
         // rounded-pill highlight that visually pops out from the shared
         // background — independently, so more than one can be active at once.
-        Column(modifier = Modifier.padding(top = SectionGap)) {
+        Column(modifier = Modifier.padding(top = TransportToFunctionGap)) {
             Surface(
                 shape = RoundedCornerShape(50),
                 color = artColors.surfaceVariant,
