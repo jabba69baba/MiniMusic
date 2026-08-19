@@ -109,10 +109,10 @@ private val PlayButtonShape = RoundedCornerShape(percent = 50)
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
 /** Fixed height shared by all three transport controls. */
-private val TransportButtonSize = 96.dp
+private val TransportButtonSize = 80.dp
 
 /** Circular previous/next controls matching the play/pause control height. */
-private val TransportCircleSize = 96.dp
+private val TransportCircleSize = 80.dp
 
 /** Original function capsule height. */
 private val CapsuleSegmentHeight = 56.dp
