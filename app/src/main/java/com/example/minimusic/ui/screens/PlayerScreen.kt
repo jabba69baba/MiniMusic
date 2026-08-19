@@ -101,23 +101,26 @@ import java.util.concurrent.TimeUnit
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
 
-/** Rounded-rectangle play/pause shape with visible straight sides, inspired by the reference transport layout. */
-private val PlayButtonShape = RoundedCornerShape(36.dp)
+/** 80dp-high play/pause shape with semicircular left and right ends and flat center edges. */
+private val PlayButtonShape = RoundedCornerShape(percent = 50)
 
 /** Corner radius each capsule segment takes on when it becomes active. */
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
-/** Fixed height for the transport row and play/pause control. */
-private val TransportButtonSize = 96.dp
+/** Fixed height shared by all three transport controls. */
+private val TransportButtonSize = 80.dp
 
-/** Slightly smaller circular previous/next controls inside the 96dp transport row. */
-private val TransportCircleSize = 88.dp
+/** Circular previous/next controls matching the play/pause control height. */
+private val TransportCircleSize = 80.dp
 
 /** Taller function capsule for a less-squashed, more square-rounded profile. */
 private val CapsuleSegmentHeight = 64.dp
 
-/** Equal internal spacing used between the major PlayerScreen sections. */
-private val ContentSectionGap = 12.dp
+/** Half of the measured reference spacing between lower content blocks. */
+private val ContentSectionGap = 6.dp
+
+/** Restored control-to-control spacing requested for the lower PlayerScreen. */
+private val ControlSectionGap = 20.dp
 
 /** Extra reserved clearance before the bottom-anchored queue drawer. */
 private val CapsuleToQueueGap = 29.dp
@@ -376,7 +379,11 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = ContentSectionGap)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 2.dp)
+                .padding(top = ContentSectionGap)
+        ) {
             Text(
                     text = song.title,
                     style = MaterialTheme.typography.headlineSmall,
@@ -401,7 +408,11 @@ private fun NowPlayingPanel(
             )
         }
 
-        Column(modifier = Modifier.padding(top = ContentSectionGap)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 2.dp)
+                .padding(top = ContentSectionGap)
+        ) {
             FlatMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
@@ -457,7 +468,7 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(TransportButtonSize)
-                .padding(top = ContentSectionGap),
+                .padding(top = ControlSectionGap),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -494,7 +505,11 @@ private fun NowPlayingPanel(
         // it while inactive; when active, that segment gets its own filled
         // rounded-pill highlight that visually pops out from the shared
         // background — independently, so more than one can be active at once.
-        Column(modifier = Modifier.padding(top = ContentSectionGap)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 2.dp)
+                .padding(top = ControlSectionGap)
+        ) {
             Surface(
                 shape = RoundedCornerShape(50),
                 color = artColors.surfaceVariant,
