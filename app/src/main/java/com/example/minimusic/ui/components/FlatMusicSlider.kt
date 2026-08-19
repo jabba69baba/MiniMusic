@@ -30,7 +30,7 @@ import kotlin.math.max
  * immediately and the media seek is committed only when the gesture ends,
  * preventing controller churn and visible jitter. The drawing has a bright
  * active segment, a distinct inactive segment separated by a small gap, and a
- * 4dp stop indicator at the far end of the track.
+ * 6dp stop indicator at the far end of the track.
  */
 @Composable
 fun FlatMusicSlider(
@@ -69,7 +69,7 @@ fun FlatMusicSlider(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp)
+            .height(16.dp)
             .pointerInput(valueRange) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -100,7 +100,7 @@ fun FlatMusicSlider(
         val strokeWidth = 8.dp.toPx()
         val startX = 4.dp.toPx()
         val endX = (size.width - 4.dp.toPx()).coerceAtLeast(startX)
-        val stopRadius = strokeWidth / 2f
+        val stopRadius = 3.dp.toPx()
         val stopCenterX = endX
         val progressX = startX + (endX - startX) * fraction
         val inactiveStartX = (progressX + 12.dp.toPx()).coerceAtMost(endX)
@@ -125,9 +125,9 @@ fun FlatMusicSlider(
             )
         }
 
-        // The terminal stop is the same color, diameter, and round-cap radius
-        // as the inactive track, so it reads as its natural end rather than a
-        // pasted-on thumb.
+        // The smaller terminal stop sits centered inside the inactive track,
+        // leaving the 8dp track visible around it rather than reading as a
+        // pasted-on full-width thumb.
         drawCircle(
             color = trackColor,
             radius = stopRadius,

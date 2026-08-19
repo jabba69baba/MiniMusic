@@ -108,16 +108,19 @@ private val PlayButtonShape = RoundedCornerShape(percent = 50)
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
 /** Fixed height shared by all three transport controls. */
-private val TransportButtonSize = 80.dp
+private val TransportButtonSize = 96.dp
 
 /** Circular previous/next controls matching the play/pause control height. */
-private val TransportCircleSize = 80.dp
+private val TransportCircleSize = 96.dp
 
-/** Taller function capsule for a less-squashed, more square-rounded profile. */
-private val CapsuleSegmentHeight = 64.dp
+/** Original function capsule height. */
+private val CapsuleSegmentHeight = 56.dp
 
-/** Half of the measured reference spacing between lower content blocks. */
-private val ContentSectionGap = 6.dp
+/** Gap from album art to the title/artist block and from title/artist to seekbar. */
+private val ContentSectionGap = 16.dp
+
+/** Gap from the seekbar to the timer/audio-quality row. */
+private val SeekbarToTimeGap = 6.dp
 
 /** Restored control-to-control spacing requested for the lower PlayerScreen. */
 private val ControlSectionGap = 20.dp
@@ -424,7 +427,7 @@ private fun NowPlayingPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 24.dp)
-                    .padding(top = ContentSectionGap),
+                    .padding(top = SeekbarToTimeGap),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
