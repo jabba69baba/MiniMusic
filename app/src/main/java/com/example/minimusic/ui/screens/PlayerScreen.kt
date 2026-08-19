@@ -6,6 +6,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -374,14 +377,24 @@ private fun NowPlayingPanel(
                 modifier = Modifier.fillMaxSize(0.3f),
                 tint = artColors.onPrimaryContainer
             )
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(ArtCornerShape)
-            )
+            AnimatedContent(
+                targetState = song,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(240, delayMillis = 40)) +
+                        scaleIn(initialScale = 0.96f, animationSpec = tween(280))) togetherWith
+                        fadeOut(animationSpec = tween(180))
+                },
+                label = "albumArtTransition"
+            ) { displayedSong ->
+                AsyncImage(
+                    model = displayedSong.albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(ArtCornerShape)
+                )
+            }
         }
 
         Column(
@@ -474,7 +487,7 @@ private fun NowPlayingPanel(
                 .fillMaxWidth()
                 .height(TransportButtonSize)
                 .padding(top = ControlSectionGap),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TransportButton(
@@ -563,17 +576,30 @@ private fun TransportButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressOverlayAlpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.20f else 0f,
+        animationSpec = tween(durationMillis = if (isPressed) 70 else 180),
+        label = "transportPressIllumination"
+    )
+
     Box(
         modifier = modifier
             .clip(shape)
             .background(containerColor)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White.copy(alpha = pressOverlayAlpha))
+        )
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
