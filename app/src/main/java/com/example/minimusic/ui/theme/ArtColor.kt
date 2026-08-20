@@ -18,7 +18,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.android.material.color.utilities.DynamicScheme
 import com.google.android.material.color.utilities.Hct
-import com.google.android.material.color.utilities.SchemeTonalSpot
+import com.google.android.material.color.utilities.SchemeVibrant
 import kotlin.math.abs
 import kotlin.math.ln
 
@@ -83,7 +83,7 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
             val palette = Palette.from(it).generate()
             // Score representative swatches rather than trusting the most
             // saturated dominant pixel. Tonal Spot below creates the roles.
-            listOfNotNull(
+            val candidates = listOfNotNull(
                 palette.dominantSwatch,
                 palette.mutedSwatch,
                 palette.darkMutedSwatch,
@@ -91,7 +91,11 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
                 palette.vibrantSwatch,
                 palette.darkVibrantSwatch,
                 palette.lightVibrantSwatch
-            ).maxByOrNull(::artworkSwatchScore)
+            )
+            val expressiveCandidates = candidates.filter {
+                Hct.fromInt(it.rgb).chroma >= 14.0
+            }
+            (expressiveCandidates.ifEmpty { candidates }).maxByOrNull(::artworkSwatchScore)
         }
         swatch?.let {
             val resolved = normalizeArtworkSeed(Color(it.rgb))
@@ -110,12 +114,12 @@ private fun artworkSwatchScore(swatch: Palette.Swatch): Double {
     val populationScore = ln((swatch.population + 1).toDouble())
     val toneScore = 1.0 - abs(hct.tone - 50.0) / 50.0
     val chromaScore = 1.0 - abs(hct.chroma - 36.0) / 72.0
-    return populationScore * 0.55 + toneScore.coerceAtLeast(0.0) * 0.25 +
-        chromaScore.coerceAtLeast(0.0) * 0.20
+    return populationScore * 0.28 + toneScore.coerceAtLeast(0.0) * 0.22 +
+        chromaScore.coerceAtLeast(0.0) * 0.50
 }
 
-private fun tonalSpotScheme(seed: Color, isDark: Boolean): DynamicScheme =
-    SchemeTonalSpot(Hct.fromInt(seed.toArgb()), isDark, 0.0)
+private fun artScheme(seed: Color, isDark: Boolean): DynamicScheme =
+    SchemeVibrant(Hct.fromInt(seed.toArgb()), isDark, 0.0)
 
 /**
  * Normalize a palette seed before it reaches Material scheme generation.
@@ -126,8 +130,8 @@ private fun tonalSpotScheme(seed: Color, isDark: Boolean): DynamicScheme =
 private fun normalizeArtworkSeed(color: Color): Color {
     val hsl = FloatArray(3)
     CoreColorUtils.colorToHSL(color.toArgb(), hsl)
-    hsl[1] = (hsl[1] * 0.62f).coerceAtMost(0.58f)
-    hsl[2] = hsl[2].coerceIn(0.24f, 0.72f)
+    hsl[1] = (hsl[1] * 0.92f).coerceAtMost(0.86f)
+    hsl[2] = hsl[2].coerceIn(0.18f, 0.84f)
     return Color(CoreColorUtils.HSLToColor(hsl))
 }
 
@@ -148,11 +152,11 @@ fun rememberArtAccentColor(albumArtUri: Uri?): Color {
     val seed = rememberArtworkSeedColor(albumArtUri)
     val appScheme = MaterialTheme.colorScheme
     val isDark = appScheme.background.luminance() < 0.5f
-    val scheme = remember(seed, isDark) { tonalSpotScheme(seed, isDark) }
+    val scheme = remember(seed, isDark) { artScheme(seed, isDark) }
     return softenedRole(
         base = appScheme.primary,
         art = Color(scheme.getPrimary()),
-        amount = 0.28f
+        amount = 0.80f
     )
 }
 
@@ -161,35 +165,39 @@ fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
     val seed = rememberArtworkSeedColor(albumArtUri)
     val appScheme = MaterialTheme.colorScheme
     val isDark = appScheme.background.luminance() < 0.5f
-    val scheme = remember(seed, isDark) { tonalSpotScheme(seed, isDark) }
+    val scheme = remember(seed, isDark) { artScheme(seed, isDark) }
     val artPrimary = Color(scheme.getPrimary())
     val artPrimaryContainer = Color(scheme.getPrimaryContainer())
     val artSecondary = Color(scheme.getSecondary())
     val artSecondaryContainer = Color(scheme.getSecondaryContainer())
     val artTertiary = Color(scheme.getTertiary())
     val artTertiaryContainer = Color(scheme.getTertiaryContainer())
+    val artBackground = Color(scheme.getBackground())
+    val artOnBackground = Color(scheme.getOnBackground())
     val artSurface = Color(scheme.getSurface())
+    val artOnSurface = Color(scheme.getOnSurface())
     val artSurfaceVariant = Color(scheme.getSurfaceVariant())
+    val artOnSurfaceVariant = Color(scheme.getOnSurfaceVariant())
 
     return ArtColorRoles(
-        primary = softenedRole(appScheme.primary, artPrimary, 0.24f),
-        onPrimary = appScheme.onPrimary,
-        primaryContainer = softenedRole(appScheme.primaryContainer, artPrimaryContainer, 0.16f),
-        onPrimaryContainer = appScheme.onPrimaryContainer,
-        secondary = softenedRole(appScheme.secondary, artSecondary, 0.18f),
-        onSecondary = appScheme.onSecondary,
-        secondaryContainer = softenedRole(appScheme.secondaryContainer, artSecondaryContainer, 0.12f),
-        onSecondaryContainer = appScheme.onSecondaryContainer,
-        tertiary = softenedRole(appScheme.tertiary, artTertiary, 0.18f),
-        onTertiary = appScheme.onTertiary,
-        tertiaryContainer = softenedRole(appScheme.tertiaryContainer, artTertiaryContainer, 0.12f),
-        onTertiaryContainer = appScheme.onTertiaryContainer,
-        background = appScheme.background,
-        onBackground = appScheme.onBackground,
-        surface = softenedRole(appScheme.surface, artSurface, 0.06f),
-        onSurface = appScheme.onSurface,
-        surfaceVariant = softenedRole(appScheme.surfaceContainerHigh, artSurfaceVariant, 0.08f),
-        onSurfaceVariant = appScheme.onSurfaceVariant
+        primary = softenedRole(appScheme.primary, artPrimary, 0.78f),
+        onPrimary = Color(scheme.getOnPrimary()),
+        primaryContainer = softenedRole(appScheme.primaryContainer, artPrimaryContainer, 0.70f),
+        onPrimaryContainer = Color(scheme.getOnPrimaryContainer()),
+        secondary = softenedRole(appScheme.secondary, artSecondary, 0.68f),
+        onSecondary = Color(scheme.getOnSecondary()),
+        secondaryContainer = softenedRole(appScheme.secondaryContainer, artSecondaryContainer, 0.58f),
+        onSecondaryContainer = Color(scheme.getOnSecondaryContainer()),
+        tertiary = softenedRole(appScheme.tertiary, artTertiary, 0.68f),
+        onTertiary = Color(scheme.getOnTertiary()),
+        tertiaryContainer = softenedRole(appScheme.tertiaryContainer, artTertiaryContainer, 0.58f),
+        onTertiaryContainer = Color(scheme.getOnTertiaryContainer()),
+        background = softenedRole(appScheme.background, artBackground, 0.72f),
+        onBackground = artOnBackground,
+        surface = softenedRole(appScheme.surface, artSurface, 0.76f),
+        onSurface = artOnSurface,
+        surfaceVariant = softenedRole(appScheme.surfaceContainerHigh, artSurfaceVariant, 0.68f),
+        onSurfaceVariant = artOnSurfaceVariant
     )
 }
 

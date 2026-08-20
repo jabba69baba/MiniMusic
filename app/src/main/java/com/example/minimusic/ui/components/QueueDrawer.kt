@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,8 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -108,22 +107,19 @@ fun BoxWithConstraintsScope.QueueDrawer(
     // closing it).
     androidx.compose.runtime.LaunchedEffect(isOpen, fullHeightPx) {
         val target = if (isOpen) openOffsetPx else closedOffsetPx
-        offsetY.animateTo(target, animationSpec = tween(260))
+        offsetY.animateTo(
+            target,
+            animationSpec = tween(280, easing = FastOutSlowInEasing)
+        )
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            // This translated surface is the only gesture hit area. When the
+            // drawer is closed, only the visible collapsed queue bar is hit-testable;
+            // when open, the visible drawer content accepts downward drags.
             .offset { IntOffset(x = 0, y = offsetY.value.roundToInt()) }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Final)
-                            .changes
-                            .forEach { it.consume() }
-                    }
-                }
-            }
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -136,14 +132,13 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
-                        // Update synchronously within the gesture's own coroutine
-                        // context (draggable already runs on one) rather than
-                        // spawning a new scope.launch per delta — concurrent
-                        // launches here were racing with the release animation
-                        // and could leave the drawer parked mid-way.
+                        // Track the finger directly; the surface is translated
+                        // during the drag, so the player behind it never receives
+                        // the gesture.
                         val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
                         scope.launch { offsetY.snapTo(newValue) }
                     },
+                    startDragImmediately = true,
                     onDragStopped = { velocity ->
                         // Always resolve to a fully open or fully closed target —
                         // no resting position in between is ever allowed, which is
@@ -154,7 +149,12 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
                         }
                         val target = if (shouldOpen) openOffsetPx else closedOffsetPx
-                        scope.launch { offsetY.animateTo(target, animationSpec = tween(220)) }
+                        scope.launch {
+                            offsetY.animateTo(
+                                target,
+                                animationSpec = tween(240, easing = FastOutSlowInEasing)
+                            )
+                        }
                         onOpenChange(shouldOpen)
                     }
                 )
