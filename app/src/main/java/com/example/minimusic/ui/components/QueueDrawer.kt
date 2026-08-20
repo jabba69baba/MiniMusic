@@ -223,7 +223,7 @@ private fun QueueHeader(
                 orientation = Orientation.Vertical,
                 state = headerDragState,
                 startDragImmediately = true,
-                onDragStopped = onHeaderDragStopped
+                onDragStopped = { velocity -> onHeaderDragStopped(velocity) }
             )
             .clickable(onClick = onToggle)
             .padding(vertical = 8.dp),
