@@ -184,6 +184,7 @@ fun PlayerScreen(
     var autoOpenedLyrics by remember(song.id) { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
     val artColors = rememberArtColorRoles(song.albumArtUri)
+    val navigationBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val view = LocalView.current
 
     val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
@@ -216,16 +217,23 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
-                .padding(top = 4.dp, bottom = 12.dp)
+                // When a queue exists, the conditional bottom reservation below
+                // owns the entire lower clearance so the function-to-queue gap is
+                // exactly CapsuleToQueueGap. Without a queue, retain the existing
+                // 12dp outer bottom padding.
+                .padding(
+                    top = 4.dp,
+                    bottom = if (playbackState.queue.size > 1) 0.dp else 12.dp
+                )
                 // Reserve real space for the drawer's collapsed bar sitting on top
                 // as a separate overlay below — it isn't part of this Column's
                 // layout flow, so padding on the last child here has no effect on
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
                     bottom = if (playbackState.queue.size > 1) {
-                        QueueDrawerCollapsedHeight + CapsuleToQueueGap
+                        QueueDrawerCollapsedHeight + CapsuleToQueueGap + navigationBarInset
                     } else {
-                        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
+                        navigationBarInset + 12.dp
                     }
                 )
         ) {
@@ -252,7 +260,10 @@ fun PlayerScreen(
                 )
             }
 
-            Box(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.BottomStart
+            ) {
                 NowPlayingPanel(
                     song = song,
                     playbackState = playbackState,
