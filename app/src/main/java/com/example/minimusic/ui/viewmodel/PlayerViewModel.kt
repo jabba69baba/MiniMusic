@@ -66,7 +66,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun connect() = controller.connect()
-    fun playQueue(songs: List<Song>, startIndex: Int) = controller.playQueue(songs, startIndex)
+    fun playQueue(songs: List<Song>, startIndex: Int, shuffle: Boolean = false) = controller.playQueue(songs, startIndex, shuffle)
     fun playNext(song: Song) = controller.playNext(song)
     fun addToQueue(song: Song) = controller.addToQueue(song)
     fun playFromQueue(index: Int) = controller.playFromQueue(index)

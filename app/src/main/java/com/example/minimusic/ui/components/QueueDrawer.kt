@@ -67,7 +67,7 @@ import coil.compose.AsyncImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private const val OPEN_FRACTION = 0.82f
+private const val OPEN_FRACTION = 0.94f
 val QueueDrawerCollapsedHeight = 48.dp
 private const val ROW_HEIGHT_DP = 64
 
@@ -149,7 +149,6 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     enabled = sheetDragEnabled,
                     orientation = Orientation.Vertical,
                     state = dragState,
-                    startDragImmediately = true,
                     onDragStopped = { velocity ->
                         val didDrag = sheetDragMoved
                         sheetDragMoved = false
@@ -171,6 +170,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     artColors = artColors,
                     isOpen = isOpen,
                     onToggle = { onOpenChange(!isOpen) },
+                    containerColor = if (isOpen) artColors.surface else artColors.surfaceVariant,
                     onHeaderDragStopped = { velocity ->
                         val didDrag = headerDragMoved
                         headerDragMoved = false
@@ -213,16 +213,17 @@ private fun QueueHeader(
     artColors: ArtColorRoles,
     isOpen: Boolean,
     onToggle: () -> Unit,
+    containerColor: Color,
     onHeaderDragStopped: (Float) -> Unit,
     headerDragState: androidx.compose.foundation.gestures.DraggableState
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(containerColor)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = headerDragState,
-                startDragImmediately = true,
                 onDragStopped = { velocity -> onHeaderDragStopped(velocity) }
             )
             .clickable(onClick = onToggle)
@@ -297,11 +298,13 @@ private fun QueueDrawerList(
                     activeDragId?.let { dragId ->
                         activeDragOffset += delta
                         val fromIndex = allSongIds.indexOf(dragId)
-                        val shift = (activeDragOffset / rowHeightPx).roundToInt()
-                        val targetIndex = (fromIndex + shift).coerceIn(0, allSongIds.lastIndex)
-                        if (fromIndex >= 0 && targetIndex != fromIndex) {
-                            onMoveItem(dragId, allSongIds[targetIndex])
-                            activeDragOffset -= (targetIndex - fromIndex) * rowHeightPx
+                        if (fromIndex in allSongIds.indices && allSongIds.isNotEmpty()) {
+                            val shift = (activeDragOffset / rowHeightPx).roundToInt()
+                            val targetIndex = (fromIndex + shift).coerceIn(0, allSongIds.lastIndex)
+                            if (targetIndex != fromIndex) {
+                                onMoveItem(dragId, allSongIds[targetIndex])
+                                activeDragOffset -= (targetIndex - fromIndex) * rowHeightPx
+                            }
                         }
                     }
                 },
