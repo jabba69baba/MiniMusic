@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.asPaddingValues
@@ -269,6 +270,7 @@ fun PlayerScreen(
                     playbackState = playbackState,
                     artColors = artColors,
                     showAudioQualityBadge = showAudioQualityBadge,
+                    balanceAlbumArtSpacing = navigationBarInset > 0.dp,
                     onSeekTo = onSeekTo,
                     onToggleShuffle = onToggleShuffle,
                     onSkipPrevious = onSkipPrevious,
@@ -377,6 +379,7 @@ private fun NowPlayingPanel(
     playbackState: PlaybackUiState,
     artColors: ArtColorRoles,
     showAudioQualityBadge: Boolean,
+    balanceAlbumArtSpacing: Boolean,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -416,7 +419,15 @@ private fun NowPlayingPanel(
             .forEach { preloadAlbumArt(context, it) }
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (balanceAlbumArtSpacing) Modifier.fillMaxHeight() else Modifier)
+    ) {
+        if (balanceAlbumArtSpacing) {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -460,6 +471,10 @@ private fun NowPlayingPanel(
                     )
                 }
             }
+        }
+
+        if (balanceAlbumArtSpacing) {
+            Spacer(modifier = Modifier.weight(1f))
         }
 
         Column(
