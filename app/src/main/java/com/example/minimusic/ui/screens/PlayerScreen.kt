@@ -81,7 +81,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -178,9 +177,9 @@ fun PlayerScreen(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
-    onQueueItemClick: (Int) -> Unit,
-    onMoveQueueItem: (Int, Int) -> Unit,
-    onRemoveQueueItem: (Int) -> Unit,
+    onQueueItemClick: (Long) -> Unit,
+    onMoveQueueItem: (Long, Long) -> Unit,
+    onRemoveQueueItem: (Long) -> Unit,
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
@@ -288,8 +287,9 @@ fun PlayerScreen(
         // Draggable queue drawer overlay — Auxio-style: album art and header
         // above stay put, the drawer slides up over the lower portion of the
         // screen rather than a separate full-screen modal.
-        if (playbackState.queue.size > 1) {
+        if (playbackState.queue.size + playbackState.history.size > 1) {
             QueueDrawer(
+                history = playbackState.history,
                 queue = playbackState.queue,
                 currentIndex = playbackState.currentIndex,
                 artColors = artColors,
@@ -579,8 +579,8 @@ private fun NowPlayingPanel(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous",
                 shape = CircleShape,
-                containerColor = artColors.primary,
-                contentColor = artColors.primary,
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
                 onClick = {
                     transitionDirection = -1
                     onSkipPrevious()
@@ -590,7 +590,7 @@ private fun NowPlayingPanel(
             PlayPauseButton(
                 isPlaying = playbackState.isPlaying,
                 containerColor = artColors.primary,
-                contentColor = artColors.primary,
+                contentColor = artColors.onPrimary,
                 onClick = onTogglePlayPause,
                 modifier = Modifier
                     .weight(1f)
@@ -600,8 +600,8 @@ private fun NowPlayingPanel(
                 icon = Icons.Filled.SkipNext,
                 contentDescription = "Next",
                 shape = CircleShape,
-                containerColor = artColors.primary,
-                contentColor = artColors.primary,
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
                 onClick = {
                     transitionDirection = 1
                     onSkipNext()
@@ -678,8 +678,7 @@ private fun TransportButton(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(Color.Transparent)
-            .border(1.5.dp, containerColor, shape)
+            .background(containerColor)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -710,31 +709,20 @@ private fun PlayPauseButton(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val pressOverlayAlpha by animateFloatAsState(
-        targetValue = if (isPressed) 0.20f else 0f,
-        animationSpec = tween(durationMillis = if (isPressed) 70 else 180),
-        label = "playPausePressIllumination"
-    )
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxHeight()
             .clip(PlayButtonShape)
-            .background(Color.Transparent)
-            .border(1.5.dp, containerColor, PlayButtonShape)
+            .background(containerColor)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),
-        contentAlignment = Alignment.Center
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(Color.White.copy(alpha = pressOverlayAlpha))
-        )
         AnimatedContent(
             targetState = isPlaying,
             transitionSpec = {

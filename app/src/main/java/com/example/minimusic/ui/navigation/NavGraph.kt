@@ -133,9 +133,9 @@ fun MiniMusicNavGraph(
                 onToggleShuffle = playerViewModel::toggleShuffle,
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
                 onOpenLyrics = { navController.navigate(Routes.LYRICS) },
-                onQueueItemClick = playerViewModel::playFromQueue,
-                onMoveQueueItem = playerViewModel::moveQueueItem,
-                onRemoveQueueItem = playerViewModel::removeQueueItem,
+                onQueueItemClick = playerViewModel::playSongById,
+                onMoveQueueItem = playerViewModel::moveQueueItemById,
+                onRemoveQueueItem = playerViewModel::removeQueueItemById,
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )

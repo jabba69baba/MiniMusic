@@ -3,7 +3,6 @@ package com.example.minimusic.ui.components
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -24,10 +23,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,40 +56,32 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.ArtColorRoles
+import coil.compose.AsyncImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** How far up the drawer sits when open, as a fraction of the available height. */
 private const val OPEN_FRACTION = 0.82f
-
-/** Height of the always-visible collapsed bar (handle + Queue label). */
 val QueueDrawerCollapsedHeight = 48.dp
+private const val ROW_HEIGHT_DP = 64
 
-private const val ROW_HEIGHT_DP = 72
-
-/**
- * Connected queue sheet with two distinct gesture regions:
- * collapsed: only the visible Queue bar can open it;
- * expanded: the list scrolls normally, and the sheet closes only when the list
- * is already at its first item and the user drags downward.
- */
 @Composable
 fun BoxWithConstraintsScope.QueueDrawer(
+    history: List<Song>,
     queue: List<Song>,
     currentIndex: Int,
     artColors: ArtColorRoles,
     isOpen: Boolean,
     onOpenChange: (Boolean) -> Unit,
-    onSongClick: (Int) -> Unit,
-    onMoveItem: (Int, Int) -> Unit,
-    onRemoveItem: (Int) -> Unit
+    onSongClick: (Long) -> Unit,
+    onMoveItem: (Long, Long) -> Unit,
+    onRemoveItem: (Long) -> Unit
 ) {
     val density = LocalDensity.current
     val fullHeightPx = with(density) { maxHeight.toPx() }
@@ -100,6 +90,8 @@ fun BoxWithConstraintsScope.QueueDrawer(
     val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
     val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
     val listState = rememberLazyListState()
+    val allSongs = remember(history, queue) { history + queue }
+    val allSongIds = remember(allSongs) { allSongs.map { it.id } }
     val isListAtTop by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
@@ -107,13 +99,14 @@ fun BoxWithConstraintsScope.QueueDrawer(
     }
 
     var offsetY by remember { mutableFloatStateOf(closedOffsetPx) }
+    var isDraggingSheet by remember { mutableStateOf(false) }
+    var sheetDragMoved by remember { mutableStateOf(false) }
+    var headerDragMoved by remember { mutableStateOf(false) }
     var animationTarget by remember { mutableStateOf<Float?>(null) }
-    var isDragging by remember { mutableStateOf(false) }
 
     LaunchedEffect(isOpen, fullHeightPx) {
         animationTarget = if (isOpen) openOffsetPx else closedOffsetPx
     }
-
     LaunchedEffect(animationTarget) {
         val target = animationTarget ?: return@LaunchedEffect
         val start = offsetY
@@ -127,8 +120,15 @@ fun BoxWithConstraintsScope.QueueDrawer(
     }
 
     val sheetDragEnabled = !isOpen || isListAtTop
+    val headerDragState = rememberDraggableState { delta ->
+        headerDragMoved = true
+        isDraggingSheet = true
+        animationTarget = null
+        offsetY = (offsetY + delta).coerceIn(openOffsetPx, closedOffsetPx)
+    }
     val dragState = rememberDraggableState { delta ->
-        isDragging = true
+        sheetDragMoved = true
+        isDraggingSheet = true
         animationTarget = null
         offsetY = (offsetY + delta).coerceIn(openOffsetPx, closedOffsetPx)
     }
@@ -144,7 +144,6 @@ fun BoxWithConstraintsScope.QueueDrawer(
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier
-                .fillMaxWidth()
                 .fillMaxSize()
                 .draggable(
                     enabled = sheetDragEnabled,
@@ -152,14 +151,18 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     state = dragState,
                     startDragImmediately = true,
                     onDragStopped = { velocity ->
-                        isDragging = false
-                        val shouldOpen = if (abs(velocity) > 700f) {
-                            velocity < 0f
-                        } else {
-                            offsetY < (openOffsetPx + closedOffsetPx) / 2f
+                        val didDrag = sheetDragMoved
+                        sheetDragMoved = false
+                        isDraggingSheet = false
+                        if (didDrag) {
+                            val shouldOpen = if (abs(velocity) > 700f) {
+                                velocity < 0f
+                            } else {
+                                offsetY < (openOffsetPx + closedOffsetPx) / 2f
+                            }
+                            animationTarget = if (shouldOpen) openOffsetPx else closedOffsetPx
+                            onOpenChange(shouldOpen)
                         }
-                        animationTarget = if (shouldOpen) openOffsetPx else closedOffsetPx
-                        onOpenChange(shouldOpen)
                     }
                 )
         ) {
@@ -167,22 +170,35 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 QueueHeader(
                     artColors = artColors,
                     isOpen = isOpen,
-                    onToggle = { onOpenChange(!isOpen) }
+                    onToggle = { onOpenChange(!isOpen) },
+                    onHeaderDragStopped = { velocity ->
+                        val didDrag = headerDragMoved
+                        headerDragMoved = false
+                        isDraggingSheet = false
+                        if (didDrag) {
+                            val shouldOpen = if (!isOpen) {
+                                velocity < -700f || offsetY < (openOffsetPx + closedOffsetPx) / 2f
+                            } else {
+                                velocity < -700f && offsetY <= (openOffsetPx + closedOffsetPx) / 2f
+                            }
+                            animationTarget = if (shouldOpen) openOffsetPx else closedOffsetPx
+                            onOpenChange(shouldOpen)
+                        }
+                    },
+                    headerDragState = headerDragState
                 )
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = artColors.onSurfaceVariant.copy(alpha = 0.28f)
-                )
-                if (isOpen || isDragging || offsetY < closedOffsetPx - collapsedBarHeightPx / 2f) {
+                if (isOpen || isDraggingSheet || offsetY < closedOffsetPx - collapsedBarHeightPx / 2f) {
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = artColors.onSurfaceVariant.copy(alpha = 0.28f)
+                    )
                     QueueDrawerList(
-                        queue = queue,
-                        currentIndex = currentIndex,
+                        songs = allSongs,
+                        currentSongId = queue.firstOrNull()?.id,
+                        allSongIds = allSongIds,
                         artColors = artColors,
                         listState = listState,
-                        onSongClick = { index ->
-                            onSongClick(index)
-                            onOpenChange(false)
-                        },
+                        onSongClick = onSongClick,
                         onMoveItem = onMoveItem,
                         onRemoveItem = onRemoveItem
                     )
@@ -196,11 +212,19 @@ fun BoxWithConstraintsScope.QueueDrawer(
 private fun QueueHeader(
     artColors: ArtColorRoles,
     isOpen: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onHeaderDragStopped: (Float) -> Unit,
+    headerDragState: androidx.compose.foundation.gestures.DraggableState
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .draggable(
+                orientation = Orientation.Vertical,
+                state = headerDragState,
+                startDragImmediately = true,
+                onDragStopped = onHeaderDragStopped
+            )
             .clickable(onClick = onToggle)
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -231,62 +255,164 @@ private fun QueueHeader(
 
 @Composable
 private fun QueueDrawerList(
-    queue: List<Song>,
-    currentIndex: Int,
+    songs: List<Song>,
+    currentSongId: Long?,
+    allSongIds: List<Long>,
     artColors: ArtColorRoles,
     listState: LazyListState,
-    onSongClick: (Int) -> Unit,
-    onMoveItem: (Int, Int) -> Unit,
-    onRemoveItem: (Int) -> Unit
+    onSongClick: (Long) -> Unit,
+    onMoveItem: (Long, Long) -> Unit,
+    onRemoveItem: (Long) -> Unit
 ) {
-    var activeDragIndex by remember { mutableStateOf<Int?>(null) }
+    var activeDragId by remember { mutableStateOf<Long?>(null) }
     var activeDragOffset by remember { mutableFloatStateOf(0f) }
     val rowHeightPx = with(LocalDensity.current) { ROW_HEIGHT_DP.dp.toPx() }
 
-    LaunchedEffect(queue, currentIndex) {
-        if (currentIndex in queue.indices) {
+    LaunchedEffect(songs, currentSongId) {
+        val currentIndex = songs.indexOfFirst { it.id == currentSongId }
+        if (currentIndex >= 0) {
             val currentVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == currentIndex }
             if (!currentVisible) listState.scrollToItem(currentIndex)
         }
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        itemsIndexed(queue, key = { _, song -> song.id }) { index, song ->
-            val isDragging = activeDragIndex == index
-            QueueDrawerRow(
-                index = index,
+        items(songs, key = { it.id }) { song ->
+            val isCurrent = song.id == currentSongId
+            val isActiveDrag = song.id == activeDragId
+            SimpleQueueRow(
                 song = song,
-                isCurrent = index == currentIndex,
+                isCurrent = isCurrent,
                 artColors = artColors,
-                isDragging = isDragging,
-                dragOffset = if (isDragging) activeDragOffset else 0f,
-                onClick = { onSongClick(index) },
-                onRemove = { onRemoveItem(index) },
-                onHandleDrag = { dragStartIndex ->
-                    activeDragIndex = dragStartIndex
+                isDragging = isActiveDrag,
+                dragOffset = if (isActiveDrag) activeDragOffset else 0f,
+                allSongIds = allSongIds,
+                onClick = { onSongClick(song.id) },
+                onRemove = { onRemoveItem(song.id) },
+                onDragStart = {
+                    activeDragId = song.id
                     activeDragOffset = 0f
                 },
-                onHandleDragAmount = { _, delta ->
-                    activeDragIndex?.let { dragIndex ->
+                onDragAmount = { delta ->
+                    activeDragId?.let { dragId ->
                         activeDragOffset += delta
+                        val fromIndex = allSongIds.indexOf(dragId)
                         val shift = (activeDragOffset / rowHeightPx).roundToInt()
-                        val targetIndex = (dragIndex + shift).coerceIn(0, queue.lastIndex)
-                        if (targetIndex != dragIndex) {
-                            onMoveItem(dragIndex, targetIndex)
-                            activeDragIndex = targetIndex
-                            activeDragOffset -= (targetIndex - dragIndex) * rowHeightPx
+                        val targetIndex = (fromIndex + shift).coerceIn(0, allSongIds.lastIndex)
+                        if (fromIndex >= 0 && targetIndex != fromIndex) {
+                            onMoveItem(dragId, allSongIds[targetIndex])
+                            activeDragOffset -= (targetIndex - fromIndex) * rowHeightPx
                         }
                     }
                 },
-                onHandleDragEnd = {
-                    activeDragIndex = null
+                onDragEnd = {
+                    activeDragId = null
                     activeDragOffset = 0f
                 }
             )
-            if (index < queue.lastIndex) {
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = artColors.onSurfaceVariant.copy(alpha = 0.16f)
+        }
+    }
+}
+
+@Composable
+private fun SimpleQueueRow(
+    song: Song,
+    isCurrent: Boolean,
+    artColors: ArtColorRoles,
+    isDragging: Boolean,
+    dragOffset: Float,
+    allSongIds: List<Long>,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    onDragStart: () -> Unit,
+    onDragAmount: (Float) -> Unit,
+    onDragEnd: () -> Unit
+) {
+    val containerColor = if (isCurrent) artColors.primaryContainer else artColors.surface.copy(alpha = 0.72f)
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ROW_HEIGHT_DP.dp)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+            .graphicsLayer {
+                translationY = if (isDragging) dragOffset else 0f
+                shadowElevation = if (isDragging) 8.dp.toPx() else 0f
+            }
+            .zIndex(if (isDragging) 1f else 0f)
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SixDotHandle(
+                color = artColors.onSurfaceVariant,
+                modifier = Modifier
+                    .size(22.dp)
+                    .pointerInput(song.id, allSongIds) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { onDragStart() },
+                            onDragCancel = onDragEnd,
+                            onDragEnd = onDragEnd,
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onDragAmount(dragAmount.y)
+                            }
+                        )
+                    }
+            )
+            Box(
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(artColors.secondaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isCurrent) Icons.Filled.PlayArrow else Icons.Filled.MusicNote,
+                    contentDescription = null,
+                    tint = artColors.onSecondaryContainer
+                )
+                AsyncImage(
+                    model = song.albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 6.dp, end = 2.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Normal),
+                    color = artColors.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${song.artist} • ${formatQueueDuration(song.durationMs)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = artColors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(onClick = onRemove) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Remove ${song.title} from queue",
+                    tint = artColors.onSurfaceVariant
                 )
             }
         }
@@ -294,120 +420,16 @@ private fun QueueDrawerList(
 }
 
 @Composable
-private fun QueueDrawerRow(
-    index: Int,
-    song: Song,
-    isCurrent: Boolean,
-    artColors: ArtColorRoles,
-    isDragging: Boolean,
-    dragOffset: Float,
-    onClick: () -> Unit,
-    onRemove: () -> Unit,
-    onHandleDrag: (Int) -> Unit,
-    onHandleDragAmount: (Int, Float) -> Unit,
-    onHandleDragEnd: () -> Unit
-) {
-    val containerColor = if (isCurrent) artColors.primaryContainer else artColors.surface
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(ROW_HEIGHT_DP.dp)
-            .graphicsLayer {
-                translationY = if (isDragging) dragOffset else 0f
-                shadowElevation = if (isDragging) 8.dp.toPx() else 0f
-            }
-            .zIndex(if (isDragging) 1f else 0f)
-            .background(containerColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SixDotHandle(
-            color = artColors.onSurfaceVariant,
-            modifier = Modifier
-                .size(28.dp)
-                .pointerInput(song.id, index) {
-                    var workingIndex = index
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = {
-                            onHandleDrag(workingIndex)
-                        },
-                        onDragCancel = onHandleDragEnd,
-                        onDragEnd = onHandleDragEnd,
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            onHandleDragAmount(workingIndex, dragAmount.y)
-                        }
-                    )
-                }
-        )
-
-        Box(
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(artColors.secondaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isCurrent) Icons.Filled.PlayArrow else Icons.Filled.MusicNote,
-                contentDescription = null,
-                tint = artColors.onSecondaryContainer
-            )
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp))
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = artColors.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "${song.artist} • ${formatQueueDuration(song.durationMs)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = artColors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        IconButton(onClick = onRemove) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Remove ${song.title} from queue",
-                tint = artColors.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
 private fun SixDotHandle(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
         drawSixDots(color)
     }
 }
 
 private fun DrawScope.drawSixDots(color: Color) {
-    val radius = 2.4.dp.toPx()
-    val xPositions = listOf(size.width * 0.38f, size.width * 0.62f)
-    val yPositions = listOf(size.height * 0.28f, size.height * 0.50f, size.height * 0.72f)
+    val radius = 2.2.dp.toPx()
+    val xPositions = listOf(size.width * 0.36f, size.width * 0.64f)
+    val yPositions = listOf(size.height * 0.26f, size.height * 0.50f, size.height * 0.74f)
     xPositions.forEach { x ->
         yPositions.forEach { y ->
             drawCircle(color = color, radius = radius, center = Offset(x, y))
@@ -416,6 +438,6 @@ private fun DrawScope.drawSixDots(color: Color) {
 }
 
 private fun formatQueueDuration(durationMs: Long): String {
-    val totalSeconds = (durationMs.coerceAtLeast(0L) / 1_000L)
+    val totalSeconds = durationMs.coerceAtLeast(0L) / 1_000L
     return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
 }
