@@ -1,3 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.MiniMusic" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- System splash theme: neutral field plus the concentric target mark. -->
+    <style name="Theme.MiniMusic.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MiniMusic</item>
+    </style>
 </resources>
