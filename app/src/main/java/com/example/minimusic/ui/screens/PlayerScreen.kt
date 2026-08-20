@@ -491,9 +491,9 @@ private fun NowPlayingPanel(
                     overflow = TextOverflow.Clip,
                     modifier = Modifier.basicMarquee(
                         iterations = Int.MAX_VALUE,
-                        initialDelayMillis = 900,
-                        repeatDelayMillis = 1_100,
-                        velocity = 34.dp
+                        initialDelayMillis = 1_000,
+                        repeatDelayMillis = 1_400,
+                        velocity = 24.dp
                     )
                 )
 
@@ -548,7 +548,7 @@ private fun NowPlayingPanel(
                                 text = badgeText,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = artColors.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }

@@ -97,10 +97,10 @@ fun FlatMusicSlider(
             }
     ) {
         val centerY = size.height / 2f
-        val strokeWidth = 10.dp.toPx()
+        val strokeWidth = 8.dp.toPx()
         val startX = 4.dp.toPx()
         val endX = (size.width - 4.dp.toPx()).coerceAtLeast(startX)
-        val stopRadius = 3.dp.toPx()
+        val stopRadius = 2.dp.toPx()
         val stopCenterX = endX
         val progressX = startX + (endX - startX) * fraction
         val inactiveStartX = (progressX + 12.dp.toPx()).coerceAtMost(endX)

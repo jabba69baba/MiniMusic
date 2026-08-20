@@ -128,9 +128,9 @@ fun MiniPlayer(
                     overflow = TextOverflow.Clip,
                     modifier = Modifier.basicMarquee(
                         iterations = Int.MAX_VALUE,
-                        initialDelayMillis = 900,
-                        repeatDelayMillis = 1_100,
-                        velocity = 34.dp
+                        initialDelayMillis = 1_000,
+                        repeatDelayMillis = 1_400,
+                        velocity = 24.dp
                     )
                 )
                 Text(
