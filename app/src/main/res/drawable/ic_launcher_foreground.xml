@@ -5,30 +5,29 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Long diagonal shadow retained from the reference, kept behind the circular mark. -->
+    <!-- The target is deliberately inset: outer radius 28 in a 108 viewport. -->
     <path
-        android:fillColor="#5D5D5D"
-        android:pathData="M22,73 L39,45 L77,45 L92,73 L70,96 L48,96 Z" />
+        android:fillColor="#5E5E5E"
+        android:pathData="M28,72 L41,47 L67,47 L84,72 L66,95 L42,95 Z" />
 
-    <!-- Concentric target/vinyl-record mark. -->
-    <path
-        android:fillColor="#171717"
-        android:pathData="M54,18 A36,36 0,1 0,54,90 A36,36 0,1 0,54,18" />
-    <path
-        android:fillColor="#3A3A3A"
-        android:pathData="M54,22 A32,32 0,1 0,54,86 A32,32 0,1 0,54,22" />
     <path
         android:fillColor="#171717"
         android:pathData="M54,26 A28,28 0,1 0,54,82 A28,28 0,1 0,54,26" />
     <path
-        android:fillColor="#454545"
+        android:fillColor="#3B3B3B"
         android:pathData="M54,30 A24,24 0,1 0,54,78 A24,24 0,1 0,54,30" />
     <path
         android:fillColor="#171717"
         android:pathData="M54,34 A20,20 0,1 0,54,74 A20,20 0,1 0,54,34" />
     <path
+        android:fillColor="#464646"
+        android:pathData="M54,38 A16,16 0,1 0,54,70 A16,16 0,1 0,54,38" />
+    <path
+        android:fillColor="#171717"
+        android:pathData="M54,42 A12,12 0,1 0,54,66 A12,12 0,1 0,54,42" />
+    <path
         android:fillColor="#A2A2A2"
-        android:pathData="M54,43 A11,11 0,1 0,54,65 A11,11 0,1 0,54,43" />
+        android:pathData="M54,46 A8,8 0,1 0,54,62 A8,8 0,1 0,54,46" />
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M54,51 A3,3 0,1 0,54,57 A3,3 0,1 0,54,51" />

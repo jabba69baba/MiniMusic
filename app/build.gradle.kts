@@ -59,6 +59,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     // Material 3, including the Expressive APIs (MaterialExpressiveTheme, expressive shapes/typography)
     implementation("androidx.compose.material3:material3:1.4.0")
+    implementation("com.google.android.material:material:1.14.0")
     implementation("androidx.compose.material:material-icons-extended")
 
     // Navigation
@@ -80,9 +81,7 @@ dependencies {
     // Settings persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Downloadable Google Fonts provider, used to fetch "Google Sans Flex" from
-    // Google Play services at runtime (no font binary bundled in the repo)
-    implementation("androidx.compose.ui:ui-text-google-fonts:1.7.6")
+    testImplementation(kotlin("test"))
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

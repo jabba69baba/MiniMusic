@@ -53,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,8 +63,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +81,7 @@ import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.theme.PillShape
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import com.example.minimusic.ui.viewmodel.SongSortOrder
@@ -118,6 +123,18 @@ fun LibraryScreen(
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     val density = LocalDensity.current
+    val view = LocalView.current
+    val miniPlayerColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
+    DisposableEffect(view, miniPlayerColors.surfaceVariant) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            window.navigationBarColor = miniPlayerColors.surfaceVariant.toArgb()
+            val useDarkIcons = miniPlayerColors.surfaceVariant.luminance() > 0.52f
+            controller.isAppearanceLightNavigationBars = useDarkIcons
+        }
+        onDispose { }
+    }
     var footerHeight by remember { mutableStateOf(0.dp) }
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
@@ -501,19 +518,19 @@ private fun SongsTab(
             onScrollToIndex = { index ->
                 listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
-            // Matches the song list's own top/bottom content padding exactly
-            // so the track starts level with the first song container and
-            // ends level with the last one, never running behind the footer.
+            // The top remains aligned with the first song container. The bottom
+            // Keep the same 3dp visual inset at both ends: the top is 8dp
+            // versus the first card's 5dp, so the bottom is shortened by 3dp.
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding + 16.dp)
         )
     }
 }
-
 @Composable
 private fun AlbumsTab(
+
     albums: List<Album>,
     bottomContentPadding: androidx.compose.ui.unit.Dp,
     onAlbumClick: (Album) -> Unit
@@ -581,7 +598,7 @@ private fun ArtistsTab(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding)
         )
     }
 }
@@ -718,11 +735,35 @@ private fun SortMenuOption(
 @Composable
 private fun LoadingState() {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CircularProgressIndicator()
+        Icon(
+            imageVector = Icons.Filled.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Loading your library",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        CircularProgressIndicator(
+            modifier = Modifier.size(32.dp),
+            strokeWidth = 3.dp
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Scanning music stored on this device…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

@@ -1,18 +1,31 @@
 package com.example.minimusic.ui.screens
 
-import androidx.compose.animation.core.Spring
+import android.app.Activity
+import android.content.Context
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +33,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -53,11 +68,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -65,14 +83,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.minimusic.data.AudioFormatInfo
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.data.readAudioFormatInfo
@@ -81,30 +106,45 @@ import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
-import com.example.minimusic.ui.theme.rememberArtAccentColor
+import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
 
-/** Play/pause button shape — a true stadium pill: corner radius is always
- *  exactly half its own height, so it looks correct regardless of TransportButtonSize. */
+/** 80dp-high play/pause shape with semicircular left and right ends and flat center edges. */
 private val PlayButtonShape = RoundedCornerShape(percent = 50)
 
 /** Corner radius each capsule segment takes on when it becomes active. */
 private val ActiveSegmentShape = RoundedCornerShape(50)
 
-/** Fixed height for the transport row's circular buttons and the play/pause pill — never allowed to shrink. */
-private val TransportButtonSize = 96.dp
+/** Fixed height shared by all three transport controls. */
+private val TransportButtonSize = 72.dp
 
-/** Fixed height for each capsule segment (shuffle/repeat/lyrics) — independent of song-info content above. */
-private val CapsuleSegmentHeight = 56.dp
+/** Circular previous/next controls matching the play/pause control height. */
+private val TransportCircleSize = 72.dp
 
-/** Equal vertical gap used between each of the panel's major sections (art block,
- *  transport row, action capsule) so the layout reads as evenly spaced/symmetrical
- *  rather than leaving unconstrained slack for Compose to distribute unevenly. */
-private val SectionGap = 20.dp
+/** Original function capsule height. */
+private val CapsuleSegmentHeight = 52.dp
+
+/** Gap from album art to the title/artist block and from title/artist to seekbar. */
+private val ContentSectionGap = 16.dp
+
+/** Gap from the seekbar to the timer/audio-quality row. */
+private val SeekbarToTimeGap = 6.dp
+
+/** Restored control-to-control spacing requested for the lower PlayerScreen. */
+private val ControlSectionGap = 20.dp
+
+/** Gap between the transport row and the function capsule. */
+private val FunctionSectionGap = 26.dp
+
+/** Extra reserved clearance before the bottom-anchored queue drawer. */
+private val CapsuleToQueueGap = 19.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -127,6 +167,7 @@ private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 fun PlayerScreen(
     playbackState: PlaybackUiState,
     showLyricsInitially: Boolean,
+    showAudioQualityBadge: Boolean = true,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -137,14 +178,28 @@ fun PlayerScreen(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
-    onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
     var autoOpenedLyrics by remember(song.id) { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
-    val accent = rememberArtAccentColor(song.albumArtUri)
+    val artColors = rememberArtColorRoles(song.albumArtUri)
+    val navigationBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val view = LocalView.current
+
+    val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
+    DisposableEffect(view, artColors.background, visibleNavigationSurface) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val controller = WindowCompat.getInsetsController(window, view)
+            window.statusBarColor = artColors.background.toArgb()
+            window.navigationBarColor = visibleNavigationSurface.toArgb()
+            controller.isAppearanceLightStatusBars = artColors.background.luminance() > 0.52f
+            controller.isAppearanceLightNavigationBars = visibleNavigationSurface.luminance() > 0.52f
+        }
+        onDispose { }
+    }
 
     LaunchedEffect(song.id, showLyricsInitially) {
         if (showLyricsInitially && !autoOpenedLyrics) {
@@ -156,41 +211,66 @@ fun PlayerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .background(artColors.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
-                .padding(top = 4.dp, bottom = 12.dp)
+                // When a queue exists, the conditional bottom reservation below
+                // owns the entire lower clearance so the function-to-queue gap is
+                // exactly CapsuleToQueueGap. Without a queue, retain the existing
+                // 12dp outer bottom padding.
+                .padding(
+                    top = 4.dp,
+                    bottom = if (playbackState.queue.size > 1) 0.dp else 12.dp
+                )
                 // Reserve real space for the drawer's collapsed bar sitting on top
                 // as a separate overlay below — it isn't part of this Column's
                 // layout flow, so padding on the last child here has no effect on
                 // the gap before it; this Column has to stop short itself instead.
-                .padding(bottom = if (playbackState.queue.size > 1) QueueDrawerCollapsedHeight + SectionGap else 0.dp)
+                .padding(
+                    bottom = if (playbackState.queue.size > 1) {
+                        QueueDrawerCollapsedHeight + CapsuleToQueueGap + navigationBarInset
+                    } else {
+                        navigationBarInset + 12.dp
+                    }
+                )
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Collapse")
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Collapse",
+                        tint = artColors.onBackground
+                    )
                 }
                 Text(
                     text = "Now Playing",
                     style = MaterialTheme.typography.titleMedium,
+                    color = artColors.onBackground,
                     modifier = Modifier.align(Alignment.Center)
                 )
                 SleepTimerButton(
                     sleepTimerState = sleepTimerState,
                     onStart = onStartSleepTimer,
                     onCancel = onCancelSleepTimer,
+                    artColors = artColors,
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
 
-            Box(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.BottomStart
+            ) {
                 NowPlayingPanel(
                     song = song,
                     playbackState = playbackState,
-                    accent = accent,
+                    artColors = artColors,
+                    showAudioQualityBadge = showAudioQualityBadge,
+                    balanceAlbumArtSpacing = navigationBarInset > 0.dp,
                     onSeekTo = onSeekTo,
                     onToggleShuffle = onToggleShuffle,
                     onSkipPrevious = onSkipPrevious,
@@ -209,11 +289,10 @@ fun PlayerScreen(
             QueueDrawer(
                 queue = playbackState.queue,
                 currentIndex = playbackState.currentIndex,
-                accent = accent,
+                artColors = artColors,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
-                onSongClick = onQueueItemClick,
-                onMove = onMoveQueueItem
+                onSongClick = onQueueItemClick
             )
         }
     }
@@ -224,6 +303,7 @@ private fun SleepTimerButton(
     sleepTimerState: SleepTimerState?,
     onStart: (Long) -> Unit,
     onCancel: () -> Unit,
+    artColors: ArtColorRoles,
     modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -232,7 +312,7 @@ private fun SleepTimerButton(
         if (sleepTimerState != null) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = artColors.primaryContainer,
                 modifier = Modifier.clickable { menuExpanded = true }
             ) {
                 Row(
@@ -244,18 +324,18 @@ private fun SleepTimerButton(
                         Icons.Filled.Timer,
                         contentDescription = "Sleep timer active",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = artColors.onPrimaryContainer
                     )
                     Text(
                         text = formatRemaining(sleepTimerState.remainingMs),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = artColors.onPrimaryContainer
                     )
                 }
             }
         } else {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Icons.Filled.Timer, contentDescription = "Sleep timer")
+                Icon(Icons.Filled.Timer, contentDescription = "Sleep timer", tint = artColors.onBackground)
             }
         }
 
@@ -284,11 +364,22 @@ private fun formatRemaining(ms: Long): String {
     return "%02d:%02d".format(minutes, seconds)
 }
 
+private fun preloadAlbumArt(context: Context, song: Song) {
+    val artworkUri = song.albumArtUri ?: return
+    val request = ImageRequest.Builder(context)
+        .data(artworkUri)
+        .memoryCachePolicy(CachePolicy.ENABLED)
+        .build()
+    context.imageLoader.enqueue(request)
+}
+
 @Composable
 private fun NowPlayingPanel(
     song: Song,
     playbackState: PlaybackUiState,
-    accent: Color,
+    artColors: ArtColorRoles,
+    showAudioQualityBadge: Boolean,
+    balanceAlbumArtSpacing: Boolean,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -299,86 +390,175 @@ private fun NowPlayingPanel(
 ) {
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
+    var displayedArtworkSong by remember { mutableStateOf(song) }
+    var transitionDirection by remember { mutableStateOf(1) }
+    val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
         formatInfo = readAudioFormatInfo(context, song.contentUri)
+
+        val artworkUri = song.albumArtUri
+        if (artworkUri == null) {
+            if (latestSong.id == song.id) displayedArtworkSong = song
+        } else {
+            val request = ImageRequest.Builder(context)
+                .data(artworkUri)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .build()
+            withContext(Dispatchers.IO) {
+                context.imageLoader.execute(request)
+            }
+            if (latestSong.id == song.id) displayedArtworkSong = song
+        }
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    LaunchedEffect(playbackState.queue) {
+        playbackState.queue
+            .drop((playbackState.currentIndex + 1).coerceAtLeast(1))
+            .take(2)
+            .forEach { preloadAlbumArt(context, it) }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (balanceAlbumArtSpacing) Modifier.fillMaxHeight() else Modifier)
+    ) {
+        if (balanceAlbumArtSpacing) {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 4.dp)
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(0.3f),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(ArtCornerShape)
-            )
+            AnimatedContent(
+                targetState = displayedArtworkSong,
+                transitionSpec = {
+                    val direction = transitionDirection
+                    (slideInHorizontally(
+                        initialOffsetX = { fullWidth -> direction * fullWidth },
+                        animationSpec = tween(480, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))) togetherWith
+                        (slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> -direction * fullWidth },
+                            animationSpec = tween(460, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)))
+                },
+                label = "albumArtCarouselTransition"
+            ) { displayedSong ->
+                if (displayedSong.albumArtUri == null) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(0.3f),
+                        tint = artColors.onPrimaryContainer
+                    )
+                } else {
+                    AsyncImage(
+                        model = displayedSong.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(ArtCornerShape)
+                    )
+                }
+            }
         }
 
-        Column(modifier = Modifier.padding(top = 18.dp)) {
+        if (balanceAlbumArtSpacing) {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 2.dp)
+                .padding(top = ContentSectionGap)
+        ) {
             Text(
-                text = song.title,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    text = song.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = artColors.onBackground,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        initialDelayMillis = 900,
+                        repeatDelayMillis = 1_100,
+                        velocity = 34.dp
+                    )
+                )
+
             Text(
                 text = song.artist,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = artColors.onSurfaceVariant,
+                    maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        Column(modifier = Modifier.padding(top = 12.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 2.dp)
+                .padding(top = ContentSectionGap)
+        ) {
             FlatMusicSlider(
                 value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
                 onValueChange = { onSeekTo(it.toLong()) },
-                activeColor = accent
+                activeColor = artColors.primary,
+                inactiveColor = artColors.onSurface.copy(alpha = 0.34f)
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 24.dp)
-                    .padding(top = 12.dp),
+                    .padding(top = SeekbarToTimeGap),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(formatDuration(playbackState.positionMs), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    formatDuration(playbackState.positionMs),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = artColors.onSurfaceVariant
+                )
 
-                val badgeText = formatInfo?.toBadgeText()
-                if (badgeText != null) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh
-                    ) {
-                        Text(
-                            text = badgeText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                Box(
+                    modifier = Modifier
+                        .width(150.dp)
+                        .height(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val badgeText = formatInfo?.toBadgeText()
+                    if (showAudioQualityBadge && badgeText != null) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = artColors.surfaceVariant
+                        ) {
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = artColors.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
 
-                Text(formatDuration(playbackState.durationMs), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    formatDuration(playbackState.durationMs),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = artColors.onSurfaceVariant
+                )
             }
         }
 
@@ -386,34 +566,42 @@ private fun NowPlayingPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(TransportButtonSize)
-                .padding(top = SectionGap),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(top = ControlSectionGap),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TransportButton(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous",
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = onSkipPrevious
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
+                onClick = {
+                    transitionDirection = -1
+                    onSkipPrevious()
+                },
+                modifier = Modifier.requiredSize(TransportCircleSize)
             )
             PlayPauseButton(
                 isPlaying = playbackState.isPlaying,
-                containerColor = accent,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = artColors.primary,
+                contentColor = artColors.onPrimary,
                 onClick = onTogglePlayPause,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
+                    .requiredHeight(TransportButtonSize)
             )
             TransportButton(
                 icon = Icons.Filled.SkipNext,
                 contentDescription = "Next",
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = onSkipNext
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
+                onClick = {
+                    transitionDirection = 1
+                    onSkipNext()
+                },
+                modifier = Modifier.requiredSize(TransportCircleSize)
             )
         }
 
@@ -421,16 +609,21 @@ private fun NowPlayingPanel(
         // it while inactive; when active, that segment gets its own filled
         // rounded-pill highlight that visually pops out from the shared
         // background — independently, so more than one can be active at once.
-        Column(modifier = Modifier.padding(top = SectionGap)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 8.dp)
+                .padding(top = FunctionSectionGap)
+        ) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = artColors.surfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(CapsuleSegmentHeight)
             ) {
                 Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
                     CapsuleSegment(
+                        artColors = artColors,
                         icon = Icons.Filled.Shuffle,
                         active = playbackState.isShuffled,
                         contentDescription = "Shuffle",
@@ -438,6 +631,7 @@ private fun NowPlayingPanel(
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
+                        artColors = artColors,
                         icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
@@ -445,6 +639,7 @@ private fun NowPlayingPanel(
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
+                        artColors = artColors,
                         icon = Icons.Filled.Subtitles,
                         active = false,
                         contentDescription = "Lyrics",
@@ -464,20 +659,33 @@ private fun TransportButton(
     shape: androidx.compose.ui.graphics.Shape,
     containerColor: Color,
     contentColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressOverlayAlpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.20f else 0f,
+        animationSpec = tween(durationMillis = if (isPressed) 70 else 180),
+        label = "transportPressIllumination"
+    )
+
     Box(
-        modifier = Modifier
-            .fillMaxHeight()
-            // Width is locked to height (not a fixed size), so this stays a
-            // perfect circle no matter how the row's available width changes —
-            // only ever adjusts horizontally, never distorts vertically.
-            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+        modifier = modifier
             .clip(shape)
             .background(containerColor)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White.copy(alpha = pressOverlayAlpha))
+        )
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
@@ -495,27 +703,49 @@ private fun PlayPauseButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Row(
         modifier = modifier
             .fillMaxHeight()
             .clip(PlayButtonShape)
             .background(containerColor)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(28.dp)
-        )
-        Text(
-            text = if (isPlaying) "Pause" else "Play",
-            style = MaterialTheme.typography.titleMedium,
-            color = contentColor,
-            modifier = Modifier.padding(start = 8.dp)
-        )
+        AnimatedContent(
+            targetState = isPlaying,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(animationSpec = tween(170)) +
+                    androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(220))) togetherWith
+                    (androidx.compose.animation.fadeOut(animationSpec = tween(120)) +
+                        androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(150)))
+            },
+            label = "playPauseMorph"
+        ) { playing ->
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing) "Pause" else "Play",
+                    tint = contentColor,
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = if (playing) "Pause" else "Play",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = contentColor,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
     }
 }
 
@@ -527,6 +757,7 @@ private fun PlayPauseButton(
  */
 @Composable
 private fun CapsuleSegment(
+    artColors: ArtColorRoles,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     active: Boolean,
     contentDescription: String,
@@ -539,16 +770,20 @@ private fun CapsuleSegment(
             .padding(horizontal = 2.dp)
             .clip(ActiveSegmentShape)
             .background(
-                if (active) MaterialTheme.colorScheme.primaryContainer
+                if (active) artColors.primaryContainer
                 else Color.Transparent
             )
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            tint = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant
         )
     }
 }

@@ -16,7 +16,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val autoShowLyrics: Boolean = false,
     val resumeOnLaunch: Boolean = true,
-    val minDurationSeconds: Int = 20
+    val minDurationSeconds: Int = 20,
+    val showAudioQualityBadge: Boolean = true
 )
 
 private val Context.dataStore by preferencesDataStore(name = "minimusic_settings")
@@ -33,6 +34,7 @@ class SettingsRepository(private val context: Context) {
         val AUTO_SHOW_LYRICS = booleanPreferencesKey("auto_show_lyrics")
         val RESUME_ON_LAUNCH = booleanPreferencesKey("resume_on_launch")
         val MIN_DURATION_SECONDS = intPreferencesKey("min_duration_seconds")
+        val SHOW_AUDIO_QUALITY_BADGE = booleanPreferencesKey("show_audio_quality_badge")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -42,7 +44,8 @@ class SettingsRepository(private val context: Context) {
                 ?: ThemeMode.SYSTEM,
             autoShowLyrics = prefs[Keys.AUTO_SHOW_LYRICS] ?: false,
             resumeOnLaunch = prefs[Keys.RESUME_ON_LAUNCH] ?: true,
-            minDurationSeconds = prefs[Keys.MIN_DURATION_SECONDS] ?: 20
+            minDurationSeconds = prefs[Keys.MIN_DURATION_SECONDS] ?: 20,
+            showAudioQualityBadge = prefs[Keys.SHOW_AUDIO_QUALITY_BADGE] ?: true
         )
     }
 
@@ -64,5 +67,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setMinDurationSeconds(seconds: Int) {
         context.dataStore.edit { it[Keys.MIN_DURATION_SECONDS] = seconds }
+    }
+
+    suspend fun setShowAudioQualityBadge(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SHOW_AUDIO_QUALITY_BADGE] = enabled }
     }
 }

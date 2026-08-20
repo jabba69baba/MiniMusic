@@ -56,9 +56,7 @@ fun MiniMusicNavGraph(
                 onPlayNext = playerViewModel::playNext,
                 onAddToQueue = playerViewModel::addToQueue,
                 onShufflePlayFrom = { song, songs ->
-                    val rest = (songs - song).shuffled()
-                    val shuffledQueue = listOf(song) + rest
-                    playerViewModel.playQueue(shuffledQueue, 0)
+                    playerViewModel.playQueue(songs, songs.indexOf(song))
                     if (!playbackState.isShuffled) playerViewModel.toggleShuffle()
                 },
                 onDeleteSong = libraryViewModel::deleteSong,
@@ -82,6 +80,7 @@ fun MiniMusicNavGraph(
                 onThemeModeChange = settingsViewModel::setThemeMode,
                 onAutoShowLyricsChange = settingsViewModel::setAutoShowLyrics,
                 onResumeOnLaunchChange = settingsViewModel::setResumeOnLaunch,
+                onShowAudioQualityBadgeChange = settingsViewModel::setShowAudioQualityBadge,
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
                 onRescanLibrary = libraryViewModel::rescanLibrary
             )
@@ -123,6 +122,7 @@ fun MiniMusicNavGraph(
             PlayerScreen(
                 playbackState = playbackState,
                 showLyricsInitially = appSettings.autoShowLyrics,
+                showAudioQualityBadge = appSettings.showAudioQualityBadge,
                 sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
@@ -133,7 +133,6 @@ fun MiniMusicNavGraph(
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
                 onOpenLyrics = { navController.navigate(Routes.LYRICS) },
                 onQueueItemClick = playerViewModel::playFromQueue,
-                onMoveQueueItem = playerViewModel::moveQueueItem,
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )

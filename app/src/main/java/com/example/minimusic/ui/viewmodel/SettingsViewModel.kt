@@ -43,4 +43,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setMinDurationSeconds(seconds: Int) = viewModelScope.launch {
         repository.setMinDurationSeconds(seconds)
     }
+
+    fun setShowAudioQualityBadge(enabled: Boolean) = viewModelScope.launch {
+        repository.setShowAudioQualityBadge(enabled)
+    }
 }

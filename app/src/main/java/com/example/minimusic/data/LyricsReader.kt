@@ -6,6 +6,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 
+private val LrcMetadataTagRegex = Regex(
+    "\\[(?:ti|ar|al|by|offset|re|ve|length|la|au|id|tool)\\s*:[^]]*]",
+    RegexOption.IGNORE_CASE
+)
+
 /**
  * Reads lyrics straight out of a song's own embedded ID3v2 tag (the "USLT" frame —
  * standard unsynchronized lyrics), so nothing is ever fetched from the network.
@@ -77,9 +82,23 @@ class LyricsReader(private val context: Context) {
         pos = indexAfterNullTerminator(body, pos, nullWidth)
         if (pos >= body.size) return null
 
-        val text = String(body, pos, body.size - pos, charset).trim('\u0000', '\uFEFF').trim()
-        return text.ifBlank { null }
+        val text = String(body, pos, body.size - pos, charset)
+        return cleanLyricsText(text)
     }
+
+    /**
+     * Removes LRC metadata headers such as [ti:], [ar:], [by:] and [offset:]
+     * without touching ordinary lyric text or timestamp tags like [00:12.34].
+     */
+    internal fun cleanLyricsText(text: String): String? = text
+        .lineSequence()
+        .map { line ->
+            LrcMetadataTagRegex.replace(line.trim('\u0000', '\uFEFF').trim(), "").trim()
+        }
+        .filter { it.isNotBlank() }
+        .joinToString("\n")
+        .trim()
+        .ifBlank { null }
 
     private fun indexAfterNullTerminator(body: ByteArray, start: Int, nullWidth: Int): Int {
         var i = start

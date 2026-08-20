@@ -96,8 +96,8 @@ fun SongListItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Normal,
                     color = contentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -105,6 +105,7 @@ fun SongListItem(
                 Text(
                     text = song.artist,
                     style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
                     color = if (isPlaying) contentColor.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

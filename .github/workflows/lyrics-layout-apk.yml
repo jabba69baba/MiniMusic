@@ -1,9 +1,9 @@
-name: Build lyrics-layout test APK
+name: Build UI polish test APK
 
 on:
   push:
     branches:
-      - fix/lyrics-layout
+      - test/ui-polish
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: MiniMusic-fix-lyrics-layout-debug
+          name: MiniMusic-test-ui-polish-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
