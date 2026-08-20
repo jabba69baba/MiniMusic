@@ -5,20 +5,30 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Five rounded waveform bars, kept inside the adaptive-icon safe zone. -->
+    <!-- The target is deliberately inset: outer radius 28 in a 108 viewport. -->
     <path
-        android:fillColor="#5A5A5A"
-        android:pathData="M25,43h4a4,4 0 0 1 4,4v14a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V47a4,4 0 0 1 4,-4z" />
+        android:fillColor="#5E5E5E"
+        android:pathData="M28,72 L41,47 L67,47 L84,72 L66,95 L42,95 Z" />
+
     <path
-        android:fillColor="#5A5A5A"
-        android:pathData="M38,29h4a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V33a4,4 0 0 1 4,-4z" />
+        android:fillColor="#171717"
+        android:pathData="M54,26 A28,28 0,1 0,54,82 A28,28 0,1 0,54,26" />
     <path
-        android:fillColor="#5A5A5A"
-        android:pathData="M52,47h4a4,4 0 0 1 4,4v10a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V51a4,4 0 0 1 4,-4z" />
+        android:fillColor="#3B3B3B"
+        android:pathData="M54,30 A24,24 0,1 0,54,78 A24,24 0,1 0,54,30" />
     <path
-        android:fillColor="#5A5A5A"
-        android:pathData="M66,29h4a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V33a4,4 0 0 1 4,-4z" />
+        android:fillColor="#171717"
+        android:pathData="M54,34 A20,20 0,1 0,54,74 A20,20 0,1 0,54,34" />
     <path
-        android:fillColor="#5A5A5A"
-        android:pathData="M79,43h4a4,4 0 0 1 4,4v14a4,4 0 0 1 -4,4h-4a4,4 0 0 1 -4,-4V47a4,4 0 0 1 4,-4z" />
+        android:fillColor="#464646"
+        android:pathData="M54,38 A16,16 0,1 0,54,70 A16,16 0,1 0,54,38" />
+    <path
+        android:fillColor="#171717"
+        android:pathData="M54,42 A12,12 0,1 0,54,66 A12,12 0,1 0,54,42" />
+    <path
+        android:fillColor="#A2A2A2"
+        android:pathData="M54,46 A8,8 0,1 0,54,62 A8,8 0,1 0,54,46" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,51 A3,3 0,1 0,54,57 A3,3 0,1 0,54,51" />
 </vector>
