@@ -11,6 +11,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +38,9 @@ class MainActivity : ComponentActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        var firstComposeFrameReady = false
         val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { !firstComposeFrameReady }
         splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
             splashScreenViewProvider.view.animate()
                 .alpha(0f)
@@ -51,6 +54,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+            SideEffect { firstComposeFrameReady = true }
+
             val libraryViewModel: LibraryViewModel = viewModel()
             val playerViewModel: PlayerViewModel = viewModel()
             val settingsViewModel: SettingsViewModel = viewModel()

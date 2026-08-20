@@ -29,6 +29,8 @@ class PlayerController(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
+    private var connecting = false
+    private var connectionGeneration = 0L
     private var currentQueue: List<Song> = emptyList()
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
@@ -44,18 +46,33 @@ class PlayerController(private val context: Context) {
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
 
     fun connect() {
+        if (controller != null || connecting) return
+        connecting = true
+        val attempt = ++connectionGeneration
         val sessionToken = SessionToken(context, ComponentName(context, MusicService::class.java))
         val future = MediaController.Builder(context, sessionToken).buildAsync()
         future.addListener(
             {
-                controller = future.get().also { it.addListener(playerListener) }
-                startPositionTicker()
+                try {
+                    if (attempt != connectionGeneration) return@addListener
+                    controller = future.get().also { it.addListener(playerListener) }
+                    startPositionTicker()
+                    connecting = false
+                } catch (_: Exception) {
+                    connecting = false
+                    scope.launch {
+                        delay(500L)
+                        if (attempt == connectionGeneration && controller == null) connect()
+                    }
+                }
             },
             MoreExecutors.directExecutor()
         )
     }
 
     fun release() {
+        connectionGeneration++
+        connecting = false
         positionTicker?.cancel()
         controller?.removeListener(playerListener)
         controller?.release()

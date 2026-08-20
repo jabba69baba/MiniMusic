@@ -67,7 +67,8 @@ fun MiniMusicNavGraph(
                 onSkipNext = playerViewModel::skipToNext,
                 onSkipPrevious = playerViewModel::skipToPrevious,
                 onOpenPlayer = { navController.navigate(Routes.PLAYER) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) }
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onRetryLoad = libraryViewModel::loadLibrary
             )
         }
 

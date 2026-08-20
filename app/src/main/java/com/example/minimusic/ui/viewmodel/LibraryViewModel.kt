@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Sort order applied to the Songs tab's list. */
@@ -27,6 +28,7 @@ enum class SongSortOrder {
 
 data class LibraryUiState(
     val isLoading: Boolean = true,
+    val loadError: String? = null,
     val allSongs: List<Song> = emptyList(),
     val albums: List<Album> = emptyList(),
     val artists: List<Artist> = emptyList(),
@@ -73,15 +75,24 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     /** Call once the READ_MEDIA_AUDIO / READ_EXTERNAL_STORAGE permission has been granted. */
     fun loadLibrary() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            val minDuration = settingsRepository.settings.first().minDurationSeconds
-            val songs = repository.loadSongs(minDuration)
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                allSongs = songs,
-                albums = repository.deriveAlbums(songs),
-                artists = repository.deriveArtists(songs)
-            )
+            _uiState.value = _uiState.value.copy(isLoading = true, loadError = null)
+            try {
+                val minDuration = settingsRepository.settings.first().minDurationSeconds
+                val songs = repository.loadSongs(minDuration)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    loadError = null,
+                    allSongs = songs,
+                    albums = repository.deriveAlbums(songs),
+                    artists = repository.deriveArtists(songs)
+                )
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    loadError = "We couldn't load your music library."
+                )
+            }
         }
     }
 

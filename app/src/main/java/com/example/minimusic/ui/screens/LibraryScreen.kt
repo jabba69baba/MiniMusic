@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -119,7 +120,8 @@ fun LibraryScreen(
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit = {},
     onOpenPlayer: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onRetryLoad: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     val density = LocalDensity.current
@@ -383,6 +385,10 @@ fun LibraryScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         when {
                             uiState.isLoading -> LoadingState()
+                            uiState.loadError != null -> LibraryLoadErrorState(
+                                message = uiState.loadError,
+                                onRetry = onRetryLoad
+                            )
                             uiState.allSongs.isEmpty() -> EmptyLibraryState()
                             else -> when (selectedTab) {
                                 LibraryTab.SONGS -> SongsTab(
@@ -764,6 +770,37 @@ private fun LoadingState() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun LibraryLoadErrorState(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(onClick = onRetry) {
+            Text("Retry")
+        }
     }
 }
 

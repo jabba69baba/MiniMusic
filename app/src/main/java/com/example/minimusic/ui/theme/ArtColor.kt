@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.ColorUtils as CoreColorUtils
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.CachePolicy
@@ -18,6 +19,8 @@ import coil.request.ImageRequest
 import com.google.android.material.color.utilities.DynamicScheme
 import com.google.android.material.color.utilities.Hct
 import com.google.android.material.color.utilities.SchemeTonalSpot
+import kotlin.math.abs
+import kotlin.math.ln
 
 /** Album-art-derived Material roles used only by PlayerScreen and LyricsScreen. */
 data class ArtColorRoles(
@@ -78,14 +81,20 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
         }
         val swatch = bitmap?.let {
             val palette = Palette.from(it).generate()
-            // Palette is only a deterministic seed selector. Tonal Spot below
-            // creates the actual Material roles and controls chroma/lightness.
-            palette.dominantSwatch
-                ?: palette.mutedSwatch
-                ?: palette.vibrantSwatch
+            // Score representative swatches rather than trusting the most
+            // saturated dominant pixel. Tonal Spot below creates the roles.
+            listOfNotNull(
+                palette.dominantSwatch,
+                palette.mutedSwatch,
+                palette.darkMutedSwatch,
+                palette.lightMutedSwatch,
+                palette.vibrantSwatch,
+                palette.darkVibrantSwatch,
+                palette.lightVibrantSwatch
+            ).maxByOrNull(::artworkSwatchScore)
         }
         swatch?.let {
-            val resolved = Color(it.rgb)
+            val resolved = normalizeArtworkSeed(Color(it.rgb))
             value = resolved
             artworkSeedCache[albumArtUri] = resolved
             if (artworkSeedCache.size > ARTWORK_SEED_CACHE_MAX_SIZE) {
@@ -96,8 +105,31 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
     return seed
 }
 
+private fun artworkSwatchScore(swatch: Palette.Swatch): Double {
+    val hct = Hct.fromInt(swatch.rgb)
+    val populationScore = ln((swatch.population + 1).toDouble())
+    val toneScore = 1.0 - abs(hct.tone - 50.0) / 50.0
+    val chromaScore = 1.0 - abs(hct.chroma - 36.0) / 72.0
+    return populationScore * 0.55 + toneScore.coerceAtLeast(0.0) * 0.25 +
+        chromaScore.coerceAtLeast(0.0) * 0.20
+}
+
 private fun tonalSpotScheme(seed: Color, isDark: Boolean): DynamicScheme =
     SchemeTonalSpot(Hct.fromInt(seed.toArgb()), isDark, 0.0)
+
+/**
+ * Normalize a palette seed before it reaches Material scheme generation.
+ * Album art can contain nearly-black or highly saturated pixels that are useful
+ * in the cover itself but are too aggressive as UI colors. This preserves hue
+ * while compressing saturation and keeping the seed in a usable tonal window.
+ */
+private fun normalizeArtworkSeed(color: Color): Color {
+    val hsl = FloatArray(3)
+    CoreColorUtils.colorToHSL(color.toArgb(), hsl)
+    hsl[1] = (hsl[1] * 0.62f).coerceAtMost(0.58f)
+    hsl[2] = hsl[2].coerceIn(0.24f, 0.72f)
+    return Color(CoreColorUtils.HSLToColor(hsl))
+}
 
 /** Blend a controlled amount of album-art color into an app Material role. */
 private fun softenedRole(base: Color, art: Color, amount: Float): Color {
@@ -120,7 +152,7 @@ fun rememberArtAccentColor(albumArtUri: Uri?): Color {
     return softenedRole(
         base = appScheme.primary,
         art = Color(scheme.getPrimary()),
-        amount = 0.35f
+        amount = 0.28f
     )
 }
 
@@ -140,23 +172,23 @@ fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
     val artSurfaceVariant = Color(scheme.getSurfaceVariant())
 
     return ArtColorRoles(
-        primary = softenedRole(appScheme.primary, artPrimary, 0.35f),
+        primary = softenedRole(appScheme.primary, artPrimary, 0.24f),
         onPrimary = appScheme.onPrimary,
-        primaryContainer = softenedRole(appScheme.primaryContainer, artPrimaryContainer, 0.30f),
+        primaryContainer = softenedRole(appScheme.primaryContainer, artPrimaryContainer, 0.16f),
         onPrimaryContainer = appScheme.onPrimaryContainer,
-        secondary = softenedRole(appScheme.secondary, artSecondary, 0.28f),
+        secondary = softenedRole(appScheme.secondary, artSecondary, 0.18f),
         onSecondary = appScheme.onSecondary,
-        secondaryContainer = softenedRole(appScheme.secondaryContainer, artSecondaryContainer, 0.24f),
+        secondaryContainer = softenedRole(appScheme.secondaryContainer, artSecondaryContainer, 0.12f),
         onSecondaryContainer = appScheme.onSecondaryContainer,
-        tertiary = softenedRole(appScheme.tertiary, artTertiary, 0.28f),
+        tertiary = softenedRole(appScheme.tertiary, artTertiary, 0.18f),
         onTertiary = appScheme.onTertiary,
-        tertiaryContainer = softenedRole(appScheme.tertiaryContainer, artTertiaryContainer, 0.24f),
+        tertiaryContainer = softenedRole(appScheme.tertiaryContainer, artTertiaryContainer, 0.12f),
         onTertiaryContainer = appScheme.onTertiaryContainer,
         background = appScheme.background,
         onBackground = appScheme.onBackground,
-        surface = softenedRole(appScheme.surface, artSurface, 0.12f),
+        surface = softenedRole(appScheme.surface, artSurface, 0.06f),
         onSurface = appScheme.onSurface,
-        surfaceVariant = softenedRole(appScheme.surfaceVariant, artSurfaceVariant, 0.20f),
+        surfaceVariant = softenedRole(appScheme.surfaceContainerHigh, artSurfaceVariant, 0.08f),
         onSurfaceVariant = appScheme.onSurfaceVariant
     )
 }
