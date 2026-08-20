@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.random.Random
 
 /**
  * Single point of contact between the UI layer and the MediaController connected to
@@ -33,11 +32,6 @@ class PlayerController(private val context: Context) {
     private var connecting = false
     private var connectionGeneration = 0L
     private var currentQueue: List<Song> = emptyList()
-    private var manualShuffleEnabled = false
-    private var customQueueOrder = false
-    private var lastShuffleOrderIds: List<Long> = emptyList()
-    private val playedHistoryIds = mutableListOf<Long>()
-    private var lastReportedCurrentId: Long? = null
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
     }.thenBy { it.artist.trim().lowercase() }
@@ -46,7 +40,6 @@ class PlayerController(private val context: Context) {
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
     private var normalizingTimeline = false
-    private var queueMutationInProgress = false
     private var pendingSeekPositionMs: Long? = null
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
@@ -87,7 +80,7 @@ class PlayerController(private val context: Context) {
     }
 
     /** Loads [songs] as the new queue and starts playback at [startIndex]. */
-    fun playQueue(songs: List<Song>, startIndex: Int, shuffle: Boolean = false) {
+    fun playQueue(songs: List<Song>, startIndex: Int) {
         val c = controller ?: return
         if (songs.isEmpty()) return
 
@@ -98,19 +91,9 @@ class PlayerController(private val context: Context) {
         } ?: 0
 
         currentQueue = orderedSongs
-        manualShuffleEnabled = false
-        customQueueOrder = false
-        lastShuffleOrderIds = emptyList()
-        playedHistoryIds.clear()
-        lastReportedCurrentId = null
         pendingSeekPositionMs = null
         val mediaItems = orderedSongs.map { it.toMediaItem() }
-        c.shuffleModeEnabled = false
         c.setMediaItems(mediaItems, orderedStartIndex, 0L)
-        if (shuffle) {
-            manualShuffleEnabled = true
-            applyFreshShuffle(c, selectedId)
-        }
         c.prepare()
         c.play()
     }
@@ -156,12 +139,9 @@ class PlayerController(private val context: Context) {
     }
 
     fun playFromQueue(index: Int) {
-        _uiState.value.queue.getOrNull(index)?.let { playSongById(it.id) }
-    }
-
-    fun playSongById(songId: Long) {
         val c = controller ?: return
-        val timelineIndex = currentQueue.indexOfFirst { it.id == songId }
+        val selectedSong = _uiState.value.queue.getOrNull(index) ?: return
+        val timelineIndex = currentQueue.indexOfFirst { it.id == selectedSong.id }
         if (timelineIndex < 0) return
 
         holdPlaybackStateAcrossTransition()
@@ -177,57 +157,14 @@ class PlayerController(private val context: Context) {
      * throwing, since drag gestures can occasionally report a stale index mid-drag.
      */
     fun moveQueueItem(fromIndex: Int, toIndex: Int) {
-        val visibleQueue = _uiState.value.queue
-        val fromSong = visibleQueue.getOrNull(fromIndex) ?: return
-        val toSong = visibleQueue.getOrNull(toIndex) ?: return
-        moveQueueItemById(fromSong.id, toSong.id)
-    }
-
-    fun moveQueueItemById(fromSongId: Long, toSongId: Long) {
         val c = controller ?: return
-        if (fromSongId == toSongId) return
-        val fromTimeline = currentQueue.indexOfFirst { it.id == fromSongId }
-        val toTimeline = currentQueue.indexOfFirst { it.id == toSongId }
-        if (fromTimeline < 0 || toTimeline < 0) return
+        if (fromIndex == toIndex) return
+        if (fromIndex !in currentQueue.indices || toIndex !in currentQueue.indices) return
 
-        if (queueMutationInProgress) return
-        queueMutationInProgress = true
-        try {
-            if (!safeMoveMediaItem(c, fromTimeline, toTimeline)) return
-            currentQueue = currentQueue.toMutableList().apply {
-                add(toTimeline, removeAt(fromTimeline))
-            }
-            customQueueOrder = true
-        } finally {
-            queueMutationInProgress = false
-        }
-        refreshCurrentItem()
-    }
+        c.moveMediaItem(fromIndex, toIndex)
 
-    /** Removes a queued song from the real timeline, not only from the UI list. */
-    fun removeQueueItem(index: Int) {
-        _uiState.value.queue.getOrNull(index)?.let { removeQueueItemById(it.id) }
-    }
-
-    fun removeQueueItemById(songId: Long) {
-        val c = controller ?: return
-        val timelineIndex = currentQueue.indexOfFirst { it.id == songId }
-        if (timelineIndex < 0) return
-
-        val isCurrent = songId == _uiState.value.currentSong?.id
-        if (isCurrent) {
-            val nextSong = currentQueue.getOrNull(timelineIndex + 1) ?: return
-            if (!safeRemoveMediaItem(c, timelineIndex)) return
-            currentQueue = currentQueue.toMutableList().apply { removeAt(timelineIndex) }
-            val nextIndex = currentQueue.indexOfFirst { it.id == nextSong.id }
-            if (nextIndex >= 0) {
-                holdPlaybackStateAcrossTransition()
-                c.seekTo(nextIndex, 0L)
-                c.play()
-            }
-        } else {
-            if (!safeRemoveMediaItem(c, timelineIndex)) return
-            currentQueue = currentQueue.toMutableList().apply { removeAt(timelineIndex) }
+        currentQueue = currentQueue.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
         }
         refreshCurrentItem()
     }
@@ -266,13 +203,9 @@ class PlayerController(private val context: Context) {
 
     fun toggleShuffle() {
         val c = controller ?: return
-        if (manualShuffleEnabled) {
-            manualShuffleEnabled = false
-            normalizeTimelineAlphabetically(c)
-        } else {
-            manualShuffleEnabled = true
-            applyFreshShuffle(c)
-        }
+        val enabled = !c.shuffleModeEnabled
+        c.shuffleModeEnabled = enabled
+        if (!enabled) normalizeTimelineAlphabetically(c)
         syncQueueFromController()
     }
 
@@ -309,9 +242,7 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            if (!shuffleModeEnabled && !manualShuffleEnabled) {
-                normalizeTimelineAlphabetically(controller)
-            }
+            if (!shuffleModeEnabled) normalizeTimelineAlphabetically(controller)
             syncQueueFromController()
         }
 
@@ -358,46 +289,8 @@ class PlayerController(private val context: Context) {
             }
         }
 
-        if (!c.shuffleModeEnabled && !manualShuffleEnabled && !customQueueOrder) {
-            normalizeTimelineAlphabetically(c)
-        }
+        if (!c.shuffleModeEnabled) normalizeTimelineAlphabetically(c)
         refreshCurrentItem()
-    }
-
-    private fun applyFreshShuffle(c: Player, currentIdOverride: Long? = null) {
-        if (currentQueue.size < 2) return
-        val currentId = currentIdOverride ?: currentQueue.getOrNull(c.currentMediaItemIndex)?.id ?: return
-        var shuffled = currentQueue.filter { it.id != currentId }.shuffled(Random)
-        var attempts = 0
-        while (shuffled.map { it.id } == lastShuffleOrderIds && attempts++ < 5) {
-            shuffled = currentQueue.filter { it.id != currentId }.shuffled(Random)
-        }
-        val target = listOf(currentQueue.first { it.id == currentId }) + shuffled
-        target.map { it.id }.forEachIndexed { targetIndex, id ->
-            val fromIndex = currentQueue.indexOfFirst { it.id == id }
-            if (fromIndex >= 0 && fromIndex != targetIndex) {
-                if (!safeMoveMediaItem(c, fromIndex, targetIndex)) return@forEachIndexed
-                currentQueue = currentQueue.toMutableList().apply {
-                    add(targetIndex, removeAt(fromIndex))
-                }
-            }
-        }
-        lastShuffleOrderIds = target.drop(1).map { it.id }
-        c.shuffleModeEnabled = false
-    }
-
-    private fun safeMoveMediaItem(c: Player, fromIndex: Int, toIndex: Int): Boolean {
-        if (fromIndex !in 0 until c.mediaItemCount || toIndex !in 0 until c.mediaItemCount) return false
-        return runCatching {
-            c.moveMediaItem(fromIndex, toIndex)
-        }.isSuccess
-    }
-
-    private fun safeRemoveMediaItem(c: Player, index: Int): Boolean {
-        if (index !in 0 until c.mediaItemCount) return false
-        return runCatching {
-            c.removeMediaItem(index)
-        }.isSuccess
     }
 
     private fun normalizeTimelineAlphabetically(c: Player?) {
@@ -419,13 +312,11 @@ class PlayerController(private val context: Context) {
             targetIds.forEachIndexed { targetIndex, targetId ->
                 val fromIndex = workingIds.indexOf(targetId)
                 if (fromIndex >= 0 && fromIndex != targetIndex) {
-                    if (!safeMoveMediaItem(c, fromIndex, targetIndex)) return@forEachIndexed
+                    c.moveMediaItem(fromIndex, targetIndex)
                     workingIds.add(targetIndex, workingIds.removeAt(fromIndex))
                 }
             }
             currentQueue = sortedSongs
-            manualShuffleEnabled = false
-            customQueueOrder = false
         } finally {
             normalizingTimeline = false
         }
@@ -452,7 +343,7 @@ class PlayerController(private val context: Context) {
             timelineIndex = c.currentTimeline.getNextWindowIndex(
                 timelineIndex,
                 c.repeatMode,
-                manualShuffleEnabled || c.shuffleModeEnabled
+                c.shuffleModeEnabled
             )
         }
 
@@ -464,24 +355,11 @@ class PlayerController(private val context: Context) {
         val currentTimelineIndex = c.currentMediaItemIndex
         val currentSong = currentQueue.getOrNull(currentTimelineIndex)
         val (displayQueue, displayIndex) = playbackQueueForDisplay(c)
-        val currentId = currentSong?.id
-        if (currentId != null && currentId != lastReportedCurrentId) {
-            lastReportedCurrentId?.let { previousId ->
-                playedHistoryIds.remove(previousId)
-                playedHistoryIds.add(previousId)
-            }
-            currentId.let { playedHistoryIds.remove(it) }
-            lastReportedCurrentId = currentId
-        }
-        val history = playedHistoryIds.mapNotNull { historyId ->
-            currentQueue.firstOrNull { it.id == historyId }
-        }
         _uiState.value = _uiState.value.copy(
             currentSong = currentSong,
             queue = displayQueue,
             currentIndex = displayIndex,
-            history = history,
-            isShuffled = manualShuffleEnabled || c.shuffleModeEnabled,
+            isShuffled = c.shuffleModeEnabled,
             repeatMode = when (c.repeatMode) {
                 Player.REPEAT_MODE_ALL -> RepeatMode.ALL
                 Player.REPEAT_MODE_ONE -> RepeatMode.ONE

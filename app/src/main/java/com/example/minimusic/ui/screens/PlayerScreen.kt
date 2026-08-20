@@ -177,9 +177,7 @@ fun PlayerScreen(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
-    onQueueItemClick: (Long) -> Unit,
-    onMoveQueueItem: (Long, Long) -> Unit,
-    onRemoveQueueItem: (Long) -> Unit,
+    onQueueItemClick: (Int) -> Unit,
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
@@ -287,17 +285,14 @@ fun PlayerScreen(
         // Draggable queue drawer overlay — Auxio-style: album art and header
         // above stay put, the drawer slides up over the lower portion of the
         // screen rather than a separate full-screen modal.
-        if (playbackState.queue.size + playbackState.history.size > 1) {
+        if (playbackState.queue.size > 1) {
             QueueDrawer(
-                history = playbackState.history,
                 queue = playbackState.queue,
                 currentIndex = playbackState.currentIndex,
                 artColors = artColors,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
-                onSongClick = onQueueItemClick,
-                onMoveItem = onMoveQueueItem,
-                onRemoveItem = onRemoveQueueItem
+                onSongClick = onQueueItemClick
             )
         }
     }

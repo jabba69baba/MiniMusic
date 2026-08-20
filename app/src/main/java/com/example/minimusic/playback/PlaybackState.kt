@@ -8,7 +8,6 @@ data class PlaybackUiState(
     val currentSong: Song? = null,
     val queue: List<Song> = emptyList(),
     val currentIndex: Int = -1,
-    val history: List<Song> = emptyList(),
     val isPlaying: Boolean = false,
     val isShuffled: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
