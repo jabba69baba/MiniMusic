@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -762,31 +762,32 @@ private fun PlayPauseButton(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AnimatedContent(
-            targetState = isPlaying,
-            transitionSpec = {
-                (androidx.compose.animation.fadeIn(animationSpec = tween(170)) +
-                    androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(220))) togetherWith
-                    (androidx.compose.animation.fadeOut(animationSpec = tween(120)) +
-                        androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(150)))
-            },
-            label = "playPauseMorph"
-        ) { playing ->
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "Pause" else "Play",
-                    tint = contentColor,
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(
-                    text = if (playing) "Pause" else "Play",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = contentColor,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+                targetState = isPlaying,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(animationSpec = tween(170)) +
+                        androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(220))) togetherWith
+                        (androidx.compose.animation.fadeOut(animationSpec = tween(120)) +
+                            androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(150)))
+                },
+                label = "playPauseMorph"
+            ) { playing ->
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (playing) "Pause" else "Play",
+                        tint = contentColor,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = if (playing) "Pause" else "Play",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = contentColor,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
             }
         }
         Box(
