@@ -232,7 +232,11 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            pendingSeekPositionMs = null
+            // A new media item always starts its UI position at zero. Keeping a
+            // prior seek target here makes the seekbar briefly rubberband to the
+            // previous track before the ticker catches up.
+            pendingSeekPositionMs = 0L
+            _uiState.value = _uiState.value.copy(positionMs = 0L)
             holdPlaybackStateAcrossTransition()
             syncQueueFromController()
         }
@@ -340,9 +344,14 @@ class PlayerController(private val context: Context) {
             visitedTimelineIndices.add(timelineIndex)
         ) {
             songsByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.let(displaySongs::add)
+            val displayRepeatMode = if (c.repeatMode == Player.REPEAT_MODE_ONE) {
+                Player.REPEAT_MODE_OFF
+            } else {
+                c.repeatMode
+            }
             timelineIndex = c.currentTimeline.getNextWindowIndex(
                 timelineIndex,
-                c.repeatMode,
+                displayRepeatMode,
                 c.shuffleModeEnabled
             )
         }

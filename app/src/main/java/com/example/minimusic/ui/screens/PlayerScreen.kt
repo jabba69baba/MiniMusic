@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -68,7 +69,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -184,12 +185,14 @@ fun PlayerScreen(
     val song = playbackState.currentSong ?: return
     var autoOpenedLyrics by remember(song.id) { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
-    val artColors = rememberArtColorRoles(song.albumArtUri)
+    val targetArtColors = rememberArtColorRoles(song.albumArtUri)
+    val artColors = animateArtColorRoles(targetArtColors)
     val navigationBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val queueSlotVisible = playbackState.queue.size > 1 || playbackState.repeatMode == RepeatMode.ONE
     val view = LocalView.current
 
     val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
-    DisposableEffect(view, artColors.background, visibleNavigationSurface) {
+    SideEffect {
         val window = (view.context as? Activity)?.window
         if (window != null) {
             val controller = WindowCompat.getInsetsController(window, view)
@@ -198,7 +201,6 @@ fun PlayerScreen(
             controller.isAppearanceLightStatusBars = artColors.background.luminance() > 0.52f
             controller.isAppearanceLightNavigationBars = visibleNavigationSurface.luminance() > 0.52f
         }
-        onDispose { }
     }
 
     LaunchedEffect(song.id, showLyricsInitially) {
@@ -224,14 +226,14 @@ fun PlayerScreen(
                 // 12dp outer bottom padding.
                 .padding(
                     top = 4.dp,
-                    bottom = if (playbackState.queue.size > 1) 0.dp else 12.dp
+                    bottom = if (queueSlotVisible) 0.dp else 12.dp
                 )
                 // Reserve real space for the drawer's collapsed bar sitting on top
                 // as a separate overlay below — it isn't part of this Column's
                 // layout flow, so padding on the last child here has no effect on
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
-                    bottom = if (playbackState.queue.size > 1) {
+                    bottom = if (queueSlotVisible) {
                         QueueDrawerCollapsedHeight + CapsuleToQueueGap + navigationBarInset
                     } else {
                         navigationBarInset + 12.dp
@@ -285,7 +287,7 @@ fun PlayerScreen(
         // Draggable queue drawer overlay — Auxio-style: album art and header
         // above stay put, the drawer slides up over the lower portion of the
         // screen rather than a separate full-screen modal.
-        if (playbackState.queue.size > 1) {
+        if (queueSlotVisible) {
             QueueDrawer(
                 queue = playbackState.queue,
                 currentIndex = playbackState.currentIndex,
@@ -653,6 +655,37 @@ private fun NowPlayingPanel(
 }
 
 @Composable
+private fun animateArtColorRoles(target: ArtColorRoles): ArtColorRoles {
+    @Composable
+    fun animated(color: Color, label: String): Color = animateColorAsState(
+        targetValue = color,
+        animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+        label = label
+    ).value
+
+    return ArtColorRoles(
+        primary = animated(target.primary, "playerPrimaryColor"),
+        onPrimary = animated(target.onPrimary, "playerOnPrimaryColor"),
+        primaryContainer = animated(target.primaryContainer, "playerPrimaryContainerColor"),
+        onPrimaryContainer = animated(target.onPrimaryContainer, "playerOnPrimaryContainerColor"),
+        secondary = animated(target.secondary, "playerSecondaryColor"),
+        onSecondary = animated(target.onSecondary, "playerOnSecondaryColor"),
+        secondaryContainer = animated(target.secondaryContainer, "playerSecondaryContainerColor"),
+        onSecondaryContainer = animated(target.onSecondaryContainer, "playerOnSecondaryContainerColor"),
+        tertiary = animated(target.tertiary, "playerTertiaryColor"),
+        onTertiary = animated(target.onTertiary, "playerOnTertiaryColor"),
+        tertiaryContainer = animated(target.tertiaryContainer, "playerTertiaryContainerColor"),
+        onTertiaryContainer = animated(target.onTertiaryContainer, "playerOnTertiaryContainerColor"),
+        background = animated(target.background, "playerBackgroundColor"),
+        onBackground = animated(target.onBackground, "playerOnBackgroundColor"),
+        surface = animated(target.surface, "playerSurfaceColor"),
+        onSurface = animated(target.onSurface, "playerOnSurfaceColor"),
+        surfaceVariant = animated(target.surfaceVariant, "playerSurfaceVariantColor"),
+        onSurfaceVariant = animated(target.onSurfaceVariant, "playerOnSurfaceVariantColor")
+    )
+}
+
+@Composable
 private fun TransportButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -704,8 +737,14 @@ private fun PlayPauseButton(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressOverlayAlpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.20f else 0f,
+        animationSpec = tween(durationMillis = if (isPressed) 70 else 180),
+        label = "playPausePressIllumination"
+    )
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxHeight()
             .clip(PlayButtonShape)
@@ -715,10 +754,14 @@ private fun PlayPauseButton(
                 indication = null,
                 onClick = onClick
             ),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.Center
     ) {
-        AnimatedContent(
+        Row(
+            modifier = Modifier.matchParentSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedContent(
             targetState = isPlaying,
             transitionSpec = {
                 (androidx.compose.animation.fadeIn(animationSpec = tween(170)) +
@@ -746,6 +789,11 @@ private fun PlayPauseButton(
                 )
             }
         }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color.White.copy(alpha = pressOverlayAlpha))
+        )
     }
 }
 
