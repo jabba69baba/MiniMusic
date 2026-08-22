@@ -339,7 +339,12 @@ class PlayerController(private val context: Context) {
                 if (enabled) {
                     rebuildTimelineForFreshShuffle(c)
                 } else {
-                    reorderTimelineEntries(c, currentQueueEntries.sortedWith(alphabeticalSongComparator))
+                    reorderTimelineEntries(
+                        c,
+                        currentQueueEntries.sortedWith(compareBy<QueueEntry> {
+                            it.song.title.trim().lowercase()
+                        }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
+                    )
                 }
                 c.shuffleModeEnabled = false
                 shuffleActive = enabled
