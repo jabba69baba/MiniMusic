@@ -203,7 +203,7 @@ fun PlayerScreen(
     val queueSlotVisible = playbackState.queue.size > 1 || playbackState.repeatMode == RepeatMode.ONE
     val view = LocalView.current
 
-    val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
+    val visibleNavigationSurface = artColors.background
     SideEffect {
         val window = (view.context as? Activity)?.window
         if (window != null) {
