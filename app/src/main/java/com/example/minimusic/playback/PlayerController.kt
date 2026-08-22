@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlin.random.Random
 
 /**
@@ -212,6 +213,7 @@ class PlayerController(private val context: Context) {
 
     /** Move a queue entry by stable identity, keeping Media3 and the local mirror aligned. */
     fun moveQueueEntry(entryId: Long, toIndex: Int) {
+        if (shuffleMutationInProgress) return
         val c = controller ?: return
         val fromIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
         if (fromIndex < 0 || currentQueueEntries.isEmpty()) return
@@ -240,6 +242,7 @@ class PlayerController(private val context: Context) {
 
     /** Applies the complete released queue order, preserving active identity by media ID. */
     fun reorderQueue(finalEntryIds: List<Long>) {
+        if (shuffleMutationInProgress) return
         val c = controller ?: return
         if (finalEntryIds.size != currentQueueEntries.size ||
             finalEntryIds.toSet().size != finalEntryIds.size ||
@@ -259,6 +262,7 @@ class PlayerController(private val context: Context) {
     }
 
     fun removeQueueEntry(entryId: Long) {
+        if (shuffleMutationInProgress) return
         val c = controller ?: return
         val removedPosition = currentQueueEntries.indexOfFirst { it.entryId == entryId }
         if (removedPosition < 0) return
@@ -334,26 +338,35 @@ class PlayerController(private val context: Context) {
             syncQueueFromController()
             if (currentQueueEntries.size != c.mediaItemCount) return
         }
+
         shuffleMutationInProgress = true
-        try {
-            val enabled = !shuffleActive
-            runTimelineMutation {
-                if (enabled) {
-                    rebuildTimelineForFreshShuffle(c)
-                } else {
-                    reorderTimelineEntries(
-                        c,
-                        currentQueueEntries.sortedWith(compareBy<QueueEntry> {
-                            it.song.title.trim().lowercase()
-                        }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
-                    )
+        val enabled = !shuffleActive
+        val targetEntries = if (enabled) {
+            freshShuffleEntries(c)
+        } else {
+            currentQueueEntries.sortedWith(compareBy<QueueEntry> {
+                it.song.title.trim().lowercase()
+            }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
+        }
+
+        // Move one existing item at a time and yield between moves. Media3 must
+        // receive these calls on the main thread, but keeping the whole loop in
+        // one synchronous callback starves Compose and the position ticker.
+        scope.launch {
+            try {
+                runTimelineMutationSuspend {
+                    reorderTimelineEntriesWithoutBlocking(c, targetEntries)
+                    c.shuffleModeEnabled = false
+                    shuffleActive = enabled
+                    syncQueueFromController()
                 }
-                c.shuffleModeEnabled = false
-                shuffleActive = enabled
+            } catch (_: RuntimeException) {
+                // Keep the controller usable if Media3 rejects a transient move;
+                // the next callback will republish the authoritative timeline.
                 syncQueueFromController()
+            } finally {
+                shuffleMutationInProgress = false
             }
-        } finally {
-            shuffleMutationInProgress = false
         }
     }
 
@@ -462,7 +475,20 @@ class PlayerController(private val context: Context) {
         }
     }
 
-    private fun rebuildTimelineForFreshShuffle(c: Player) {
+    private suspend fun runTimelineMutationSuspend(block: suspend () -> Unit) {
+        timelineMutationDepth += 1
+        try {
+            block()
+        } finally {
+            timelineMutationDepth -= 1
+            if (timelineMutationDepth == 0 && syncRequestedAfterMutation) {
+                syncRequestedAfterMutation = false
+                syncQueueFromController()
+            }
+        }
+    }
+
+    private fun freshShuffleEntries(c: Player): List<QueueEntry> {
         val activeEntry = resolveCurrentEntry(c)
         val shuffledEntries = currentQueueEntries
             .shuffled(Random(System.nanoTime().toInt()))
@@ -471,7 +497,24 @@ class PlayerController(private val context: Context) {
             shuffledEntries.removeAll { it.entryId == active.entryId }
             shuffledEntries.add(0, active)
         }
-        reorderTimelineEntries(c, shuffledEntries)
+        return shuffledEntries
+    }
+
+    private suspend fun reorderTimelineEntriesWithoutBlocking(
+        c: Player,
+        targetEntries: List<QueueEntry>
+    ) {
+        if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
+        pendingSeekPositionMs = null
+        targetEntries.forEachIndexed { targetIndex, targetEntry ->
+            val currentIndex = (targetIndex until c.mediaItemCount).firstOrNull { index ->
+                c.getMediaItemAt(index).mediaId == targetEntry.entryId.toString()
+            } ?: return@forEachIndexed
+            if (currentIndex != targetIndex) {
+                c.moveMediaItem(currentIndex, targetIndex)
+                yield()
+            }
+        }
     }
 
     private fun reorderTimelineEntries(c: Player, targetEntries: List<QueueEntry>) {

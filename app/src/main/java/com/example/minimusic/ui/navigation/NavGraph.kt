@@ -13,8 +13,6 @@ import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
-import com.example.minimusic.ui.components.QueueScreen
-import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
@@ -23,7 +21,6 @@ import com.example.minimusic.ui.viewmodel.SettingsViewModel
 private object Routes {
     const val LIBRARY = "library"
     const val PLAYER = "player"
-    const val QUEUE = "queue"
     const val LYRICS = "lyrics"
     const val SETTINGS = "settings"
     const val ALBUM = "album/{albumId}"
@@ -135,9 +132,6 @@ fun MiniMusicNavGraph(
                 onToggleShuffle = playerViewModel::toggleShuffle,
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
                 onOpenLyrics = { navController.navigate(Routes.LYRICS) },
-                onOpenQueue = {
-                    navController.navigate(Routes.QUEUE) { launchSingleTop = true }
-                },
                 onQueueItemClick = playerViewModel::playFromQueue,
                 onQueueEntryClick = playerViewModel::playQueueEntry,
                 onReorderQueue = playerViewModel::reorderQueue,
@@ -148,21 +142,6 @@ fun MiniMusicNavGraph(
                 },
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
-            )
-        }
-
-        composable(Routes.QUEUE) {
-            QueueScreen(
-                snapshot = queueSnapshot,
-                artColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri),
-                onBack = { navController.popBackStack() },
-                onEntryClick = playerViewModel::playQueueEntry,
-                onReorderEntries = playerViewModel::reorderQueue,
-                onRemoveEntry = playerViewModel::removeQueueEntry,
-                onClearQueue = {
-                    playerViewModel.clearQueue()
-                    navController.popBackStack(Routes.LIBRARY, inclusive = false)
-                }
             )
         }
 
