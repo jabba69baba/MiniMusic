@@ -7,6 +7,9 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,10 +61,15 @@ fun FlatMusicSlider(
         }
     }
 
+    val animatedCommittedFraction by animateFloatAsState(
+        targetValue = committedFraction,
+        animationSpec = tween(durationMillis = 360, easing = LinearEasing),
+        label = "trackProgressTransition"
+    )
     val fraction = when {
         isDragging -> dragFraction
         pendingFraction != null -> pendingFraction!!
-        else -> committedFraction
+        else -> animatedCommittedFraction
     }
     val trackColor = inactiveColor ?: MaterialTheme.colorScheme.surfaceVariant
     val resolvedActiveColor = activeColor ?: MaterialTheme.colorScheme.primary

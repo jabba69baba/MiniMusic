@@ -113,6 +113,7 @@ import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /** Large rounded-square corner radius used for the album art frame. */
@@ -138,6 +139,12 @@ private val ContentSectionGap = 16.dp
 
 /** Gap from the seekbar to the timer/audio-quality row. */
 private val SeekbarToTimeGap = 6.dp
+
+/** Shared duration for coordinated artwork and metadata transitions. */
+private const val TrackTransitionDurationMillis = 480
+
+/** Short delay while the incoming audio metadata settles before its badge appears. */
+private const val QualityBadgeDelayMillis = 140L
 
 /** Restored control-to-control spacing requested for the lower PlayerScreen. */
 private val ControlSectionGap = 20.dp
@@ -398,12 +405,18 @@ private fun NowPlayingPanel(
 ) {
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
+    var badgeReady by remember(song.id) { mutableStateOf(false) }
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
-        formatInfo = readAudioFormatInfo(context, song.contentUri)
+        badgeReady = false
+        formatInfo = withContext(Dispatchers.IO) {
+            readAudioFormatInfo(context, song.contentUri)
+        }
+        delay(QualityBadgeDelayMillis)
+        if (latestSong.id == song.id) badgeReady = true
 
         val artworkUri = song.albumArtUri
         if (artworkUri == null) {
@@ -452,12 +465,14 @@ private fun NowPlayingPanel(
                     val direction = transitionDirection
                     (slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = tween(480, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))) togetherWith
+                        animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                    ) + fadeIn(                        animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing))) togetherWith
+
                         (slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = tween(460, easing = FastOutSlowInEasing)
-                        ) + fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)))
+                            animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                        ) + fadeOut(                            animationSpec = tween(TrackTransitionDurationMillis / 2, easing = FastOutSlowInEasing)))
+
                 },
                 label = "albumArtCarouselTransition"
             ) { displayedSong ->
@@ -485,13 +500,33 @@ private fun NowPlayingPanel(
             Spacer(modifier = Modifier.weight(1f))
         }
 
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 2.dp)
-                .padding(top = ContentSectionGap)
-        ) {
-            Text(
-                    text = song.title,
+        AnimatedContent(
+            targetState = song,
+            transitionSpec = {
+                val direction = transitionDirection
+                (slideInHorizontally(
+                    initialOffsetX = { width -> direction * (width / 8) },
+                    animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                ) + fadeIn(
+                    animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                )) togetherWith
+                    (slideOutHorizontally(
+                        targetOffsetX = { width -> -direction * (width / 8) },
+                        animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                    ) + fadeOut(
+                        animationSpec = tween(TrackTransitionDurationMillis / 2, easing = FastOutSlowInEasing)
+                    ))
+            },
+            contentKey = { it.id },
+            label = "songMetadataTransition"
+        ) { displayedSong ->
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .padding(top = ContentSectionGap)
+            ) {
+                Text(
+                    text = displayedSong.title,
                     style = MaterialTheme.typography.headlineSmall,
                     color = artColors.onBackground,
                     maxLines = 1,
@@ -505,13 +540,14 @@ private fun NowPlayingPanel(
                     )
                 )
 
-            Text(
-                text = song.artist,
+                Text(
+                    text = displayedSong.artist,
                     style = MaterialTheme.typography.bodyLarge,
                     color = artColors.onSurfaceVariant,
                     maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Column(
@@ -547,17 +583,36 @@ private fun NowPlayingPanel(
                     contentAlignment = Alignment.Center
                 ) {
                     val badgeText = formatInfo?.toBadgeText()
-                    if (showAudioQualityBadge && badgeText != null) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = artColors.surfaceVariant
-                        ) {
-                            Text(
-                                text = badgeText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = artColors.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    AnimatedContent(
+                        targetState = if (showAudioQualityBadge && badgeReady) badgeText else null,
+                        transitionSpec = {
+                            fadeIn(
+                                animationSpec = tween(
+                                    TrackTransitionDurationMillis / 2,
+                                    easing = FastOutSlowInEasing
+                                )
+                            ) togetherWith fadeOut(
+                                animationSpec = tween(
+                                    TrackTransitionDurationMillis / 3,
+                                    easing = FastOutSlowInEasing
+                                )
                             )
+                        },
+                        contentKey = { it ?: "empty" },
+                        label = "audioQualityBadgeTransition"
+                    ) { visibleBadgeText ->
+                        if (visibleBadgeText != null) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = artColors.surfaceVariant
+                            ) {
+                                Text(
+                                    text = visibleBadgeText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = artColors.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -665,7 +720,7 @@ private fun animateArtColorRoles(target: ArtColorRoles): ArtColorRoles {
     @Composable
     fun animated(color: Color, label: String): Color = animateColorAsState(
         targetValue = color,
-        animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = TrackTransitionDurationMillis, easing = FastOutSlowInEasing),
         label = label
     ).value
 
