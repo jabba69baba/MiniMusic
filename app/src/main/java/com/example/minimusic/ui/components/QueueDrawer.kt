@@ -275,7 +275,9 @@ fun BoxWithConstraintsScope.QueueDrawer(
                                 val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
                                 scope.launch { offsetY.snapTo(newValue) }
                             },
-                            startDragImmediately = true,
+                            // Let child action pills receive taps; the drawer still
+                            // begins dragging as soon as the pointer moves.
+                            startDragImmediately = false,
                             onDragStopped = { velocity ->
                                 val shouldOpen = if (abs(velocity) > 800f) {
                                     velocity < 0f
@@ -382,10 +384,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     QueueDrawerList(
                         snapshot = snapshot,
                         artColors = artColors,
-                        onEntryClick = {
-                            onEntryClick(it)
-                            onOpenChange(false)
-                        },
+                        onEntryClick = onEntryClick,
                         onReorderEntries = onReorderEntries,
                         onRemoveEntry = onRemoveEntry,
                         locateRequest = locateRequest,
@@ -436,6 +435,7 @@ private fun ColumnScope.QueueDrawerList(
             .weight(1f)
             .clipToBounds(),
         factory = { viewContext ->
+
             val recyclerView = RecyclerView(viewContext).apply {
                 layoutManager = LinearLayoutManager(viewContext)
                 setHasFixedSize(true)

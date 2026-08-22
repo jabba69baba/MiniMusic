@@ -354,6 +354,13 @@ class PlayerController(private val context: Context) {
             }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
         }
 
+        // Publish the target order immediately. The active entry is resolved by
+        // stable media ID, so this does not disturb the current playback clock
+        // while the controller reconciles its physical timeline below.
+        currentQueueEntries = targetEntries
+        currentQueue = targetEntries.map { it.song }
+        refreshCurrentItem()
+
         // Move one existing item at a time and yield between moves. Media3 must
         // receive these calls on the main thread, but keeping the whole loop in
         // one synchronous callback starves Compose and the position ticker.
