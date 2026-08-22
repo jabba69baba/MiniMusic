@@ -476,25 +476,19 @@ class PlayerController(private val context: Context) {
 
     private fun reorderTimelineEntries(c: Player, targetEntries: List<QueueEntry>) {
         if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
-        val activeEntryId = resolveCurrentEntry(c)?.entryId
-        val targetIndex = activeEntryId?.let { id ->
-            targetEntries.indexOfFirst { it.entryId == id }
-        }?.takeIf { it >= 0 } ?: 0
-        val positionMs = c.currentPosition.coerceAtLeast(0L)
-        val wasPlaying = c.isPlaying
-        // Queue reordering is not a seek operation; never carry an older seek
-        // preview into the newly installed timeline.
-        pendingSeekPositionMs = null
-        val mediaItems = targetEntries.map { entry ->
-            entry.song.toMediaItem(mediaId = entry.entryId.toString())
-        }
 
-        // A single setMediaItems call avoids the transient index states produced by
-        // repeated moveMediaItem calls. The surrounding mutation guard defers all
-        // Media3 callbacks until this complete order is installed.
-        c.setMediaItems(mediaItems, targetIndex, positionMs)
-        c.prepare()
-        if (wasPlaying) c.play() else c.pause()
+        // Reorder the existing Media3 timeline in place. Replacing the entire
+        // timeline with setMediaItems() forces a prepare cycle, which briefly
+        // reports duration and position as zero and can pause playback.
+        pendingSeekPositionMs = null
+        targetEntries.forEachIndexed { targetIndex, targetEntry ->
+            val currentIndex = (targetIndex until c.mediaItemCount).firstOrNull { index ->
+                c.getMediaItemAt(index).mediaId == targetEntry.entryId.toString()
+            } ?: return@forEachIndexed
+            if (currentIndex != targetIndex) {
+                c.moveMediaItem(currentIndex, targetIndex)
+            }
+        }
         currentQueueEntries = targetEntries
         currentQueue = targetEntries.map { it.song }
     }

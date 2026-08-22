@@ -127,14 +127,12 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 .fillMaxWidth()
                 .fillMaxSize()
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 8.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                val headerHeight = if (isOpen) 88.dp else QueueDrawerCollapsedHeight
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(headerHeight)
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
@@ -157,69 +155,89 @@ fun BoxWithConstraintsScope.QueueDrawer(
                                 }
                                 onOpenChange(shouldOpen)
                             }
-                        )
-                        .clickable { onOpenChange(!isOpen) }
-                        .padding(vertical = 8.dp),
+                        ),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(top = 4.dp, bottom = 8.dp)
+                            .padding(top = if (isOpen) 8.dp else 6.dp, bottom = 4.dp)
                             .size(width = 36.dp, height = 4.dp)
                             .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        androidx.compose.material3.IconButton(
-                            onClick = {
-                                onClearQueue()
-                            },
-                            modifier = Modifier.size(40.dp)
+                    if (isOpen) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = "Clear queue",
-                                modifier = Modifier.size(21.dp),
-                                tint = artColors.onSurfaceVariant
-                            )
+                            androidx.compose.material3.IconButton(
+                                onClick = onClearQueue,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = "Clear queue",
+                                    modifier = Modifier.size(21.dp),
+                                    tint = artColors.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.size(28.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.QueueMusic,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = artColors.onSurface
+                                )
+                                Text(
+                                    text = "Queue",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = artColors.onSurface,
+                                    modifier = Modifier.padding(start = 6.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.size(28.dp))
+                            androidx.compose.material3.IconButton(
+                                onClick = { locateRequest++ },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.MyLocation,
+                                    contentDescription = "Locate current song",
+                                    modifier = Modifier.size(21.dp),
+                                    tint = artColors.onSurfaceVariant
+                                )
+                            }
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.QueueMusic,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = artColors.onSurface
-                            )
-                            Text(
-                                text = "Queue",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = artColors.onSurface,
-                                modifier = Modifier.padding(start = 6.dp)
-                            )
-                        }
-                        androidx.compose.material3.IconButton(
-                            onClick = {
-                                locateRequest++
-                            },
-                            modifier = Modifier.size(40.dp)
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp)
+                                .clickable { onOpenChange(true) },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.MyLocation,
-                                contentDescription = "Locate current song",
-                                modifier = Modifier.size(21.dp),
-                                tint = artColors.onSurfaceVariant
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.QueueMusic,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = artColors.onSurface
+                                )
+                                Text(
+                                    text = "Queue",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = artColors.onSurface,
+                                    modifier = Modifier.padding(start = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
 
-                val isSubstantiallyOpen = offsetY.value < closedOffsetPx - collapsedBarHeightPx / 2f
-                if (isSubstantiallyOpen) {
+                if (isOpen) {
                     QueueDrawerList(
                         snapshot = snapshot,
                         artColors = artColors,
@@ -254,20 +272,13 @@ private fun ColumnScope.QueueDrawerList(
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
     var previousLocateRequest by remember { mutableStateOf(0) }
 
+    // Keep the RecyclerView visually below the fixed drawer header; this
+    // boundary prevents rows from painting over the Queue title or controls.
     Spacer(modifier = Modifier.height(8.dp))
     androidx.compose.material3.HorizontalDivider(
         color = artColors.onSurfaceVariant.copy(alpha = 0.28f)
     )
-    if (snapshot.historyEntries.isNotEmpty()) {
-        Text(
-            text = "History",
-            style = MaterialTheme.typography.labelLarge,
-            color = artColors.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-    } else {
-        Spacer(modifier = Modifier.height(8.dp))
-    }
+    Spacer(modifier = Modifier.height(8.dp))
 
     adapter.onEntryClick = latestOnEntryClick
     adapter.onReorderEntries = latestOnReorderEntries
@@ -515,12 +526,15 @@ private class PracticalQueueAdapter(
                 root.context.dp(8),
                 root.context.dp(4)
             )
+            // Played history rows fade as a single visual unit. The current row
+            // remains fully opaque and is identified only by its highlighted card.
+            root.alpha = if (isHistory) 0.58f else 1f
             title.text = entry.song.title
             artist.text = entry.song.artist
             title.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_medium))
             artist.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_regular))
             title.setTextColor(resolved.onSurface.toArgb())
-            artist.setTextColor(resolved.onSurfaceVariant.copy(alpha = if (isHistory) 0.65f else 1f).toArgb())
+            artist.setTextColor(resolved.onSurfaceVariant.toArgb())
             title.textSize = 16f
             artist.textSize = 14f
             artwork.setImageResource(android.R.drawable.ic_menu_gallery)
