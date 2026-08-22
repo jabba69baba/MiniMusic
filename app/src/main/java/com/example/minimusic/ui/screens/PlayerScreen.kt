@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -406,17 +407,28 @@ private fun NowPlayingPanel(
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
     var badgeReady by remember(song.id) { mutableStateOf(false) }
+    val badgeAlpha = remember { Animatable(0f) }
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
         badgeReady = false
+        badgeAlpha.snapTo(0f)
         formatInfo = withContext(Dispatchers.IO) {
             readAudioFormatInfo(context, song.contentUri)
         }
         delay(QualityBadgeDelayMillis)
-        if (latestSong.id == song.id) badgeReady = true
+        if (latestSong.id == song.id) {
+            badgeReady = true
+            badgeAlpha.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = TrackTransitionDurationMillis / 2,
+                    easing = FastOutSlowInEasing
+                )
+            )
+        }
 
         val artworkUri = song.albumArtUri
         if (artworkUri == null) {
@@ -466,12 +478,24 @@ private fun NowPlayingPanel(
                     (slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
                         animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
-                    ) + fadeIn(                        animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing))) togetherWith
-
+                    ) + fadeIn(
+                        animationSpec = tween(
+                            TrackTransitionDurationMillis,
+                            easing = FastOutSlowInEasing
+                        )
+                    )) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
-                        ) + fadeOut(                            animationSpec = tween(TrackTransitionDurationMillis / 2, easing = FastOutSlowInEasing)))
+                            animationSpec = tween(
+                                TrackTransitionDurationMillis,
+                                easing = FastOutSlowInEasing
+                            )
+                        ) + fadeOut(
+                            animationSpec = tween(
+                                TrackTransitionDurationMillis / 2,
+                                easing = FastOutSlowInEasing
+                            )
+                        ))
 
                 },
                 label = "albumArtCarouselTransition"
@@ -560,7 +584,8 @@ private fun NowPlayingPanel(
                 valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
                 onValueChange = { onSeekTo(it.toLong()) },
                 activeColor = artColors.primary,
-                inactiveColor = artColors.onSurface.copy(alpha = 0.34f)
+                inactiveColor = artColors.onSurface.copy(alpha = 0.34f),
+                transitionKey = song.id
             )
             Row(
                 modifier = Modifier
@@ -583,36 +608,18 @@ private fun NowPlayingPanel(
                     contentAlignment = Alignment.Center
                 ) {
                     val badgeText = formatInfo?.toBadgeText()
-                    AnimatedContent(
-                        targetState = if (showAudioQualityBadge && badgeReady) badgeText else null,
-                        transitionSpec = {
-                            fadeIn(
-                                animationSpec = tween(
-                                    TrackTransitionDurationMillis / 2,
-                                    easing = FastOutSlowInEasing
-                                )
-                            ) togetherWith fadeOut(
-                                animationSpec = tween(
-                                    TrackTransitionDurationMillis / 3,
-                                    easing = FastOutSlowInEasing
-                                )
+                    if (showAudioQualityBadge && badgeReady && badgeText != null) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = artColors.surfaceVariant,
+                            modifier = Modifier.graphicsLayer { alpha = badgeAlpha.value }
+                        ) {
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = artColors.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
-                        },
-                        contentKey = { it ?: "empty" },
-                        label = "audioQualityBadgeTransition"
-                    ) { visibleBadgeText ->
-                        if (visibleBadgeText != null) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = artColors.surfaceVariant
-                            ) {
-                                Text(
-                                    text = visibleBadgeText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = artColors.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
                         }
                     }
                 }

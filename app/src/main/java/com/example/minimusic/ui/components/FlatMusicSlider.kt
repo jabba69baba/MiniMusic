@@ -7,8 +7,8 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,7 +42,9 @@ fun FlatMusicSlider(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     activeColor: Color? = null,
-    inactiveColor: Color? = null
+    inactiveColor: Color? = null,
+    /** Changes only when the media item changes; ordinary progress must not animate. */
+    transitionKey: Any? = null
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
@@ -50,6 +52,32 @@ fun FlatMusicSlider(
 
     val range = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
     val committedFraction = ((value - valueRange.start) / range).coerceIn(0f, 1f)
+    var lastTransitionKey by remember { mutableStateOf(transitionKey) }
+    var lastStableFraction by remember { mutableFloatStateOf(committedFraction) }
+    var isTrackResetting by remember { mutableStateOf(false) }
+    val resetFraction = remember { Animatable(committedFraction) }
+
+    LaunchedEffect(committedFraction, transitionKey) {
+        // On a new track, preserve the previous fraction for the reset coroutine;
+        // the new track's initial zero must not overwrite it first.
+        if (transitionKey == lastTransitionKey && !isTrackResetting) {
+            lastStableFraction = committedFraction
+        }
+    }
+    LaunchedEffect(transitionKey) {
+        if (transitionKey != lastTransitionKey) {
+            val startFraction = lastStableFraction.coerceIn(0f, 1f)
+            lastTransitionKey = transitionKey
+            isTrackResetting = true
+            resetFraction.snapTo(startFraction)
+            resetFraction.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 480, easing = LinearEasing)
+            )
+            isTrackResetting = false
+            lastStableFraction = 0f
+        }
+    }
 
     LaunchedEffect(valueRange) {
         pendingFraction = null
@@ -61,15 +89,11 @@ fun FlatMusicSlider(
         }
     }
 
-    val animatedCommittedFraction by animateFloatAsState(
-        targetValue = committedFraction,
-        animationSpec = tween(durationMillis = 360, easing = LinearEasing),
-        label = "trackProgressTransition"
-    )
     val fraction = when {
         isDragging -> dragFraction
         pendingFraction != null -> pendingFraction!!
-        else -> animatedCommittedFraction
+        isTrackResetting -> resetFraction.value
+        else -> committedFraction
     }
     val trackColor = inactiveColor ?: MaterialTheme.colorScheme.surfaceVariant
     val resolvedActiveColor = activeColor ?: MaterialTheme.colorScheme.primary
