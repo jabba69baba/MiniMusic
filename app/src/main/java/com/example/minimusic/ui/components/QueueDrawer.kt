@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -86,6 +87,102 @@ import kotlin.math.roundToInt
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
 val QueueDrawerCollapsedHeight = 48.dp
 private const val OPEN_FRACTION = 0.82f
+
+/** Dedicated queue destination; the list is laid out below a fixed header. */
+@Composable
+fun QueueScreen(
+    snapshot: QueueSnapshot,
+    artColors: ArtColorRoles,
+    onBack: () -> Unit,
+    onEntryClick: (Long) -> Unit,
+    onReorderEntries: (List<Long>) -> Unit,
+    onRemoveEntry: (Long) -> Unit,
+    onClearQueue: () -> Unit
+) {
+    BackHandler(onBack = onBack)
+    var locateRequest by remember { mutableStateOf(0) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.systemBars),
+        color = artColors.surfaceVariant,
+        tonalElevation = 0.dp
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(88.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(
+                            artColors.onSurfaceVariant.copy(alpha = 0.55f),
+                            RoundedCornerShape(50)
+                        )
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 28.dp, start = 8.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    androidx.compose.material3.IconButton(
+                        onClick = onClearQueue,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Clear queue",
+                            modifier = Modifier.size(21.dp),
+                            tint = artColors.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.size(28.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.QueueMusic,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = artColors.onSurface
+                        )
+                        Text(
+                            text = "Queue",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = artColors.onSurface,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.size(28.dp))
+                    androidx.compose.material3.IconButton(
+                        onClick = { locateRequest++ },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MyLocation,
+                            contentDescription = "Locate current song",
+                            modifier = Modifier.size(21.dp),
+                            tint = artColors.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            QueueDrawerList(
+                snapshot = snapshot,
+                artColors = artColors,
+                onEntryClick = onEntryClick,
+                onReorderEntries = onReorderEntries,
+                onRemoveEntry = onRemoveEntry,
+                locateRequest = locateRequest
+            )
+        }
+    }
+}
 
 @Composable
 fun BoxWithConstraintsScope.QueueDrawer(
@@ -449,6 +546,20 @@ private class PracticalQueueAdapter(
             if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
             moveLocal(from, to)
             return true
+        }
+
+        override fun interpolateOutOfBoundsScroll(
+            recyclerView: RecyclerView,
+            viewSize: Int,
+            viewSizeOutOfBounds: Int,
+            totalSize: Int,
+            msSinceStartScroll: Long
+        ): Int {
+            if (viewSizeOutOfBounds == 0) return 0
+            val direction = if (viewSizeOutOfBounds > 0) 1 else -1
+            val distance = abs(viewSizeOutOfBounds).coerceAtLeast(context.dp(12))
+            val step = (context.dp(12) + distance / 5).coerceAtMost(context.dp(48))
+            return direction * step
         }
 
         override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) = Unit

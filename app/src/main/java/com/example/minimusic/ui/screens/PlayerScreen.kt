@@ -107,7 +107,6 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
-import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -155,7 +154,7 @@ private val ControlSectionGap = 20.dp
 private val FunctionSectionGap = 26.dp
 
 /** Extra reserved clearance before the bottom-anchored queue drawer. */
-private val CapsuleToQueueGap = 19.dp
+private val CapsuleToQueueGap = 8.dp
 
 /** Preset durations offered in the sleep timer menu. */
 private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
@@ -188,6 +187,7 @@ fun PlayerScreen(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenQueue: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
     onQueueEntryClick: (Long) -> Unit = {},
     onReorderQueue: (List<Long>) -> Unit = {},
@@ -197,7 +197,6 @@ fun PlayerScreen(
     onCancelSleepTimer: () -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
-    var queueOpen by remember { mutableStateOf(false) }
     val targetArtColors = rememberArtColorRoles(song.albumArtUri)
     val artColors = animateArtColorRoles(targetArtColors)
     val navigationBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -291,20 +290,52 @@ fun PlayerScreen(
             }
         }
 
-        // Draggable queue drawer overlay — Auxio-style: album art and header
-        // above stay put, the drawer slides up over the lower portion of the
-        // screen rather than a separate full-screen modal.
+        // The queue is a separate destination. Only its compact launcher is
+        // retained on PlayerScreen, so the list cannot paint over the player.
         if (queueSlotVisible) {
-            QueueDrawer(
-                snapshot = queueSnapshot,
-                artColors = artColors,
-                isOpen = queueOpen,
-                onOpenChange = { queueOpen = it },
-                onEntryClick = onQueueEntryClick,
-                onReorderEntries = onReorderQueue,
-                onRemoveEntry = onRemoveQueueEntry,
-                onClearQueue = onClearQueue
-            )
+            Surface(
+                color = artColors.surfaceVariant,
+                tonalElevation = 0.dp,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(QueueDrawerCollapsedHeight + navigationBarInset)
+                    .padding(bottom = navigationBarInset)
+                    .clickable(onClick = onOpenQueue)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp, bottom = 4.dp)
+                            .size(width = 36.dp, height = 4.dp)
+                            .background(
+                                artColors.onSurfaceVariant.copy(alpha = 0.55f),
+                                RoundedCornerShape(50)
+                            )
+                    )
+                    Row(
+                        modifier = Modifier.height(32.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.QueueMusic,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = artColors.onSurface
+                        )
+                        Text(
+                            text = "Queue",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = artColors.onSurface,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
