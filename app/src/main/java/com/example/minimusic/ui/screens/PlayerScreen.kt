@@ -114,8 +114,9 @@ import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
@@ -415,9 +416,36 @@ private fun NowPlayingPanel(
     LaunchedEffect(song.id) {
         badgeReady = false
         badgeAlpha.snapTo(0f)
-        formatInfo = withContext(Dispatchers.IO) {
-            readAudioFormatInfo(context, song.contentUri)
+
+        coroutineScope {
+            val formatJob = async(Dispatchers.IO) {
+                readAudioFormatInfo(context, song.contentUri)
+            }
+            val artworkJob = async(Dispatchers.IO) {
+                val artworkUri = song.albumArtUri
+                if (artworkUri != null) {
+                    val request = ImageRequest.Builder(context)
+                        .data(artworkUri)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .build()
+                    context.imageLoader.execute(request)
+                }
+            }
+
+            if (latestSong.id == song.id) {
+                // Artwork is released to the carousel independently of the badge,
+                // so metadata extraction cannot delay the visual track switch.
+                artworkJob.await()
+                if (latestSong.id == song.id) {
+                    displayedArtworkSong = song
+                }
+            } else {
+                artworkJob.cancel()
+            }
+
+            formatInfo = formatJob.await()
         }
+
         delay(QualityBadgeDelayMillis)
         if (latestSong.id == song.id) {
             badgeReady = true
@@ -428,20 +456,6 @@ private fun NowPlayingPanel(
                     easing = FastOutSlowInEasing
                 )
             )
-        }
-
-        val artworkUri = song.albumArtUri
-        if (artworkUri == null) {
-            if (latestSong.id == song.id) displayedArtworkSong = song
-        } else {
-            val request = ImageRequest.Builder(context)
-                .data(artworkUri)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .build()
-            withContext(Dispatchers.IO) {
-                context.imageLoader.execute(request)
-            }
-            if (latestSong.id == song.id) displayedArtworkSong = song
         }
     }
 
@@ -498,6 +512,7 @@ private fun NowPlayingPanel(
                         ))
 
                 },
+                contentKey = { it.id },
                 label = "albumArtCarouselTransition"
             ) { displayedSong ->
                 if (displayedSong.albumArtUri == null) {
