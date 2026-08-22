@@ -209,6 +209,15 @@ private fun ColumnScope.QueueDrawerList(
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
     val adapter = remember { PracticalQueueAdapter(context) }
 
+    if (snapshot.historyEntries.isNotEmpty()) {
+        Text(
+            text = "History",
+            style = MaterialTheme.typography.labelLarge,
+            color = artColors.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+    }
+
     adapter.onEntryClick = latestOnEntryClick
     adapter.onMoveEntry = latestOnMoveEntry
     adapter.onRemoveEntry = latestOnRemoveEntry
@@ -262,14 +271,16 @@ private class PracticalQueueAdapter(
             deferredSnapshot = snapshot
             return
         }
+        val displayEntries = snapshot.historyEntries + snapshot.visibleEntries
         val oldIds = entries.map { it.entryId }
-        val newIds = snapshot.visibleEntries.map { it.entryId }
+        val newIds = displayEntries.map { it.entryId }
         val orderChanged = oldIds != newIds
+        val displayCurrentPosition = snapshot.historyEntries.size + snapshot.resolvedVisiblePosition
         val stateChanged = currentEntryId != snapshot.currentEntryId ||
-            currentPosition != snapshot.resolvedVisiblePosition
-        entries = snapshot.visibleEntries
+            currentPosition != displayCurrentPosition
+        entries = displayEntries
         currentEntryId = snapshot.currentEntryId
-        currentPosition = snapshot.resolvedVisiblePosition
+        currentPosition = displayCurrentPosition
         if (orderChanged) notifyDataSetChanged()
         else if (stateChanged && entries.isNotEmpty()) {
             notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)

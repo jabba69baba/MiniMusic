@@ -17,6 +17,8 @@ data class QueueSnapshot(
     val entries: List<QueueEntry> = emptyList(),
     val currentPosition: Int = -1,
     val currentEntryId: Long? = null,
+    /** Entries that have already played in oldest-to-newest order. */
+    val historyEntries: List<QueueEntry> = emptyList(),
     /** Playback order shown by the queue UI: current item followed by actual upcoming items. */
     val visibleEntries: List<QueueEntry> = entries
 ) {
@@ -24,8 +26,11 @@ data class QueueSnapshot(
         require(currentPosition in -1 until entries.size)
         require(entries.map { it.entryId }.distinct().size == entries.size)
         require(currentEntryId == null || entries.any { it.entryId == currentEntryId })
+        require(historyEntries.map { it.entryId }.distinct().size == historyEntries.size)
+        require(historyEntries.all { history -> entries.any { it.entryId == history.entryId } })
         require(visibleEntries.map { it.entryId }.distinct().size == visibleEntries.size)
         require(visibleEntries.all { visible -> entries.any { it.entryId == visible.entryId } })
+        require(historyEntries.none { history -> visibleEntries.any { it.entryId == history.entryId } })
     }
 
     val resolvedCurrentPosition: Int

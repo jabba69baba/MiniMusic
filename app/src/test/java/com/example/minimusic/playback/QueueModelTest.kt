@@ -78,6 +78,23 @@ class QueueModelTest {
     }
 
     @Test
+    fun `history is separate from visible playback order`() {
+        val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
+        val snapshot = QueueSnapshot(
+            entries = entries,
+            currentPosition = 2,
+            currentEntryId = 2L,
+            historyEntries = listOf(entries[0], entries[1]),
+            visibleEntries = listOf(entries[2], entries[3])
+        )
+
+        assertEquals(listOf(0L, 1L), snapshot.historyEntries.map { it.entryId })
+        assertEquals(listOf(2L, 3L), snapshot.visibleEntries.map { it.entryId })
+        assertEquals(-1, snapshot.visiblePositionOf(0L))
+        assertEquals(0, snapshot.visiblePositionOf(2L))
+    }
+
+    @Test
     fun `invalid entry changes are no-ops`() {
         val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
         val snapshot = QueueSnapshot(entries, currentPosition = 1)

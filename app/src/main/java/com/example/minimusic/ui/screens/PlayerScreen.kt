@@ -181,6 +181,7 @@ fun PlayerScreen(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
+    onQueueEntryClick: (Long) -> Unit = {},
     onMoveQueueEntry: (Long, Int) -> Unit = { _, _ -> },
     onRemoveQueueEntry: (Long) -> Unit = {},
     onStartSleepTimer: (Long) -> Unit = {},
@@ -297,10 +298,7 @@ fun PlayerScreen(
                 artColors = artColors,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
-                onEntryClick = { entryId ->
-                    val index = queueSnapshot.visiblePositionOf(entryId)
-                    if (index >= 0) onQueueItemClick(index)
-                },
+                onEntryClick = onQueueEntryClick,
                 onMoveEntry = onMoveQueueEntry,
                 onRemoveEntry = onRemoveQueueEntry
             )
