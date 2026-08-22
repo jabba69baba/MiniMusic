@@ -380,7 +380,7 @@ private class PracticalQueueAdapter(
             val rowColor = if (isCurrent) resolved.primaryContainer else resolved.surface
             root.background = GradientDrawable().apply {
                 setColor(rowColor.toArgb())
-                cornerRadius = context.dp(16).toFloat()
+                cornerRadius = root.context.dp(16).toFloat()
             }
             title.text = if (isCurrent) "▶ ${entry.song.title}" else entry.song.title
             artist.text = entry.song.artist
@@ -391,7 +391,7 @@ private class PracticalQueueAdapter(
             artwork.setImageResource(android.R.drawable.ic_menu_gallery)
             entry.song.albumArtUri?.let { uri ->
                 imageLoader.enqueue(
-                    ImageRequest.Builder(context)
+                    ImageRequest.Builder(root.context)
                         .data(uri)
                         .target(artwork)
                         .build()
