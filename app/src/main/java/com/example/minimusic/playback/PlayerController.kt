@@ -340,7 +340,12 @@ class PlayerController(private val context: Context) {
         }
 
         shuffleMutationInProgress = true
+        val previousShuffleActive = shuffleActive
         val enabled = !shuffleActive
+        // Publish the control state before the timeline work begins so the
+        // player button responds on the tap frame rather than after all moves.
+        shuffleActive = enabled
+        _uiState.value = _uiState.value.copy(isShuffled = enabled)
         val targetEntries = if (enabled) {
             freshShuffleEntries(c)
         } else {
@@ -357,12 +362,13 @@ class PlayerController(private val context: Context) {
                 runTimelineMutationSuspend {
                     reorderTimelineEntriesWithoutBlocking(c, targetEntries)
                     c.shuffleModeEnabled = false
-                    shuffleActive = enabled
                     syncQueueFromController()
                 }
             } catch (_: RuntimeException) {
                 // Keep the controller usable if Media3 rejects a transient move;
-                // the next callback will republish the authoritative timeline.
+                // restore the previous visual state and republish the timeline.
+                shuffleActive = previousShuffleActive
+                _uiState.value = _uiState.value.copy(isShuffled = previousShuffleActive)
                 syncQueueFromController()
             } finally {
                 shuffleMutationInProgress = false

@@ -19,6 +19,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.activity.compose.BackHandler
@@ -88,6 +89,40 @@ import kotlin.math.roundToInt
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
 val QueueDrawerCollapsedHeight = 48.dp
 private const val OPEN_FRACTION = 0.82f
+
+@Composable
+private fun QueueActionPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    contentDescription: String,
+    artColors: ArtColorRoles,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(50))
+            .background(artColors.primaryContainer)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(18.dp),
+            tint = artColors.onPrimaryContainer
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = artColors.onPrimaryContainer,
+            modifier = Modifier.padding(start = 7.dp)
+        )
+    }
+}
 
 /** Dedicated queue destination; the list is laid out below a fixed header. */
 @Composable
@@ -179,7 +214,8 @@ fun QueueScreen(
                 onEntryClick = onEntryClick,
                 onReorderEntries = onReorderEntries,
                 onRemoveEntry = onRemoveEntry,
-                locateRequest = locateRequest
+                locateRequest = locateRequest,
+                queueTopRequest = 0
             )
         }
     }
@@ -204,6 +240,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
     val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
     val offsetY = remember { Animatable(closedOffsetPx) }
     var locateRequest by remember { mutableStateOf(0) }
+    var queueTopRequest by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(isOpen, fullHeightPx) {
@@ -226,7 +263,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 .fillMaxSize()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                val headerHeight = if (isOpen) 88.dp else QueueDrawerCollapsedHeight
+                val headerHeight = if (isOpen) 102.dp else QueueDrawerCollapsedHeight
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -258,7 +295,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(top = if (isOpen) 8.dp else 6.dp, bottom = 4.dp)
+                            .padding(top = 6.dp, bottom = 4.dp)
                             .size(width = 36.dp, height = 4.dp)
                             .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                     )
@@ -266,23 +303,14 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
+                                .height(32.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            androidx.compose.material3.IconButton(
-                                onClick = onClearQueue,
-                                modifier = Modifier.size(40.dp)
+                            Row(
+                                modifier = Modifier.clickable { queueTopRequest++ },
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = "Clear queue",
-                                    modifier = Modifier.size(21.dp),
-                                    tint = artColors.onSurfaceVariant
-                                )
-                            }
-                            Spacer(modifier = Modifier.size(28.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Filled.QueueMusic,
                                     contentDescription = null,
@@ -296,18 +324,32 @@ fun BoxWithConstraintsScope.QueueDrawer(
                                     modifier = Modifier.padding(start = 6.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.size(28.dp))
-                            androidx.compose.material3.IconButton(
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            QueueActionPill(
+                                icon = Icons.Filled.Delete,
+                                label = "Clear",
+                                contentDescription = "Clear queue",
+                                artColors = artColors,
+                                onClick = onClearQueue,
+                                modifier = Modifier.weight(1f)
+                            )
+                            QueueActionPill(
+                                icon = Icons.Filled.MyLocation,
+                                label = "Locate",
+                                contentDescription = "Locate current song",
+                                artColors = artColors,
                                 onClick = { locateRequest++ },
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.MyLocation,
-                                    contentDescription = "Locate current song",
-                                    modifier = Modifier.size(21.dp),
-                                    tint = artColors.onSurfaceVariant
-                                )
-                            }
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     } else {
                         Box(
@@ -345,7 +387,8 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         },
                         onReorderEntries = onReorderEntries,
                         onRemoveEntry = onRemoveEntry,
-                        locateRequest = locateRequest
+                        locateRequest = locateRequest,
+                        queueTopRequest = queueTopRequest
                     )
                 }
             }
@@ -360,7 +403,8 @@ private fun ColumnScope.QueueDrawerList(
     onEntryClick: (Long) -> Unit,
     onReorderEntries: (List<Long>) -> Unit,
     onRemoveEntry: (Long) -> Unit,
-    locateRequest: Int
+    locateRequest: Int,
+    queueTopRequest: Int
 ) {
     val context = LocalContext.current
     val latestOnEntryClick by rememberUpdatedState(onEntryClick)
@@ -369,6 +413,7 @@ private fun ColumnScope.QueueDrawerList(
     val adapter = remember { PracticalQueueAdapter(context) }
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
     var previousLocateRequest by remember { mutableStateOf(0) }
+    var previousQueueTopRequest by remember { mutableStateOf(0) }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
     // boundary prevents rows from painting over the Queue title or controls.
@@ -387,12 +432,14 @@ private fun ColumnScope.QueueDrawerList(
     AndroidView(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f),
+            .weight(1f)
+            .clipToBounds(),
         factory = { viewContext ->
             val recyclerView = RecyclerView(viewContext).apply {
                 layoutManager = LinearLayoutManager(viewContext)
                 setHasFixedSize(true)
                 overScrollMode = View.OVER_SCROLL_NEVER
+                clipToPadding = true
             }
             val touchHelper = ItemTouchHelper(adapter.MoveCallback())
             adapter.startDrag = { holder -> touchHelper.startDrag(holder) }
@@ -422,6 +469,15 @@ private fun ColumnScope.QueueDrawerList(
                     val currentPosition = snapshot.resolvedCurrentPosition
                     if (currentPosition >= 0) {
                         layout.scrollToPositionWithOffset(currentPosition, 0)
+                    }
+                }
+            }
+            if (queueTopRequest != previousQueueTopRequest) {
+                previousQueueTopRequest = queueTopRequest
+                recyclerView.post {
+                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+                    if (adapter.itemCount > 0) {
+                        layout.scrollToPositionWithOffset(0, 0)
                     }
                 }
             }
