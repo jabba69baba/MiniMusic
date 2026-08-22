@@ -253,18 +253,7 @@ class PlayerController(private val context: Context) {
         if (targetEntries.size != currentQueueEntries.size) return
 
         runTimelineMutation {
-            val workingIds = (0 until c.mediaItemCount)
-                .map { index -> c.getMediaItemAt(index).mediaId }
-                .toMutableList()
-            targetEntries.forEachIndexed { targetIndex, entry ->
-                val fromIndex = workingIds.indexOf(entry.entryId.toString())
-                if (fromIndex >= 0 && fromIndex != targetIndex) {
-                    c.moveMediaItem(fromIndex, targetIndex)
-                    workingIds.add(targetIndex, workingIds.removeAt(fromIndex))
-                }
-            }
-            currentQueueEntries = targetEntries
-            currentQueue = targetEntries.map { it.song }
+            reorderTimelineEntries(c, targetEntries)
             refreshCurrentItem()
         }
     }
@@ -470,17 +459,23 @@ class PlayerController(private val context: Context) {
     }
 
     private fun reorderTimelineEntries(c: Player, targetEntries: List<QueueEntry>) {
-        if (targetEntries.size != c.mediaItemCount) return
-        val workingIds = (0 until c.mediaItemCount)
-            .map { index -> c.getMediaItemAt(index).mediaId }
-            .toMutableList()
-        targetEntries.forEachIndexed { targetIndex, entry ->
-            val fromIndex = workingIds.indexOf(entry.entryId.toString())
-            if (fromIndex >= 0 && fromIndex != targetIndex) {
-                c.moveMediaItem(fromIndex, targetIndex)
-                workingIds.add(targetIndex, workingIds.removeAt(fromIndex))
-            }
+        if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
+        val activeEntryId = resolveCurrentEntry(c)?.entryId
+        val targetIndex = activeEntryId?.let { id ->
+            targetEntries.indexOfFirst { it.entryId == id }
+        }?.takeIf { it >= 0 } ?: 0
+        val positionMs = c.currentPosition.coerceAtLeast(0L)
+        val wasPlaying = c.isPlaying
+        val mediaItems = targetEntries.map { entry ->
+            entry.song.toMediaItem(mediaId = entry.entryId.toString())
         }
+
+        // A single setMediaItems call avoids the transient index states produced by
+        // repeated moveMediaItem calls. The surrounding mutation guard defers all
+        // Media3 callbacks until this complete order is installed.
+        c.setMediaItems(mediaItems, targetIndex, positionMs)
+        c.prepare()
+        if (wasPlaying) c.play() else c.pause()
         currentQueueEntries = targetEntries
         currentQueue = targetEntries.map { it.song }
     }
