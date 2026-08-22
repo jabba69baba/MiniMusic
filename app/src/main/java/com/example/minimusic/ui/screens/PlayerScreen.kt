@@ -192,6 +192,7 @@ fun PlayerScreen(
     onQueueEntryClick: (Long) -> Unit = {},
     onReorderQueue: (List<Long>) -> Unit = {},
     onRemoveQueueEntry: (Long) -> Unit = {},
+    onClearQueue: () -> Unit = {},
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
@@ -301,7 +302,8 @@ fun PlayerScreen(
                 onOpenChange = { queueOpen = it },
                 onEntryClick = onQueueEntryClick,
                 onReorderEntries = onReorderQueue,
-                onRemoveEntry = onRemoveQueueEntry
+                onRemoveEntry = onRemoveQueueEntry,
+                onClearQueue = onClearQueue
             )
         }
     }

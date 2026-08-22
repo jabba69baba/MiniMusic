@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +67,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
+import com.example.minimusic.R
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -90,7 +94,8 @@ fun BoxWithConstraintsScope.QueueDrawer(
     onOpenChange: (Boolean) -> Unit,
     onEntryClick: (Long) -> Unit,
     onReorderEntries: (List<Long>) -> Unit,
-    onRemoveEntry: (Long) -> Unit
+    onRemoveEntry: (Long) -> Unit,
+    onClearQueue: () -> Unit
 ) {
     val density = LocalDensity.current
     val fullHeightPx = with(density) { maxHeight.toPx() }
@@ -99,6 +104,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
     val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
     val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
     val offsetY = remember { Animatable(closedOffsetPx) }
+    var locateRequest by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(isOpen, fullHeightPx) {
@@ -161,19 +167,53 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             .size(width = 36.dp, height = 4.dp)
                             .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.QueueMusic,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = artColors.onSurface
-                        )
-                        Text(
-                            text = "Queue",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = artColors.onSurface,
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        androidx.compose.material3.IconButton(
+                            onClick = {
+                                onClearQueue()
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "Clear queue",
+                                modifier = Modifier.size(21.dp),
+                                tint = artColors.onSurfaceVariant
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = artColors.onSurface
+                            )
+                            Text(
+                                text = "Queue",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = artColors.onSurface,
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                        androidx.compose.material3.IconButton(
+                            onClick = {
+                                locateRequest++
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MyLocation,
+                                contentDescription = "Locate current song",
+                                modifier = Modifier.size(21.dp),
+                                tint = artColors.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -187,7 +227,8 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             onOpenChange(false)
                         },
                         onReorderEntries = onReorderEntries,
-                        onRemoveEntry = onRemoveEntry
+                        onRemoveEntry = onRemoveEntry,
+                        locateRequest = locateRequest
                     )
                 }
             }
@@ -201,7 +242,8 @@ private fun ColumnScope.QueueDrawerList(
     artColors: ArtColorRoles,
     onEntryClick: (Long) -> Unit,
     onReorderEntries: (List<Long>) -> Unit,
-    onRemoveEntry: (Long) -> Unit
+    onRemoveEntry: (Long) -> Unit,
+    locateRequest: Int
 ) {
     val context = LocalContext.current
     val latestOnEntryClick by rememberUpdatedState(onEntryClick)
@@ -209,14 +251,21 @@ private fun ColumnScope.QueueDrawerList(
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
     val adapter = remember { PracticalQueueAdapter(context) }
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
+    var previousLocateRequest by remember { mutableStateOf(0) }
 
+    Spacer(modifier = Modifier.height(8.dp))
+    androidx.compose.material3.HorizontalDivider(
+        color = artColors.onSurfaceVariant.copy(alpha = 0.28f)
+    )
     if (snapshot.historyEntries.isNotEmpty()) {
         Text(
             text = "History",
             style = MaterialTheme.typography.labelLarge,
             color = artColors.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+    } else {
+        Spacer(modifier = Modifier.height(8.dp))
     }
 
     adapter.onEntryClick = latestOnEntryClick
@@ -252,6 +301,16 @@ private fun ColumnScope.QueueDrawerList(
                     if (currentPosition < 0) return@post
                     val lastVisible = layout.findLastVisibleItemPosition()
                     if (currentPosition > 0 && currentPosition >= lastVisible) {
+                        layout.scrollToPositionWithOffset(currentPosition, 0)
+                    }
+                }
+            }
+            if (locateRequest != previousLocateRequest) {
+                previousLocateRequest = locateRequest
+                recyclerView.post {
+                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+                    val currentPosition = snapshot.resolvedCurrentPosition
+                    if (currentPosition >= 0) {
                         layout.scrollToPositionWithOffset(currentPosition, 0)
                     }
                 }
@@ -426,8 +485,8 @@ private class PracticalQueueAdapter(
             textColumn.addView(artist)
             root.addView(textColumn)
 
-            close.layoutParams = LinearLayout.LayoutParams(context.dp(44), context.dp(44))
-            close.setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            close.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
+            close.setImageResource(R.drawable.ic_queue_remove)
             close.contentDescription = "Remove from queue"
             close.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             root.addView(close)
@@ -455,8 +514,10 @@ private class PracticalQueueAdapter(
                 root.context.dp(8),
                 root.context.dp(4)
             )
-            title.text = if (isCurrent) "▶ ${entry.song.title}" else entry.song.title
+            title.text = entry.song.title
             artist.text = entry.song.artist
+            title.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_medium))
+            artist.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_regular))
             title.setTextColor(resolved.onSurface.toArgb())
             artist.setTextColor(resolved.onSurfaceVariant.copy(alpha = if (isHistory) 0.65f else 1f).toArgb())
             title.textSize = 16f

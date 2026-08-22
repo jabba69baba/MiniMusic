@@ -275,6 +275,19 @@ class PlayerController(private val context: Context) {
         }
     }
 
+    /** Stops playback and empties the active queue without releasing the controller. */
+    fun clearQueue() {
+        val c = controller ?: return
+        c.stop()
+        c.clearMediaItems()
+        currentQueueEntries = emptyList()
+        currentQueue = emptyList()
+        shuffleActive = false
+        pendingSeekPositionMs = null
+        _queueSnapshot.value = QueueSnapshot()
+        _uiState.value = PlaybackUiState()
+    }
+
     /**
      * Inserts [song] immediately after the currently playing item, so it plays
      * right after the current track without disturbing the rest of the queue.
@@ -372,7 +385,10 @@ class PlayerController(private val context: Context) {
             // A new media item always starts its UI position at zero. Keeping a
             // prior seek target here makes the seekbar briefly rubberband to the
             // previous track before the ticker catches up.
-            pendingSeekPositionMs = 0L
+            // A media transition starts the new track at zero, but zero must not
+            // remain as a pending seek target while the new track progresses.
+            // Otherwise the ticker keeps rendering 0 after shuffle/reorder.
+            pendingSeekPositionMs = null
             _uiState.value = _uiState.value.copy(positionMs = 0L)
             holdPlaybackStateAcrossTransition()
             syncQueueFromController()
@@ -466,6 +482,9 @@ class PlayerController(private val context: Context) {
         }?.takeIf { it >= 0 } ?: 0
         val positionMs = c.currentPosition.coerceAtLeast(0L)
         val wasPlaying = c.isPlaying
+        // Queue reordering is not a seek operation; never carry an older seek
+        // preview into the newly installed timeline.
+        pendingSeekPositionMs = null
         val mediaItems = targetEntries.map { entry ->
             entry.song.toMediaItem(mediaId = entry.entryId.toString())
         }

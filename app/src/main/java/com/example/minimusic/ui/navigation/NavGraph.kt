@@ -136,6 +136,10 @@ fun MiniMusicNavGraph(
                 onQueueEntryClick = playerViewModel::playQueueEntry,
                 onReorderQueue = playerViewModel::reorderQueue,
                 onRemoveQueueEntry = playerViewModel::removeQueueEntry,
+                onClearQueue = {
+                    playerViewModel.clearQueue()
+                    navController.popBackStack(Routes.LIBRARY, inclusive = false)
+                },
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )
