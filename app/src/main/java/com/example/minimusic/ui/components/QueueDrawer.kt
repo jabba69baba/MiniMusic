@@ -117,26 +117,6 @@ fun BoxWithConstraintsScope.QueueDrawer(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxSize()
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = rememberDraggableState { delta ->
-                        val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
-                        scope.launch { offsetY.snapTo(newValue) }
-                    },
-                    startDragImmediately = true,
-                    onDragStopped = { velocity ->
-                        val shouldOpen = if (abs(velocity) > 800f) {
-                            velocity < 0f
-                        } else {
-                            offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
-                        }
-                        val target = if (shouldOpen) openOffsetPx else closedOffsetPx
-                        scope.launch {
-                            offsetY.animateTo(target, animationSpec = tween(240, easing = FastOutSlowInEasing))
-                        }
-                        onOpenChange(shouldOpen)
-                    }
-                )
         ) {
             Column(
                 modifier = Modifier
@@ -146,6 +126,29 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .draggable(
+                            orientation = Orientation.Vertical,
+                            state = rememberDraggableState { delta ->
+                                val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
+                                scope.launch { offsetY.snapTo(newValue) }
+                            },
+                            startDragImmediately = true,
+                            onDragStopped = { velocity ->
+                                val shouldOpen = if (abs(velocity) > 800f) {
+                                    velocity < 0f
+                                } else {
+                                    offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
+                                }
+                                val target = if (shouldOpen) openOffsetPx else closedOffsetPx
+                                scope.launch {
+                                    offsetY.animateTo(
+                                        target,
+                                        animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                                onOpenChange(shouldOpen)
+                            }
+                        )
                         .clickable { onOpenChange(!isOpen) }
                         .padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
