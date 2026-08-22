@@ -58,7 +58,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -474,8 +474,7 @@ private fun NowPlayingPanel(
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
-                .background(artColors.primaryContainer)
-                .clickable(onClick = onOpenLyrics),
+                .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
@@ -718,10 +717,10 @@ private fun NowPlayingPanel(
                     )
                     CapsuleSegment(
                         artColors = artColors,
-                        icon = Icons.Filled.Speed,
+                        icon = Icons.Filled.Subtitles,
                         active = false,
-                        contentDescription = "Playback speed",
-                        onClick = null,
+                        contentDescription = "Lyrics",
+                        onClick = onOpenLyrics,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -886,7 +885,7 @@ private fun CapsuleSegment(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     active: Boolean,
     contentDescription: String,
-    onClick: (() -> Unit)?,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -898,16 +897,10 @@ private fun CapsuleSegment(
                 if (active) artColors.primaryContainer
                 else Color.Transparent
             )
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onClick
-                    )
-                } else {
-                    Modifier
-                }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
             ),
         contentAlignment = Alignment.Center
     ) {
