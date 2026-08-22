@@ -64,6 +64,7 @@ dependencies {
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     // Media3 (ExoPlayer + MediaSession) for offline local playback
     implementation("androidx.media3:media3-exoplayer:1.5.1")

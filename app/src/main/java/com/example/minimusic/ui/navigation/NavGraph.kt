@@ -38,6 +38,7 @@ fun MiniMusicNavGraph(
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
     val playbackState by playerViewModel.uiState.collectAsState()
+    val queueSnapshot by playerViewModel.queueSnapshot.collectAsState()
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
 
@@ -122,6 +123,7 @@ fun MiniMusicNavGraph(
             val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
             PlayerScreen(
                 playbackState = playbackState,
+                queueSnapshot = queueSnapshot,
                 showLyricsInitially = appSettings.autoShowLyrics,
                 showAudioQualityBadge = appSettings.showAudioQualityBadge,
                 sleepTimerState = sleepTimerState,
@@ -134,6 +136,8 @@ fun MiniMusicNavGraph(
                 onCycleRepeat = playerViewModel::cycleRepeatMode,
                 onOpenLyrics = { navController.navigate(Routes.LYRICS) },
                 onQueueItemClick = playerViewModel::playFromQueue,
+                onMoveQueueEntry = playerViewModel::moveQueueEntry,
+                onRemoveQueueEntry = playerViewModel::removeQueueEntry,
                 onStartSleepTimer = playerViewModel::startSleepTimer,
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )

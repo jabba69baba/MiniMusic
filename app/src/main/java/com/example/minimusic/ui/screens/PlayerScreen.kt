@@ -103,6 +103,7 @@ import com.example.minimusic.data.AudioFormatInfo
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
+import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
@@ -167,7 +168,8 @@ private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 @Composable
 fun PlayerScreen(
     playbackState: PlaybackUiState,
-    showLyricsInitially: Boolean,
+    queueSnapshot: QueueSnapshot,
+    showLyricsInitially: Boolean = false,
     showAudioQualityBadge: Boolean = true,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
@@ -179,6 +181,8 @@ fun PlayerScreen(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onQueueItemClick: (Int) -> Unit,
+    onMoveQueueEntry: (Long, Int) -> Unit = { _, _ -> },
+    onRemoveQueueEntry: (Long) -> Unit = {},
     onStartSleepTimer: (Long) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {}
 ) {
@@ -289,12 +293,16 @@ fun PlayerScreen(
         // screen rather than a separate full-screen modal.
         if (queueSlotVisible) {
             QueueDrawer(
-                queue = playbackState.queue,
-                currentIndex = playbackState.currentIndex,
+                snapshot = queueSnapshot,
                 artColors = artColors,
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
-                onSongClick = onQueueItemClick
+                onEntryClick = { entryId ->
+                    val index = queueSnapshot.positionOf(entryId)
+                    if (index >= 0) onQueueItemClick(index)
+                },
+                onMoveEntry = onMoveQueueEntry,
+                onRemoveEntry = onRemoveQueueEntry
             )
         }
     }

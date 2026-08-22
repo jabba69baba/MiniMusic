@@ -8,6 +8,7 @@ import com.example.minimusic.data.LyricsReader
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.PlayerController
+import com.example.minimusic.playback.QueueSnapshot
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +36,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val lyricsReader: LyricsReader = (application as MainApplication).lyricsReader
 
     val uiState: StateFlow<PlaybackUiState> = controller.uiState
+    val queueSnapshot: StateFlow<QueueSnapshot> = controller.queueSnapshot
 
     private val _lyricsState = MutableStateFlow<LyricsState>(LyricsState.Idle)
     val lyricsState: StateFlow<LyricsState> = _lyricsState.asStateFlow()
@@ -71,6 +73,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun addToQueue(song: Song) = controller.addToQueue(song)
     fun playFromQueue(index: Int) = controller.playFromQueue(index)
     fun moveQueueItem(fromIndex: Int, toIndex: Int) = controller.moveQueueItem(fromIndex, toIndex)
+    fun moveQueueEntry(entryId: Long, toIndex: Int) = controller.moveQueueEntry(entryId, toIndex)
+    fun removeQueueEntry(entryId: Long) = controller.removeQueueEntry(entryId)
     fun togglePlayPause() = controller.togglePlayPause()
     fun skipToNext() = controller.skipToNext()
     fun skipToPrevious() = controller.skipToPrevious()

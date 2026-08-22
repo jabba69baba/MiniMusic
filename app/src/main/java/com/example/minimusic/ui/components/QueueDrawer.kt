@@ -1,5 +1,18 @@
 package com.example.minimusic.ui.components
 
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -10,25 +23,20 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,86 +48,66 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import coil.ImageLoader
+import coil.request.ImageRequest
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.playback.QueueEntry
+import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.ui.theme.ArtColorRoles
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** How far up the drawer sits when open, as a fraction of the available height. */
+/** Height of the always-visible collapsed bar (handle + "Queue" label). */
+val QueueDrawerCollapsedHeight = 48.dp
 private const val OPEN_FRACTION = 0.82f
 
-/** Height of the always-visible collapsed bar (handle + "Queue" label). */
-/** Height of the always-visible collapsed bar (handle + "Queue" label). Public so
- *  callers (e.g. PlayerScreen) can reserve matching bottom clearance for their
- *  own content above the drawer. */
-val QueueDrawerCollapsedHeight = 48.dp
-
-private const val ROW_HEIGHT_DP = 64
-
-/**
- * A queue sheet that lives inside the Player screen's own layout rather than
- * a separate full-screen modal. The album art and header stay put above it,
- * while the sheet slides over the lower portion of the screen. Collapsed, only
- * a slim handle and "Queue" bar are visible; tapping or swiping the sheet
- * reveals the stable, tap-to-play list. Queue rows intentionally do not
- * reorder or translate on long press.
- *
- * Must be placed inside a [Box] that fills the area the drawer should be able
- * to expand into (typically the whole Player screen content area).
- */
 @Composable
 fun BoxWithConstraintsScope.QueueDrawer(
-    queue: List<Song>,
-    currentIndex: Int,
+    snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
     isOpen: Boolean,
     onOpenChange: (Boolean) -> Unit,
-    onSongClick: (Int) -> Unit
+    onEntryClick: (Long) -> Unit,
+    onMoveEntry: (Long, Int) -> Unit,
+    onRemoveEntry: (Long) -> Unit
 ) {
     val density = LocalDensity.current
     val fullHeightPx = with(density) { maxHeight.toPx() }
     val collapsedBarHeightPx = with(density) { QueueDrawerCollapsedHeight.toPx() }
-    val navBarHeightPx = androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(density).toFloat()
+    val navBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
     val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
-    // The drawer's own Column already pads its content below the nav bar, but the
-    // *resting* (closed) position is calculated here against the full screen height
-    // before that inner padding applies — so the nav bar height is subtracted
-    // explicitly as well, or the collapsed bar visually sits underneath/behind it.
     val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
-
     val offsetY = remember { Animatable(closedOffsetPx) }
     val scope = rememberCoroutineScope()
 
-    // Keep the drawer's animated position in sync with isOpen when it changes
-    // from outside a drag (e.g. tapping the collapsed bar, or a song selection
-    // closing it).
-    androidx.compose.runtime.LaunchedEffect(isOpen, fullHeightPx) {
+    LaunchedEffect(isOpen, fullHeightPx) {
         val target = if (isOpen) openOffsetPx else closedOffsetPx
-        offsetY.animateTo(
-            target,
-            animationSpec = tween(280, easing = FastOutSlowInEasing)
-        )
+        offsetY.animateTo(target, animationSpec = tween(280, easing = FastOutSlowInEasing))
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            // This translated surface is the only gesture hit area. When the
-            // drawer is closed, only the visible collapsed queue bar is hit-testable;
-            // when open, the visible drawer content accepts downward drags.
-            .offset { IntOffset(x = 0, y = offsetY.value.roundToInt()) }
+            .offset { IntOffset(0, offsetY.value.roundToInt()) }
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -132,17 +120,11 @@ fun BoxWithConstraintsScope.QueueDrawer(
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
-                        // Track the finger directly; the surface is translated
-                        // during the drag, so the player behind it never receives
-                        // the gesture.
                         val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
                         scope.launch { offsetY.snapTo(newValue) }
                     },
                     startDragImmediately = true,
                     onDragStopped = { velocity ->
-                        // Always resolve to a fully open or fully closed target —
-                        // no resting position in between is ever allowed, which is
-                        // what previously let the drawer get stuck mid-drag.
                         val shouldOpen = if (abs(velocity) > 800f) {
                             velocity < 0f
                         } else {
@@ -150,10 +132,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         }
                         val target = if (shouldOpen) openOffsetPx else closedOffsetPx
                         scope.launch {
-                            offsetY.animateTo(
-                                target,
-                                animationSpec = tween(240, easing = FastOutSlowInEasing)
-                            )
+                            offsetY.animateTo(target, animationSpec = tween(240, easing = FastOutSlowInEasing))
                         }
                         onOpenChange(shouldOpen)
                     }
@@ -164,11 +143,6 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     .fillMaxSize()
                     .padding(bottom = 8.dp)
             ) {
-                // Collapsed bar: drag handle + icon + "Queue" label, always visible
-                // at the top of the drawer regardless of open/closed state —
-                // tapping it toggles, matching the slim bar in the collapsed
-                // reference. Extra bottom padding above keeps it clear of the
-                // system navigation bar rather than sitting flush against it.
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,8 +154,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         modifier = Modifier
                             .padding(top = 4.dp, bottom = 8.dp)
                             .size(width = 36.dp, height = 4.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f))
+                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -199,18 +172,17 @@ fun BoxWithConstraintsScope.QueueDrawer(
                     }
                 }
 
-                // Only render the stable list once the drawer is meaningfully
-                // open, so collapsed state never shows a row sliver.
                 val isSubstantiallyOpen = offsetY.value < closedOffsetPx - collapsedBarHeightPx / 2f
                 if (isSubstantiallyOpen) {
                     QueueDrawerList(
-                        queue = queue,
-                        currentIndex = currentIndex,
+                        snapshot = snapshot,
                         artColors = artColors,
-                        onSongClick = { index ->
-                            onSongClick(index)
+                        onEntryClick = {
+                            onEntryClick(it)
                             onOpenChange(false)
-                        }
+                        },
+                        onMoveEntry = onMoveEntry,
+                        onRemoveEntry = onRemoveEntry
                     )
                 }
             }
@@ -220,98 +192,245 @@ fun BoxWithConstraintsScope.QueueDrawer(
 
 @Composable
 private fun QueueDrawerList(
-    queue: List<Song>,
-    currentIndex: Int,
+    snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
-    onSongClick: (Int) -> Unit
+    onEntryClick: (Long) -> Unit,
+    onMoveEntry: (Long, Int) -> Unit,
+    onRemoveEntry: (Long) -> Unit
 ) {
-    val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val latestOnEntryClick by rememberUpdatedState(onEntryClick)
+    val latestOnMoveEntry by rememberUpdatedState(onMoveEntry)
+    val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
+    val adapter = remember { PracticalQueueAdapter(context) }
 
-    LaunchedEffect(queue, currentIndex) {
-        if (currentIndex in queue.indices) {
-            val currentVisible = listState.layoutInfo.visibleItemsInfo.any { it.index == currentIndex }
-            if (!currentVisible) {
-                listState.scrollToItem(currentIndex)
+    adapter.onEntryClick = latestOnEntryClick
+    adapter.onMoveEntry = latestOnMoveEntry
+    adapter.onRemoveEntry = latestOnRemoveEntry
+    adapter.artColors = artColors
+    adapter.submitSnapshot(snapshot)
+
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { viewContext ->
+            val recyclerView = RecyclerView(viewContext).apply {
+                layoutManager = LinearLayoutManager(viewContext)
+                setHasFixedSize(true)
+                overScrollMode = View.OVER_SCROLL_NEVER
             }
+            val touchHelper = ItemTouchHelper(adapter.MoveCallback())
+            adapter.startDrag = { holder -> touchHelper.startDrag(holder) }
+            recyclerView.adapter = adapter
+            touchHelper.attachToRecyclerView(recyclerView)
+            recyclerView
+        },
+        update = { recyclerView ->
+            recyclerView.itemAnimator = null
+            adapter.submitSnapshot(snapshot)
         }
-    }
-
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        itemsIndexed(queue, key = { _, song -> song.id }) { index, song ->
-            QueueDrawerRow(
-                song = song,
-                isCurrent = index == currentIndex,
-                artColors = artColors,
-                onClick = { onSongClick(index) }
-            )
-        }
-    }
+    )
 }
 
-@Composable
-private fun QueueDrawerRow(
-    song: Song,
-    isCurrent: Boolean,
-    artColors: ArtColorRoles,
-    onClick: () -> Unit
-) {
-    val containerColor = if (isCurrent) {
-        artColors.primaryContainer
-    } else {
-        artColors.surface.copy(alpha = 0.72f)
+private class PracticalQueueAdapter(
+    private val context: Context
+) : RecyclerView.Adapter<PracticalQueueAdapter.Holder>() {
+    private var entries: List<QueueEntry> = emptyList()
+    private var currentEntryId: Long? = null
+    private var currentPosition: Int = -1
+    private var isPlaying = false
+    var artColors: ArtColorRoles? = null
+    var onEntryClick: (Long) -> Unit = {}
+    var onMoveEntry: (Long, Int) -> Unit = { _, _ -> }
+    var onRemoveEntry: (Long) -> Unit = {}
+    var startDrag: ((RecyclerView.ViewHolder) -> Unit)? = null
+
+    init {
+        setHasStableIds(true)
     }
 
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = containerColor,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(ROW_HEIGHT_DP.dp)
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+    fun submitSnapshot(snapshot: QueueSnapshot) {
+        val oldIds = entries.map { it.entryId }
+        val newIds = snapshot.entries.map { it.entryId }
+        val orderChanged = oldIds != newIds
+        entries = snapshot.entries
+        currentEntryId = snapshot.currentEntryId
+        currentPosition = snapshot.resolvedCurrentPosition
+        if (orderChanged) notifyDataSetChanged()
+        else if (entries.isNotEmpty()) notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)
+    }
+
+    override fun getItemId(position: Int): Long = entries[position].entryId
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
+        Holder(context, artColors)
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        val entry = entries[position]
+        holder.bind(
+            entry = entry,
+            isCurrent = entry.entryId == currentEntryId ||
+                (currentEntryId == null && position == currentPosition),
+            isHistory = currentPosition >= 0 && position < currentPosition,
+            colors = artColors,
+            onClick = { onEntryClick(entry.entryId) },
+            onRemove = { onRemoveEntry(entry.entryId) },
+            onStartDrag = { startDrag?.invoke(holder) }
+        )
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty()) {
+            onBindViewHolder(holder, position)
+        } else {
+            onBindViewHolder(holder, position)
+        }
+    }
+
+    override fun getItemCount(): Int = entries.size
+
+    private fun moveLocal(from: Int, to: Int) {
+        if (from !in entries.indices || to !in entries.indices || from == to) return
+        val moved = entries.toMutableList().apply { add(to, removeAt(from)) }
+        entries = moved
+        notifyItemMoved(from, to)
+    }
+
+    inner class MoveCallback : ItemTouchHelper.Callback() {
+        override fun isLongPressDragEnabled(): Boolean = false
+        override fun isItemViewSwipeEnabled(): Boolean = false
+
+        override fun getMovementFlags(
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder
+        ): Int = makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
+
+        override fun onMove(
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder,
+            target: RecyclerView.ViewHolder
+        ): Boolean {
+            val from = viewHolder.bindingAdapterPosition
+            val to = target.bindingAdapterPosition
+            if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
+            val entryId = entries.getOrNull(from)?.entryId ?: return false
+            moveLocal(from, to)
+            onMoveEntry(entryId, to)
+            return true
+        }
+
+        override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) = Unit
+    }
+
+    class Holder(
+        context: Context,
+        initialColors: ArtColorRoles?
+    ) : RecyclerView.ViewHolder(LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = context.dp(64)
+        setPadding(context.dp(8), context.dp(4), context.dp(8), context.dp(4))
+    }) {
+        private val root = itemView as LinearLayout
+        private val handle = QueueHandleView(context)
+        private val artwork = ImageView(context)
+        private val title = TextView(context)
+        private val artist = TextView(context)
+        private val close = ImageButton(context)
+        private val textColumn = LinearLayout(context)
+        private val imageLoader = ImageLoader(context)
+
+        init {
+            handle.layoutParams = LinearLayout.LayoutParams(context.dp(32), ViewGroup.LayoutParams.MATCH_PARENT)
+            root.addView(handle)
+
+            artwork.layoutParams = LinearLayout.LayoutParams(context.dp(44), context.dp(44)).apply {
+                marginEnd = context.dp(8)
+            }
+            artwork.scaleType = ImageView.ScaleType.CENTER_CROP
+            root.addView(artwork)
+
+            textColumn.orientation = LinearLayout.VERTICAL
+            textColumn.gravity = Gravity.CENTER_VERTICAL
+            textColumn.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            title.maxLines = 1
+            title.ellipsize = TextUtils.TruncateAt.END
+            artist.maxLines = 1
+            artist.ellipsize = TextUtils.TruncateAt.END
+            textColumn.addView(title)
+            textColumn.addView(artist)
+            root.addView(textColumn)
+
+            close.layoutParams = LinearLayout.LayoutParams(context.dp(44), context.dp(44))
+            close.setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            close.contentDescription = "Remove from queue"
+            close.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            root.addView(close)
+        }
+
+        fun bind(
+            entry: QueueEntry,
+            isCurrent: Boolean,
+            isHistory: Boolean,
+            colors: ArtColorRoles?,
+            onClick: () -> Unit,
+            onRemove: () -> Unit,
+            onStartDrag: () -> Unit
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(artColors.secondaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    tint = artColors.onSecondaryContainer
-                )
-                AsyncImage(
-                    model = song.albumArtUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
+            val resolved = colors ?: return
+            val rowColor = if (isCurrent) resolved.primaryContainer else resolved.surface
+            root.background = GradientDrawable().apply {
+                setColor(rowColor.toArgb())
+                cornerRadius = context.dp(16).toFloat()
+            }
+            title.text = if (isCurrent) "▶ ${entry.song.title}" else entry.song.title
+            artist.text = entry.song.artist
+            title.setTextColor(resolved.onSurface.toArgb())
+            artist.setTextColor(resolved.onSurfaceVariant.copy(alpha = if (isHistory) 0.65f else 1f).toArgb())
+            title.textSize = 16f
+            artist.textSize = 14f
+            artwork.setImageResource(android.R.drawable.ic_menu_gallery)
+            entry.song.albumArtUri?.let { uri ->
+                imageLoader.enqueue(
+                    ImageRequest.Builder(context)
+                        .data(uri)
+                        .target(artwork)
+                        .build()
                 )
             }
+            handle.dotColor = resolved.onSurfaceVariant.toArgb()
+            handle.setOnTouchListener { _, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) onStartDrag()
+                false
+            }
+            close.setColorFilter(resolved.onSurfaceVariant.toArgb())
+            close.setOnClickListener { onRemove() }
+            root.setOnClickListener { onClick() }
+        }
+    }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = artColors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = artColors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+    private companion object {
+        const val PAYLOAD_STATE = "queue_state"
+    }
+}
+
+private class QueueHandleView(context: Context) : View(context) {
+    var dotColor: Int = android.graphics.Color.GRAY
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        paint.color = dotColor
+        val radius = context.dp(2).toFloat()
+        val xGap = context.dp(8).toFloat()
+        val yGap = context.dp(7).toFloat()
+        val startX = width / 2f - xGap / 2f
+        val startY = height / 2f - yGap
+        repeat(3) { row ->
+            repeat(2) { column ->
+                canvas.drawCircle(startX + column * xGap, startY + row * yGap, radius, paint)
             }
         }
     }
 }
+
+private fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()

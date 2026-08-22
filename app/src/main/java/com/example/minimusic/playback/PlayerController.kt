@@ -32,6 +32,10 @@ class PlayerController(private val context: Context) {
     private var connecting = false
     private var connectionGeneration = 0L
     private var currentQueue: List<Song> = emptyList()
+    private var currentQueueEntries: List<QueueEntry> = emptyList()
+    private var nextQueueEntryId = 1L
+    private var timelineMutationDepth = 0
+    private var syncRequestedAfterMutation = false
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
     }.thenBy { it.artist.trim().lowercase() }
@@ -44,6 +48,9 @@ class PlayerController(private val context: Context) {
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
+
+    private val _queueSnapshot = MutableStateFlow(QueueSnapshot())
+    val queueSnapshot: StateFlow<QueueSnapshot> = _queueSnapshot.asStateFlow()
 
     fun connect() {
         if (controller != null || connecting) return
@@ -90,9 +97,14 @@ class PlayerController(private val context: Context) {
             orderedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
         } ?: 0
 
-        currentQueue = orderedSongs
+        currentQueueEntries = orderedSongs.map { song ->
+            QueueEntry(entryId = nextQueueEntryId++, song = song)
+        }
+        currentQueue = currentQueueEntries.map { it.song }
         pendingSeekPositionMs = null
-        val mediaItems = orderedSongs.map { it.toMediaItem() }
+        val mediaItems = currentQueueEntries.map { entry ->
+            entry.song.toMediaItem(mediaId = entry.entryId.toString())
+        }
         c.setMediaItems(mediaItems, orderedStartIndex, 0L)
         c.prepare()
         c.play()
@@ -139,9 +151,17 @@ class PlayerController(private val context: Context) {
     }
 
     fun playFromQueue(index: Int) {
+        val entry = currentQueueEntries
+            .getOrNull(_uiState.value.queue.getOrNull(index)?.let { song ->
+                currentQueueEntries.indexOfFirst { it.song.id == song.id }
+            } ?: -1)
+            ?: return
+        playQueueEntry(entry.entryId)
+    }
+
+    fun playQueueEntry(entryId: Long) {
         val c = controller ?: return
-        val selectedSong = _uiState.value.queue.getOrNull(index) ?: return
-        val timelineIndex = currentQueue.indexOfFirst { it.id == selectedSong.id }
+        val timelineIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
         if (timelineIndex < 0) return
 
         holdPlaybackStateAcrossTransition()
@@ -150,23 +170,54 @@ class PlayerController(private val context: Context) {
         c.play()
     }
 
-    /**
-     * Moves the queue item at [fromIndex] to [toIndex], reordering both ExoPlayer's
-     * live timeline (so playback order actually changes) and the local [currentQueue]
-     * mirror (so the UI stays in sync). No-ops on an out-of-range index rather than
-     * throwing, since drag gestures can occasionally report a stale index mid-drag.
-     */
-    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+    /** Move a queue entry by stable identity, keeping Media3 and the local mirror aligned. */
+    fun moveQueueEntry(entryId: Long, toIndex: Int) {
         val c = controller ?: return
-        if (fromIndex == toIndex) return
-        if (fromIndex !in currentQueue.indices || toIndex !in currentQueue.indices) return
+        val fromIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
+        if (fromIndex < 0 || currentQueueEntries.isEmpty()) return
+        val destination = toIndex.coerceIn(currentQueueEntries.indices)
+        if (fromIndex == destination) return
 
-        c.moveMediaItem(fromIndex, toIndex)
-
-        currentQueue = currentQueue.toMutableList().apply {
-            add(toIndex, removeAt(fromIndex))
+        runTimelineMutation {
+            c.moveMediaItem(fromIndex, destination)
+            currentQueueEntries = currentQueueEntries.toMutableList().apply {
+                add(destination, removeAt(fromIndex))
+            }
+            currentQueue = currentQueueEntries.map { it.song }
+            refreshCurrentItem()
         }
-        refreshCurrentItem()
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        currentQueueEntries.getOrNull(fromIndex)?.let { entry ->
+            moveQueueEntry(entry.entryId, toIndex)
+        }
+    }
+
+    fun removeQueueEntry(entryId: Long) {
+        val c = controller ?: return
+        val removedPosition = currentQueueEntries.indexOfFirst { it.entryId == entryId }
+        if (removedPosition < 0) return
+        val wasCurrent = currentQueueEntries.getOrNull(c.currentMediaItemIndex)?.entryId == entryId
+        val nextPosition = when {
+            !wasCurrent -> -1
+            removedPosition + 1 < currentQueueEntries.size -> removedPosition + 1
+            c.repeatMode == Player.REPEAT_MODE_ALL && currentQueueEntries.size > 1 -> 0
+            else -> -1
+        }
+
+        runTimelineMutation {
+            c.removeMediaItem(removedPosition)
+            currentQueueEntries = currentQueueEntries.toMutableList().apply { removeAt(removedPosition) }
+            currentQueue = currentQueueEntries.map { it.song }
+            if (wasCurrent && nextPosition >= 0 && currentQueueEntries.isNotEmpty()) {
+                val adjustedPosition = if (nextPosition > removedPosition) nextPosition - 1 else nextPosition
+                holdPlaybackStateAcrossTransition()
+                c.seekTo(adjustedPosition.coerceAtMost(currentQueueEntries.lastIndex), 0L)
+                c.play()
+            }
+            refreshCurrentItem()
+        }
     }
 
     /**
@@ -180,9 +231,11 @@ class PlayerController(private val context: Context) {
             playQueue(listOf(song), 0)
             return
         }
-        val insertAt = (c.currentMediaItemIndex + 1).coerceIn(0, currentQueue.size)
-        c.addMediaItem(insertAt, song.toMediaItem())
-        currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
+        val insertAt = (c.currentMediaItemIndex + 1).coerceIn(0, currentQueueEntries.size)
+        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
+        c.addMediaItem(insertAt, song.toMediaItem(mediaId = entry.entryId.toString()))
+        currentQueueEntries = currentQueueEntries.toMutableList().apply { add(insertAt, entry) }
+        currentQueue = currentQueueEntries.map { it.song }
         refreshCurrentItem()
     }
 
@@ -196,8 +249,13 @@ class PlayerController(private val context: Context) {
             playQueue(listOf(song), 0)
             return
         }
-        c.addMediaItem(song.toMediaItem())
-        currentQueue = currentQueue + song
+        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
+        c.addMediaItem(
+            currentQueueEntries.size,
+            song.toMediaItem(mediaId = entry.entryId.toString())
+        )
+        currentQueueEntries = currentQueueEntries + entry
+        currentQueue = currentQueueEntries.map { it.song }
         refreshCurrentItem()
     }
 
@@ -275,6 +333,10 @@ class PlayerController(private val context: Context) {
     }
 
     private fun syncQueueFromController() {
+        if (timelineMutationDepth > 0) {
+            syncRequestedAfterMutation = true
+            return
+        }
         val c = controller ?: return
         if (normalizingTimeline) {
             refreshCurrentItem()
@@ -282,14 +344,13 @@ class PlayerController(private val context: Context) {
         }
 
         if (c.mediaItemCount > 0 && currentQueue.isNotEmpty()) {
-            val songsByMediaId = currentQueue.associateBy { it.id.toString() }
-            val controllerSongs = (0 until c.mediaItemCount).mapNotNull { itemIndex ->
-                songsByMediaId[c.getMediaItemAt(itemIndex).mediaId]
+            val entriesByMediaId = currentQueueEntries.associateBy { it.entryId.toString() }
+            val controllerEntries = (0 until c.mediaItemCount).mapNotNull { itemIndex ->
+                entriesByMediaId[c.getMediaItemAt(itemIndex).mediaId]
             }
-            if (controllerSongs.size == c.mediaItemCount) {
-                val controllerIds = controllerSongs.map { it.id }.toSet()
-                currentQueue = currentQueue.filter { it.id in controllerIds } +
-                    controllerSongs.filterNot { song -> currentQueue.any { it.id == song.id } }
+            if (controllerEntries.size == c.mediaItemCount) {
+                currentQueueEntries = controllerEntries
+                currentQueue = controllerEntries.map { it.song }
             }
         }
 
@@ -297,16 +358,32 @@ class PlayerController(private val context: Context) {
         refreshCurrentItem()
     }
 
+    private fun runTimelineMutation(block: () -> Unit) {
+        timelineMutationDepth += 1
+        try {
+            block()
+        } finally {
+            timelineMutationDepth -= 1
+            if (timelineMutationDepth == 0 && syncRequestedAfterMutation) {
+                syncRequestedAfterMutation = false
+                syncQueueFromController()
+            }
+        }
+    }
+
     private fun normalizeTimelineAlphabetically(c: Player?) {
         if (c == null || c.mediaItemCount < 2 || normalizingTimeline) return
-        val sortedSongs = currentQueue.sortedWith(alphabeticalSongComparator)
-        if (sortedSongs.size != c.mediaItemCount) return
+        val sortedEntries = currentQueueEntries.sortedWith(compareBy<QueueEntry> {
+            it.song.title.trim().lowercase()
+        }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
+        if (sortedEntries.size != c.mediaItemCount) return
 
-        val targetIds = sortedSongs.map { it.id.toString() }
+        val targetIds = sortedEntries.map { it.entryId.toString() }
         val currentIds = (0 until c.mediaItemCount)
             .map { index -> c.getMediaItemAt(index).mediaId }
         if (currentIds == targetIds) {
-            currentQueue = sortedSongs
+            currentQueueEntries = sortedEntries
+            currentQueue = sortedEntries.map { it.song }
             return
         }
 
@@ -320,7 +397,8 @@ class PlayerController(private val context: Context) {
                     workingIds.add(targetIndex, workingIds.removeAt(fromIndex))
                 }
             }
-            currentQueue = sortedSongs
+            currentQueueEntries = sortedEntries
+            currentQueue = sortedEntries.map { it.song }
         } finally {
             normalizingTimeline = false
         }
@@ -333,7 +411,7 @@ class PlayerController(private val context: Context) {
             return currentQueue to -1
         }
 
-        val songsByMediaId = currentQueue.associateBy { it.id.toString() }
+        val entriesByMediaId = currentQueueEntries.associateBy { it.entryId.toString() }
         val displaySongs = mutableListOf<Song>()
         val visitedTimelineIndices = mutableSetOf<Int>()
         var timelineIndex = currentTimelineIndex
@@ -343,7 +421,7 @@ class PlayerController(private val context: Context) {
             timelineIndex in 0 until c.mediaItemCount &&
             visitedTimelineIndices.add(timelineIndex)
         ) {
-            songsByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.let(displaySongs::add)
+            entriesByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.song?.let(displaySongs::add)
             val displayRepeatMode = if (c.repeatMode == Player.REPEAT_MODE_ONE) {
                 Player.REPEAT_MODE_OFF
             } else {
@@ -361,9 +439,15 @@ class PlayerController(private val context: Context) {
 
     private fun refreshCurrentItem() {
         val c = controller ?: return
-        val currentTimelineIndex = c.currentMediaItemIndex
-        val currentSong = currentQueue.getOrNull(currentTimelineIndex)
+        val currentEntry = resolveCurrentEntry(c)
+        val currentTimelineIndex = currentEntry?.let { currentQueueEntries.indexOf(it) } ?: -1
+        val currentSong = currentEntry?.song
         val (displayQueue, displayIndex) = playbackQueueForDisplay(c)
+        _queueSnapshot.value = QueueSnapshot(
+            entries = currentQueueEntries,
+            currentPosition = currentTimelineIndex.takeIf { it in currentQueueEntries.indices } ?: -1,
+            currentEntryId = currentEntry?.entryId
+        )
         _uiState.value = _uiState.value.copy(
             currentSong = currentSong,
             queue = displayQueue,
@@ -376,6 +460,12 @@ class PlayerController(private val context: Context) {
             },
             durationMs = c.duration.coerceAtLeast(0L)
         )
+    }
+
+    private fun resolveCurrentEntry(c: Player): QueueEntry? {
+        val mediaId = c.currentMediaItem?.mediaId
+        return currentQueueEntries.firstOrNull { it.entryId.toString() == mediaId }
+            ?: currentQueueEntries.getOrNull(c.currentMediaItemIndex)
     }
 
     private fun startPositionTicker() {
@@ -407,9 +497,9 @@ class PlayerController(private val context: Context) {
         }
     }
 
-    private fun Song.toMediaItem(): MediaItem =
+    private fun Song.toMediaItem(mediaId: String = id.toString()): MediaItem =
         MediaItem.Builder()
-            .setMediaId(id.toString())
+            .setMediaId(mediaId)
             .setUri(contentUri)
             .setMediaMetadata(
                 MediaMetadata.Builder()
