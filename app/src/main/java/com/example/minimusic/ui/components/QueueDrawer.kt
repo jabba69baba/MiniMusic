@@ -245,6 +245,8 @@ private class PracticalQueueAdapter(
     private var currentEntryId: Long? = null
     private var currentPosition: Int = -1
     private var isPlaying = false
+    private var isDragging = false
+    private var deferredSnapshot: QueueSnapshot? = null
     var artColors: ArtColorRoles? = null
     var onEntryClick: (Long) -> Unit = {}
     var onMoveEntry: (Long, Int) -> Unit = { _, _ -> }
@@ -256,6 +258,10 @@ private class PracticalQueueAdapter(
     }
 
     fun submitSnapshot(snapshot: QueueSnapshot) {
+        if (isDragging) {
+            deferredSnapshot = snapshot
+            return
+        }
         val oldIds = entries.map { it.entryId }
         val newIds = snapshot.visibleEntries.map { it.entryId }
         val orderChanged = oldIds != newIds
@@ -299,6 +305,19 @@ private class PracticalQueueAdapter(
 
     override fun getItemCount(): Int = entries.size
 
+    fun beginDrag() {
+        isDragging = true
+        deferredSnapshot = null
+    }
+
+    fun endDrag() {
+        isDragging = false
+        deferredSnapshot?.let {
+            deferredSnapshot = null
+            submitSnapshot(it)
+        }
+    }
+
     private fun moveLocal(from: Int, to: Int) {
         if (from !in entries.indices || to !in entries.indices || from == to) return
         val moved = entries.toMutableList().apply { add(to, removeAt(from)) }
@@ -314,6 +333,16 @@ private class PracticalQueueAdapter(
             recyclerView: RecyclerView,
             viewHolder: RecyclerView.ViewHolder
         ): Int = makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
+
+        override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+            super.onSelectedChanged(viewHolder, actionState)
+            if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) beginDrag()
+        }
+
+        override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+            super.clearView(recyclerView, viewHolder)
+            endDrag()
+        }
 
         override fun onMove(
             recyclerView: RecyclerView,
@@ -337,6 +366,10 @@ private class PracticalQueueAdapter(
         initialColors: ArtColorRoles?
     ) : RecyclerView.ViewHolder(LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
+        layoutParams = RecyclerView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            context.dp(72)
+        )
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = context.dp(64)
         setPadding(context.dp(8), context.dp(4), context.dp(8), context.dp(4))

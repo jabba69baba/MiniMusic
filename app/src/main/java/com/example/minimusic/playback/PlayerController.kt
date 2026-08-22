@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 /**
  * Single point of contact between the UI layer and the MediaController connected to
@@ -36,6 +37,7 @@ class PlayerController(private val context: Context) {
     private var nextQueueEntryId = 1L
     private var timelineMutationDepth = 0
     private var syncRequestedAfterMutation = false
+    private var shuffleMutationInProgress = false
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
     }.thenBy { it.artist.trim().lowercase() }
@@ -259,10 +261,27 @@ class PlayerController(private val context: Context) {
 
     fun toggleShuffle() {
         val c = controller ?: return
-        val enabled = !c.shuffleModeEnabled
-        c.shuffleModeEnabled = enabled
-        if (!enabled) normalizeTimelineAlphabetically(c)
-        syncQueueFromController()
+        if (shuffleMutationInProgress || c.mediaItemCount < 2) return
+        if (currentQueueEntries.size != c.mediaItemCount) {
+            syncQueueFromController()
+            if (currentQueueEntries.size != c.mediaItemCount) return
+        }
+        shuffleMutationInProgress = true
+        try {
+            val enabled = !c.shuffleModeEnabled
+            runTimelineMutation {
+                if (enabled) {
+                    rebuildTimelineForFreshShuffle(c)
+                    c.shuffleModeEnabled = true
+                } else {
+                    c.shuffleModeEnabled = false
+                    normalizeTimelineAlphabetically(c)
+                }
+                syncQueueFromController()
+            }
+        } finally {
+            shuffleMutationInProgress = false
+        }
     }
 
     fun cycleRepeatMode() {
@@ -302,7 +321,9 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            if (!shuffleModeEnabled) normalizeTimelineAlphabetically(controller)
+            // The command above owns the mutation transaction. This callback may be
+            // synchronous on some Media3 versions, so never normalize or publish a
+            // partially-mutated timeline from inside the callback.
             syncQueueFromController()
         }
 
@@ -369,8 +390,37 @@ class PlayerController(private val context: Context) {
         }
     }
 
+    private fun rebuildTimelineForFreshShuffle(c: Player) {
+        val activeEntry = resolveCurrentEntry(c)
+        val activeIndex = c.currentMediaItemIndex.coerceIn(0, currentQueueEntries.lastIndex)
+        val randomizedEntries = currentQueueEntries
+            .shuffled(Random(System.nanoTime().toInt()))
+            .toMutableList()
+        activeEntry?.let { active ->
+            randomizedEntries.removeAll { it.entryId == active.entryId }
+            randomizedEntries.add(activeIndex, active)
+        }
+
+        val workingIds = (0 until c.mediaItemCount)
+            .map { index -> c.getMediaItemAt(index).mediaId }
+            .toMutableList()
+        randomizedEntries.forEachIndexed { targetIndex, entry ->
+            val fromIndex = workingIds.indexOf(entry.entryId.toString())
+            if (fromIndex >= 0 && fromIndex != targetIndex) {
+                c.moveMediaItem(fromIndex, targetIndex)
+                workingIds.add(targetIndex, workingIds.removeAt(fromIndex))
+            }
+        }
+        currentQueueEntries = randomizedEntries
+        currentQueue = randomizedEntries.map { it.song }
+    }
+
     private fun normalizeTimelineAlphabetically(c: Player?) {
         if (c == null || c.mediaItemCount < 2 || normalizingTimeline) return
+        if (timelineMutationDepth == 0) {
+            runTimelineMutation { normalizeTimelineAlphabetically(c) }
+            return
+        }
         val sortedEntries = currentQueueEntries.sortedWith(compareBy<QueueEntry> {
             it.song.title.trim().lowercase()
         }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
