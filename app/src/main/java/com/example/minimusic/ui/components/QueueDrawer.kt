@@ -208,6 +208,7 @@ private fun ColumnScope.QueueDrawerList(
     val latestOnReorderEntries by rememberUpdatedState(onReorderEntries)
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
     val adapter = remember { PracticalQueueAdapter(context) }
+    var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
 
     if (snapshot.historyEntries.isNotEmpty()) {
         Text(
@@ -243,6 +244,18 @@ private fun ColumnScope.QueueDrawerList(
         update = { recyclerView ->
             recyclerView.itemAnimator = null
             adapter.submitSnapshot(snapshot)
+            if (snapshot.currentEntryId != previousCurrentEntryId) {
+                previousCurrentEntryId = snapshot.currentEntryId
+                recyclerView.post {
+                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+                    val currentPosition = snapshot.resolvedCurrentPosition
+                    if (currentPosition < 0) return@post
+                    val lastVisible = layout.findLastVisibleItemPosition()
+                    if (currentPosition > 0 && currentPosition >= lastVisible) {
+                        layout.scrollToPositionWithOffset(currentPosition, 0)
+                    }
+                }
+            }
         }
     )
 }
