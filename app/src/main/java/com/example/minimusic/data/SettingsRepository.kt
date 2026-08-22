@@ -14,7 +14,6 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 data class AppSettings(
     val dynamicColorEnabled: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val autoShowLyrics: Boolean = false,
     val resumeOnLaunch: Boolean = true,
     val minDurationSeconds: Int = 20,
     val showAudioQualityBadge: Boolean = true
@@ -31,7 +30,6 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color_enabled")
         val THEME_MODE = stringPreferencesKey("theme_mode")
-        val AUTO_SHOW_LYRICS = booleanPreferencesKey("auto_show_lyrics")
         val RESUME_ON_LAUNCH = booleanPreferencesKey("resume_on_launch")
         val MIN_DURATION_SECONDS = intPreferencesKey("min_duration_seconds")
         val SHOW_AUDIO_QUALITY_BADGE = booleanPreferencesKey("show_audio_quality_badge")
@@ -42,7 +40,6 @@ class SettingsRepository(private val context: Context) {
             dynamicColorEnabled = prefs[Keys.DYNAMIC_COLOR] ?: true,
             themeMode = prefs[Keys.THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                 ?: ThemeMode.SYSTEM,
-            autoShowLyrics = prefs[Keys.AUTO_SHOW_LYRICS] ?: false,
             resumeOnLaunch = prefs[Keys.RESUME_ON_LAUNCH] ?: true,
             minDurationSeconds = prefs[Keys.MIN_DURATION_SECONDS] ?: 20,
             showAudioQualityBadge = prefs[Keys.SHOW_AUDIO_QUALITY_BADGE] ?: true
@@ -57,9 +54,6 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[Keys.THEME_MODE] = mode.name }
     }
 
-    suspend fun setAutoShowLyrics(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.AUTO_SHOW_LYRICS] = enabled }
-    }
 
     suspend fun setResumeOnLaunch(enabled: Boolean) {
         context.dataStore.edit { it[Keys.RESUME_ON_LAUNCH] = enabled }

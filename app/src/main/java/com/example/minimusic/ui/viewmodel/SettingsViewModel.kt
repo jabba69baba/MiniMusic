@@ -32,10 +32,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         repository.setThemeMode(mode)
     }
 
-    fun setAutoShowLyrics(enabled: Boolean) = viewModelScope.launch {
-        repository.setAutoShowLyrics(enabled)
-    }
-
     fun setResumeOnLaunch(enabled: Boolean) = viewModelScope.launch {
         repository.setResumeOnLaunch(enabled)
     }

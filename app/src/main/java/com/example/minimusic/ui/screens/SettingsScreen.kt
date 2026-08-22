@@ -45,7 +45,6 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
-    onAutoShowLyricsChange: (Boolean) -> Unit,
     onResumeOnLaunchChange: (Boolean) -> Unit,
     onShowAudioQualityBadgeChange: (Boolean) -> Unit,
     onMinDurationChange: (Int) -> Unit,
@@ -95,14 +94,6 @@ fun SettingsScreen(
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp)) }
 
             item { SectionHeader("Player", Icons.Filled.MusicNote) }
-            item {
-                SettingsSwitchRow(
-                    title = "Open lyrics automatically",
-                    subtitle = "Show the lyrics panel by default when opening a track",
-                    checked = settings.autoShowLyrics,
-                    onCheckedChange = onAutoShowLyricsChange
-                )
-            }
             item {
                 SettingsSwitchRow(
                     title = "Resume on launch",

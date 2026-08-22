@@ -58,7 +58,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -178,7 +178,6 @@ private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
 fun PlayerScreen(
     playbackState: PlaybackUiState,
     queueSnapshot: QueueSnapshot,
-    showLyricsInitially: Boolean = false,
     showAudioQualityBadge: Boolean = true,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
@@ -197,7 +196,6 @@ fun PlayerScreen(
     onCancelSleepTimer: () -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
-    var autoOpenedLyrics by remember(song.id) { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
     val targetArtColors = rememberArtColorRoles(song.albumArtUri)
     val artColors = animateArtColorRoles(targetArtColors)
@@ -217,12 +215,6 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(song.id, showLyricsInitially) {
-        if (showLyricsInitially && !autoOpenedLyrics) {
-            autoOpenedLyrics = true
-            onOpenLyrics()
-        }
-    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -482,7 +474,8 @@ private fun NowPlayingPanel(
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
-                .background(artColors.primaryContainer),
+                .background(artColors.primaryContainer)
+                .clickable(onClick = onOpenLyrics),
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
@@ -709,14 +702,6 @@ private fun NowPlayingPanel(
                 Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
                     CapsuleSegment(
                         artColors = artColors,
-                        icon = Icons.Filled.Shuffle,
-                        active = playbackState.isShuffled,
-                        contentDescription = "Shuffle",
-                        onClick = onToggleShuffle,
-                        modifier = Modifier.weight(1f)
-                    )
-                    CapsuleSegment(
-                        artColors = artColors,
                         icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
@@ -725,10 +710,18 @@ private fun NowPlayingPanel(
                     )
                     CapsuleSegment(
                         artColors = artColors,
-                        icon = Icons.Filled.Subtitles,
+                        icon = Icons.Filled.Shuffle,
+                        active = playbackState.isShuffled,
+                        contentDescription = "Shuffle",
+                        onClick = onToggleShuffle,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CapsuleSegment(
+                        artColors = artColors,
+                        icon = Icons.Filled.Speed,
                         active = false,
-                        contentDescription = "Lyrics",
-                        onClick = onOpenLyrics,
+                        contentDescription = "Playback speed",
+                        onClick = null,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -893,7 +886,7 @@ private fun CapsuleSegment(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     active: Boolean,
     contentDescription: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -905,10 +898,16 @@ private fun CapsuleSegment(
                 if (active) artColors.primaryContainer
                 else Color.Transparent
             )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
