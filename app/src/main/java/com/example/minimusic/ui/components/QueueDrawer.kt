@@ -89,7 +89,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
     isOpen: Boolean,
     onOpenChange: (Boolean) -> Unit,
     onEntryClick: (Long) -> Unit,
-    onMoveEntry: (Long, Int) -> Unit,
+    onReorderEntries: (List<Long>) -> Unit,
     onRemoveEntry: (Long) -> Unit
 ) {
     val density = LocalDensity.current
@@ -186,7 +186,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             onEntryClick(it)
                             onOpenChange(false)
                         },
-                        onMoveEntry = onMoveEntry,
+                        onReorderEntries = onReorderEntries,
                         onRemoveEntry = onRemoveEntry
                     )
                 }
@@ -200,12 +200,12 @@ private fun ColumnScope.QueueDrawerList(
     snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
     onEntryClick: (Long) -> Unit,
-    onMoveEntry: (Long, Int) -> Unit,
+    onReorderEntries: (List<Long>) -> Unit,
     onRemoveEntry: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val latestOnEntryClick by rememberUpdatedState(onEntryClick)
-    val latestOnMoveEntry by rememberUpdatedState(onMoveEntry)
+    val latestOnReorderEntries by rememberUpdatedState(onReorderEntries)
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
     val adapter = remember { PracticalQueueAdapter(context) }
 
@@ -219,7 +219,7 @@ private fun ColumnScope.QueueDrawerList(
     }
 
     adapter.onEntryClick = latestOnEntryClick
-    adapter.onMoveEntry = latestOnMoveEntry
+    adapter.onReorderEntries = latestOnReorderEntries
     adapter.onRemoveEntry = latestOnRemoveEntry
     adapter.artColors = artColors
     adapter.submitSnapshot(snapshot)
@@ -258,7 +258,7 @@ private class PracticalQueueAdapter(
     private var deferredSnapshot: QueueSnapshot? = null
     var artColors: ArtColorRoles? = null
     var onEntryClick: (Long) -> Unit = {}
-    var onMoveEntry: (Long, Int) -> Unit = { _, _ -> }
+    var onReorderEntries: (List<Long>) -> Unit = {}
     var onRemoveEntry: (Long) -> Unit = {}
     var startDrag: ((RecyclerView.ViewHolder) -> Unit)? = null
 
@@ -271,16 +271,15 @@ private class PracticalQueueAdapter(
             deferredSnapshot = snapshot
             return
         }
-        val displayEntries = snapshot.historyEntries + snapshot.visibleEntries
+        val displayEntries = snapshot.visibleEntries
         val oldIds = entries.map { it.entryId }
         val newIds = displayEntries.map { it.entryId }
         val orderChanged = oldIds != newIds
-        val displayCurrentPosition = snapshot.historyEntries.size + snapshot.resolvedVisiblePosition
         val stateChanged = currentEntryId != snapshot.currentEntryId ||
-            currentPosition != displayCurrentPosition
+            currentPosition != snapshot.resolvedCurrentPosition
         entries = displayEntries
         currentEntryId = snapshot.currentEntryId
-        currentPosition = displayCurrentPosition
+        currentPosition = snapshot.resolvedCurrentPosition
         if (orderChanged) notifyDataSetChanged()
         else if (stateChanged && entries.isNotEmpty()) {
             notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)
@@ -352,6 +351,7 @@ private class PracticalQueueAdapter(
 
         override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
             super.clearView(recyclerView, viewHolder)
+            onReorderEntries(entries.map { it.entryId })
             endDrag()
         }
 
@@ -363,9 +363,7 @@ private class PracticalQueueAdapter(
             val from = viewHolder.bindingAdapterPosition
             val to = target.bindingAdapterPosition
             if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
-            val entryId = entries.getOrNull(from)?.entryId ?: return false
             moveLocal(from, to)
-            onMoveEntry(entryId, to)
             return true
         }
 

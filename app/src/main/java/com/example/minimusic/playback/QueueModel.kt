@@ -17,9 +17,9 @@ data class QueueSnapshot(
     val entries: List<QueueEntry> = emptyList(),
     val currentPosition: Int = -1,
     val currentEntryId: Long? = null,
-    /** Entries that have already played in oldest-to-newest order. */
+    /** Entries before the active entry in the complete ordered queue. */
     val historyEntries: List<QueueEntry> = emptyList(),
-    /** Playback order shown by the queue UI: current item followed by actual upcoming items. */
+    /** Complete ordered queue rendered by the UI; current position is derived from currentEntryId. */
     val visibleEntries: List<QueueEntry> = entries
 ) {
     init {
@@ -30,7 +30,6 @@ data class QueueSnapshot(
         require(historyEntries.all { history -> entries.any { it.entryId == history.entryId } })
         require(visibleEntries.map { it.entryId }.distinct().size == visibleEntries.size)
         require(visibleEntries.all { visible -> entries.any { it.entryId == visible.entryId } })
-        require(historyEntries.none { history -> visibleEntries.any { it.entryId == history.entryId } })
     }
 
     val resolvedCurrentPosition: Int
@@ -64,15 +63,14 @@ data class QueueSnapshot(
             sourcePosition > currentPosition && destination <= currentPosition -> currentPosition + 1
             else -> currentPosition
         }
-        val movedVisibleEntries = if (visibleEntries.map { it.entryId } == entries.map { it.entryId }) {
-            movedEntries
-        } else {
-            visibleEntries
-        }
+        val movedCurrentPosition = currentEntryId?.let { id ->
+            movedEntries.indexOfFirst { it.entryId == id }
+        }?.takeIf { it >= 0 } ?: movedPosition
         return copy(
             entries = movedEntries,
-            currentPosition = movedPosition,
-            visibleEntries = movedVisibleEntries
+            currentPosition = movedCurrentPosition,
+            historyEntries = movedEntries.take(movedCurrentPosition.coerceAtLeast(0)),
+            visibleEntries = movedEntries
         )
     }
 
@@ -100,12 +98,13 @@ data class QueueSnapshot(
             nextPosition >= 0 -> remaining[nextPosition].entryId
             else -> null
         }
-        val remainingVisibleEntries = visibleEntries.filterNot { it.entryId == entryId }
+        val remainingHistory = remaining.take(nextPosition.coerceAtLeast(0))
         return copy(
             entries = remaining,
             currentPosition = nextPosition,
             currentEntryId = nextCurrentId,
-            visibleEntries = remainingVisibleEntries
+            historyEntries = remainingHistory,
+            visibleEntries = remaining
         )
     }
 }

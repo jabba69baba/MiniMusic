@@ -78,6 +78,41 @@ class QueueModelTest {
     }
 
     @Test
+    fun `history is the complete prefix when current is selected deep in queue`() {
+        val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
+        val snapshot = QueueSnapshot(
+            entries = entries,
+            currentPosition = 4,
+            currentEntryId = 4L,
+            historyEntries = entries.take(4),
+            visibleEntries = entries
+        )
+
+        assertEquals(listOf(0L, 1L, 2L, 3L), snapshot.historyEntries.map { it.entryId })
+        assertEquals(listOf(0L, 1L, 2L, 3L, 4L), snapshot.visibleEntries.map { it.entryId })
+        assertEquals(4, snapshot.resolvedVisiblePosition)
+    }
+
+    @Test
+    fun `moving an entry across current keeps every entry and recomputes history`() {
+        val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
+        val snapshot = QueueSnapshot(
+            entries = entries,
+            currentPosition = 2,
+            currentEntryId = 2L,
+            historyEntries = entries.take(2),
+            visibleEntries = entries
+        )
+
+        val moved = snapshot.moveEntry(0L, 4)
+
+        assertEquals(listOf(1L, 2L, 3L, 4L, 0L), moved.entries.map { it.entryId })
+        assertEquals(1, moved.resolvedCurrentPosition)
+        assertEquals(listOf(1L), moved.historyEntries.map { it.entryId })
+        assertEquals(moved.entries, moved.visibleEntries)
+    }
+
+    @Test
     fun `history is separate from visible playback order`() {
         val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
         val snapshot = QueueSnapshot(
