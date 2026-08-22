@@ -13,14 +13,19 @@ data class QueueEntry(
  * never by a position that can change during reorder.
  */
 data class QueueSnapshot(
+    /** Canonical Media3 timeline order used for mutations. */
     val entries: List<QueueEntry> = emptyList(),
     val currentPosition: Int = -1,
-    val currentEntryId: Long? = null
+    val currentEntryId: Long? = null,
+    /** Playback order shown by the queue UI: current item followed by actual upcoming items. */
+    val visibleEntries: List<QueueEntry> = entries
 ) {
     init {
         require(currentPosition in -1 until entries.size)
         require(entries.map { it.entryId }.distinct().size == entries.size)
         require(currentEntryId == null || entries.any { it.entryId == currentEntryId })
+        require(visibleEntries.map { it.entryId }.distinct().size == visibleEntries.size)
+        require(visibleEntries.all { visible -> entries.any { it.entryId == visible.entryId } })
     }
 
     val resolvedCurrentPosition: Int
@@ -29,7 +34,12 @@ data class QueueSnapshot(
     val currentEntry: QueueEntry?
         get() = currentEntryId?.let(::entry) ?: entries.getOrNull(currentPosition)
 
+    val resolvedVisiblePosition: Int
+        get() = visibleEntries.indexOfFirst { it.entryId == currentEntryId }
+
     fun positionOf(entryId: Long): Int = entries.indexOfFirst { it.entryId == entryId }
+
+    fun visiblePositionOf(entryId: Long): Int = visibleEntries.indexOfFirst { it.entryId == entryId }
 
     fun entry(entryId: Long): QueueEntry? = entries.firstOrNull { it.entryId == entryId }
 
@@ -49,14 +59,30 @@ data class QueueSnapshot(
             sourcePosition > currentPosition && destination <= currentPosition -> currentPosition + 1
             else -> currentPosition
         }
-        return copy(entries = movedEntries, currentPosition = movedPosition)
+        val movedVisibleEntries = if (visibleEntries.map { it.entryId } == entries.map { it.entryId }) {
+            movedEntries
+        } else {
+            visibleEntries
+        }
+        return copy(
+            entries = movedEntries,
+            currentPosition = movedPosition,
+            visibleEntries = movedVisibleEntries
+        )
     }
 
     fun removeEntry(entryId: Long): QueueSnapshot {
         val removedPosition = positionOf(entryId)
         if (removedPosition < 0) return this
         val remaining = entries.toMutableList().apply { removeAt(removedPosition) }
-        if (remaining.isEmpty()) return copy(entries = emptyList(), currentPosition = -1, currentEntryId = null)
+        if (remaining.isEmpty()) {
+            return copy(
+                entries = emptyList(),
+                currentPosition = -1,
+                currentEntryId = null,
+                visibleEntries = emptyList()
+            )
+        }
 
         val nextPosition = when {
             currentPosition < 0 -> -1
@@ -69,10 +95,12 @@ data class QueueSnapshot(
             nextPosition >= 0 -> remaining[nextPosition].entryId
             else -> null
         }
+        val remainingVisibleEntries = visibleEntries.filterNot { it.entryId == entryId }
         return copy(
             entries = remaining,
             currentPosition = nextPosition,
-            currentEntryId = nextCurrentId
+            currentEntryId = nextCurrentId,
+            visibleEntries = remainingVisibleEntries
         )
     }
 }

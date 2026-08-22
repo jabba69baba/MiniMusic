@@ -62,6 +62,22 @@ class QueueModelTest {
     }
 
     @Test
+    fun `visible positions follow actual upcoming order`() {
+        val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
+        val visible = listOf(entries[2], entries[0], entries[3], entries[1])
+        val snapshot = QueueSnapshot(
+            entries = entries,
+            currentPosition = 2,
+            currentEntryId = 2L,
+            visibleEntries = visible
+        )
+
+        assertEquals(listOf(2L, 0L, 3L, 1L), snapshot.visibleEntries.map { it.entryId })
+        assertEquals(0, snapshot.resolvedVisiblePosition)
+        assertEquals(3, snapshot.visiblePositionOf(1L))
+    }
+
+    @Test
     fun `invalid entry changes are no-ops`() {
         val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
         val snapshot = QueueSnapshot(entries, currentPosition = 1)

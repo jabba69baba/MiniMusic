@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -194,7 +196,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
 }
 
 @Composable
-private fun QueueDrawerList(
+private fun ColumnScope.QueueDrawerList(
     snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
     onEntryClick: (Long) -> Unit,
@@ -214,7 +216,9 @@ private fun QueueDrawerList(
     adapter.submitSnapshot(snapshot)
 
     AndroidView(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f),
         factory = { viewContext ->
             val recyclerView = RecyclerView(viewContext).apply {
                 layoutManager = LinearLayoutManager(viewContext)
@@ -253,13 +257,17 @@ private class PracticalQueueAdapter(
 
     fun submitSnapshot(snapshot: QueueSnapshot) {
         val oldIds = entries.map { it.entryId }
-        val newIds = snapshot.entries.map { it.entryId }
+        val newIds = snapshot.visibleEntries.map { it.entryId }
         val orderChanged = oldIds != newIds
-        entries = snapshot.entries
+        val stateChanged = currentEntryId != snapshot.currentEntryId ||
+            currentPosition != snapshot.resolvedVisiblePosition
+        entries = snapshot.visibleEntries
         currentEntryId = snapshot.currentEntryId
-        currentPosition = snapshot.resolvedCurrentPosition
+        currentPosition = snapshot.resolvedVisiblePosition
         if (orderChanged) notifyDataSetChanged()
-        else if (entries.isNotEmpty()) notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)
+        else if (stateChanged && entries.isNotEmpty()) {
+            notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)
+        }
     }
 
     override fun getItemId(position: Int): Long = entries[position].entryId
@@ -381,10 +389,17 @@ private class PracticalQueueAdapter(
         ) {
             val resolved = colors ?: return
             val rowColor = if (isCurrent) resolved.primaryContainer else resolved.surface
-            root.background = GradientDrawable().apply {
+            val card = GradientDrawable().apply {
                 setColor(rowColor.toArgb())
                 cornerRadius = root.context.dp(16).toFloat()
             }
+            root.background = InsetDrawable(
+                card,
+                root.context.dp(8),
+                root.context.dp(4),
+                root.context.dp(8),
+                root.context.dp(4)
+            )
             title.text = if (isCurrent) "▶ ${entry.song.title}" else entry.song.title
             artist.text = entry.song.artist
             title.setTextColor(resolved.onSurface.toArgb())

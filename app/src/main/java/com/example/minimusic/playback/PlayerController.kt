@@ -175,7 +175,14 @@ class PlayerController(private val context: Context) {
         val c = controller ?: return
         val fromIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
         if (fromIndex < 0 || currentQueueEntries.isEmpty()) return
-        val destination = toIndex.coerceIn(currentQueueEntries.indices)
+
+        // Queue UI positions follow Media3's actual current/upcoming traversal, which
+        // differs from canonical timeline positions while shuffle is enabled.
+        val visibleEntries = playbackEntriesForDisplay(c)
+        val destinationEntry = visibleEntries.getOrNull(toIndex)
+        val destination = destinationEntry?.let { entry ->
+            currentQueueEntries.indexOfFirst { it.entryId == entry.entryId }
+        }?.takeIf { it >= 0 } ?: currentQueueEntries.lastIndex
         if (fromIndex == destination) return
 
         runTimelineMutation {
@@ -199,23 +206,14 @@ class PlayerController(private val context: Context) {
         val removedPosition = currentQueueEntries.indexOfFirst { it.entryId == entryId }
         if (removedPosition < 0) return
         val wasCurrent = currentQueueEntries.getOrNull(c.currentMediaItemIndex)?.entryId == entryId
-        val nextPosition = when {
-            !wasCurrent -> -1
-            removedPosition + 1 < currentQueueEntries.size -> removedPosition + 1
-            c.repeatMode == Player.REPEAT_MODE_ALL && currentQueueEntries.size > 1 -> 0
-            else -> -1
-        }
-
         runTimelineMutation {
+            // Media3 owns next-item selection here, including shuffle and repeat rules.
+            // We only remove the stable entry and let the transition callback publish
+            // the new visible order.
+            if (wasCurrent) holdPlaybackStateAcrossTransition()
             c.removeMediaItem(removedPosition)
             currentQueueEntries = currentQueueEntries.toMutableList().apply { removeAt(removedPosition) }
             currentQueue = currentQueueEntries.map { it.song }
-            if (wasCurrent && nextPosition >= 0 && currentQueueEntries.isNotEmpty()) {
-                val adjustedPosition = if (nextPosition > removedPosition) nextPosition - 1 else nextPosition
-                holdPlaybackStateAcrossTransition()
-                c.seekTo(adjustedPosition.coerceAtMost(currentQueueEntries.lastIndex), 0L)
-                c.play()
-            }
             refreshCurrentItem()
         }
     }
@@ -404,29 +402,27 @@ class PlayerController(private val context: Context) {
         }
     }
 
-    private fun playbackQueueForDisplay(c: Player): Pair<List<Song>, Int> {
-        if (currentQueue.isEmpty()) return emptyList<Song>() to -1
+    private fun playbackEntriesForDisplay(c: Player): List<QueueEntry> {
+        if (currentQueueEntries.isEmpty()) return emptyList()
         val currentTimelineIndex = c.currentMediaItemIndex
-        if (currentTimelineIndex !in 0 until c.mediaItemCount) {
-            return currentQueue to -1
-        }
+        if (currentTimelineIndex !in 0 until c.mediaItemCount) return currentQueueEntries
 
         val entriesByMediaId = currentQueueEntries.associateBy { it.entryId.toString() }
-        val displaySongs = mutableListOf<Song>()
+        val displayEntries = mutableListOf<QueueEntry>()
         val visitedTimelineIndices = mutableSetOf<Int>()
         var timelineIndex = currentTimelineIndex
+        val displayRepeatMode = if (c.repeatMode == Player.REPEAT_MODE_ONE) {
+            Player.REPEAT_MODE_OFF
+        } else {
+            c.repeatMode
+        }
 
         while (
             timelineIndex != C.INDEX_UNSET &&
             timelineIndex in 0 until c.mediaItemCount &&
             visitedTimelineIndices.add(timelineIndex)
         ) {
-            entriesByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.song?.let(displaySongs::add)
-            val displayRepeatMode = if (c.repeatMode == Player.REPEAT_MODE_ONE) {
-                Player.REPEAT_MODE_OFF
-            } else {
-                c.repeatMode
-            }
+            entriesByMediaId[c.getMediaItemAt(timelineIndex).mediaId]?.let(displayEntries::add)
             timelineIndex = c.currentTimeline.getNextWindowIndex(
                 timelineIndex,
                 displayRepeatMode,
@@ -434,7 +430,13 @@ class PlayerController(private val context: Context) {
             )
         }
 
-        return if (displaySongs.isEmpty()) currentQueue to -1 else displaySongs to 0
+        return if (displayEntries.isEmpty()) currentQueueEntries else displayEntries
+    }
+
+    private fun playbackQueueForDisplay(c: Player): Pair<List<Song>, Int> {
+        val displayEntries = playbackEntriesForDisplay(c)
+        return displayEntries.map { it.song } to
+            displayEntries.indexOfFirst { it.entryId == resolveCurrentEntry(c)?.entryId }
     }
 
     private fun refreshCurrentItem() {
@@ -442,11 +444,14 @@ class PlayerController(private val context: Context) {
         val currentEntry = resolveCurrentEntry(c)
         val currentTimelineIndex = currentEntry?.let { currentQueueEntries.indexOf(it) } ?: -1
         val currentSong = currentEntry?.song
-        val (displayQueue, displayIndex) = playbackQueueForDisplay(c)
+        val displayEntries = playbackEntriesForDisplay(c)
+        val displayQueue = displayEntries.map { it.song }
+        val displayIndex = displayEntries.indexOfFirst { it.entryId == currentEntry?.entryId }
         _queueSnapshot.value = QueueSnapshot(
             entries = currentQueueEntries,
             currentPosition = currentTimelineIndex.takeIf { it in currentQueueEntries.indices } ?: -1,
-            currentEntryId = currentEntry?.entryId
+            currentEntryId = currentEntry?.entryId,
+            visibleEntries = displayEntries
         )
         _uiState.value = _uiState.value.copy(
             currentSong = currentSong,

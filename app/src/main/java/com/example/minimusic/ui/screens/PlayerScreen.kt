@@ -298,7 +298,7 @@ fun PlayerScreen(
                 isOpen = queueOpen,
                 onOpenChange = { queueOpen = it },
                 onEntryClick = { entryId ->
-                    val index = queueSnapshot.positionOf(entryId)
+                    val index = queueSnapshot.visiblePositionOf(entryId)
                     if (index >= 0) onQueueItemClick(index)
                 },
                 onMoveEntry = onMoveQueueEntry,
