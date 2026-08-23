@@ -51,6 +51,7 @@ class PlayerController(private val context: Context) {
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
     private var pendingSeekPositionMs: Long? = null
+    private var reorderJob: Job? = null
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -273,26 +274,37 @@ class PlayerController(private val context: Context) {
 
     /** Applies the complete released queue order, preserving active identity by media ID. */
     fun reorderQueue(finalEntryIds: List<Long>) {
-        val c = controller ?: return
-        if (finalEntryIds.size != currentQueueEntries.size ||
-            finalEntryIds.toSet().size != finalEntryIds.size ||
-            finalEntryIds.toSet() != currentQueueEntries.map { it.entryId }.toSet() ||
-            c.mediaItemCount != currentQueueEntries.size
+        val requestedIds = finalEntryIds.toList()
+        val initialController = controller ?: return
+        if (requestedIds.size != currentQueueEntries.size ||
+            requestedIds.toSet().size != requestedIds.size ||
+            requestedIds.toSet() != currentQueueEntries.map { it.entryId }.toSet() ||
+            initialController.mediaItemCount != currentQueueEntries.size
         ) return
 
-        val targetEntries = finalEntryIds.mapNotNull { id ->
-            currentQueueEntries.firstOrNull { it.entryId == id }
-        }
-        if (targetEntries.size != currentQueueEntries.size) return
-
-        runTimelineMutation {
-            reorderTimelineEntries(c, targetEntries)
-            if (c.shuffleModeEnabled) {
-                c.shuffleModeEnabled = false
-                shuffleActive = false
-                _uiState.value = _uiState.value.copy(isShuffled = false)
+        // ItemTouchHelper calls this from clearView. Defer the Media3 timeline
+        // mutation until RecyclerView has fully returned from its release/layout
+        // pass; otherwise Media3 callbacks can synchronously re-enter the adapter.
+        reorderJob?.cancel()
+        reorderJob = scope.launch {
+            delay(32L)
+            val c = controller ?: return@launch
+            if (c.mediaItemCount != requestedIds.size) return@launch
+            val targetEntries = requestedIds.mapNotNull { id ->
+                currentQueueEntries.firstOrNull { it.entryId == id }
             }
-            refreshCurrentItem()
+            if (targetEntries.size != requestedIds.size) return@launch
+
+            runTimelineMutation {
+                reorderTimelineEntries(c, targetEntries)
+                if (c.shuffleModeEnabled) {
+                    c.shuffleModeEnabled = false
+                    shuffleActive = false
+                    _uiState.value = _uiState.value.copy(isShuffled = false)
+                }
+                refreshCurrentItem()
+            }
+            reorderJob = null
         }
     }
 

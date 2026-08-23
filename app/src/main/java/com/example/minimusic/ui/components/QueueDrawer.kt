@@ -573,16 +573,13 @@ private class PracticalQueueAdapter(
         releaseSubmitted = false
     }
 
-    fun endDrag(recyclerView: RecyclerView) {
+    fun endDrag() {
         isDragging = false
         draggedEntryId = null
-        val pendingSnapshot = deferredSnapshot
+        // The deferred snapshots describe the queue before the released order
+        // is committed. Drop them; the controller publishes one authoritative
+        // snapshot after the deferred reorder completes.
         deferredSnapshot = null
-        // ItemTouchHelper invokes clearView while RecyclerView may still be in
-        // its layout/scroll pass. Never notify the adapter re-entrantly here.
-        if (pendingSnapshot != null) {
-            recyclerView.post { submitSnapshot(pendingSnapshot) }
-        }
     }
 
     private fun moveLocal(from: Int, to: Int) {
@@ -593,6 +590,8 @@ private class PracticalQueueAdapter(
     }
 
     inner class MoveCallback : ItemTouchHelper.Callback() {
+        private var autoScrollPosted = false
+
         override fun isLongPressDragEnabled(): Boolean = false
         override fun isItemViewSwipeEnabled(): Boolean = false
 
@@ -616,7 +615,7 @@ private class PracticalQueueAdapter(
                 onReorderEntries(entries.map { it.entryId })
             }
             viewHolder.setIsRecyclable(true)
-            endDrag(recyclerView)
+            endDrag()
         }
 
         override fun onMove(
@@ -633,7 +632,50 @@ private class PracticalQueueAdapter(
             return true
         }
 
-        override fun getBoundingBoxMargin(): Int = context.dp(24)
+        override fun getBoundingBoxMargin(): Int = context.dp(72)
+
+        override fun onChildDraw(
+            canvas: Canvas,
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder,
+            dX: Float,
+            dY: Float,
+            actionState: Int,
+            isCurrentlyActive: Boolean
+        ) {
+            super.onChildDraw(canvas, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
+            if (actionState != ItemTouchHelper.ACTION_STATE_DRAG || !isCurrentlyActive || autoScrollPosted) {
+                return
+            }
+
+            val edge = context.dp(72)
+            val projectedTop = viewHolder.itemView.top + dY
+            val projectedBottom = viewHolder.itemView.bottom + dY
+            val scrollDistance = when {
+                projectedBottom > recyclerView.height - edge -> {
+                    ((projectedBottom - (recyclerView.height - edge)) / 3f)
+                        .roundToInt()
+                        .coerceIn(context.dp(8), context.dp(36))
+                }
+                projectedTop < edge -> {
+                    -((edge - projectedTop) / 3f)
+                        .roundToInt()
+                        .coerceIn(context.dp(8), context.dp(36))
+                }
+                else -> 0
+            }
+            if (scrollDistance == 0 || !recyclerView.canScrollVertically(if (scrollDistance > 0) 1 else -1)) {
+                return
+            }
+
+            autoScrollPosted = true
+            recyclerView.post {
+                autoScrollPosted = false
+                if (isDragging && recyclerView.isAttachedToWindow) {
+                    recyclerView.scrollBy(0, scrollDistance)
+                }
+            }
+        }
 
         override fun interpolateOutOfBoundsScroll(
             recyclerView: RecyclerView,
