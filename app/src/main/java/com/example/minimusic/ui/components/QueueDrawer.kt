@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.ColorUtils
 import com.example.minimusic.R
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -637,6 +638,8 @@ private class PracticalQueueAdapter(
     inner class MoveCallback : ItemTouchHelper.Callback() {
         private var activeRecyclerView: RecyclerView? = null
         private var activeViewHolder: RecyclerView.ViewHolder? = null
+        private var draggedTopPx = 0f
+        private var draggedBottomPx = 0f
         private var autoScrollRunning = false
         private val autoScrollRunnable = object : Runnable {
             override fun run() {
@@ -649,9 +652,11 @@ private class PracticalQueueAdapter(
                 // Trigger only inside the marked upper-green/lower-yellow
                 // boundary bands. One card (72dp) is reserved outside them,
                 // avoiding the overly aggressive early scrolling behavior.
+                // Use ItemTouchHelper's actual dY position, not the holder's
+                // static layout bounds, so the trigger follows the finger.
                 val edge = context.dp(96)
-                val top = holder.itemView.top + holder.itemView.translationY
-                val bottom = holder.itemView.bottom + holder.itemView.translationY
+                val top = if (draggedBottomPx > draggedTopPx) draggedTopPx else holder.itemView.top.toFloat()
+                val bottom = if (draggedBottomPx > draggedTopPx) draggedBottomPx else holder.itemView.bottom.toFloat()
                 val delta = when {
                     bottom > recyclerView.height - edge -> {
                         ((bottom - (recyclerView.height - edge)) / 4f)
@@ -675,6 +680,8 @@ private class PracticalQueueAdapter(
         private fun startAutoScroll(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
             activeRecyclerView = recyclerView
             activeViewHolder = viewHolder
+            draggedTopPx = viewHolder.itemView.top.toFloat()
+            draggedBottomPx = viewHolder.itemView.bottom.toFloat()
             if (!autoScrollRunning) {
                 autoScrollRunning = true
                 recyclerView.postOnAnimation(autoScrollRunnable)
@@ -685,6 +692,8 @@ private class PracticalQueueAdapter(
             activeRecyclerView?.removeCallbacks(autoScrollRunnable)
             activeRecyclerView = null
             activeViewHolder = null
+            draggedTopPx = 0f
+            draggedBottomPx = 0f
             autoScrollRunning = false
         }
 
@@ -741,6 +750,22 @@ private class PracticalQueueAdapter(
             if (from !in entries.indices || to !in entries.indices) return false
             moveLocal(from, to)
             return true
+        }
+
+        override fun onChildDraw(
+            canvas: Canvas,
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder,
+            dX: Float,
+            dY: Float,
+            actionState: Int,
+            isCurrentlyActive: Boolean
+        ) {
+            if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder === activeViewHolder) {
+                draggedTopPx = viewHolder.itemView.top + dY
+                draggedBottomPx = viewHolder.itemView.bottom + dY
+            }
+            super.onChildDraw(canvas, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
         }
 
         override fun getBoundingBoxMargin(): Int = context.dp(48)
@@ -819,8 +844,14 @@ private class PracticalQueueAdapter(
         ) {
             val resolved = colors ?: return
             val rowColor = if (isCurrent) resolved.primaryContainer else resolved.surface
+            val rowArgb = rowColor.toArgb()
+            val opaqueHistoryColor = if (isHistory) {
+                ColorUtils.blendARGB(rowArgb, resolved.surfaceVariant.toArgb(), 0.32f)
+            } else {
+                rowArgb
+            }
             val card = GradientDrawable().apply {
-                setColor(rowColor.toArgb())
+                setColor(opaqueHistoryColor)
                 cornerRadius = root.context.dp(16).toFloat()
             }
             root.background = InsetDrawable(
@@ -830,15 +861,27 @@ private class PracticalQueueAdapter(
                 root.context.dp(8),
                 root.context.dp(4)
             )
-            // Played history rows fade as a single visual unit. The current row
-            // remains fully opaque and is identified only by its highlighted card.
-            root.alpha = if (isHistory) 0.58f else 1f
+            // The current row remains fully opaque and is identified only by its
+            // highlighted card. History is conveyed by blended opaque colors.
+            // The card itself always remains fully opaque. History is conveyed
+            // by blended opaque colors rather than a translucent whole-row layer.
+            root.alpha = 1f
             title.text = entry.song.title
             artist.text = entry.song.artist
             title.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_medium))
             artist.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_regular))
-            title.setTextColor(resolved.onSurface.toArgb())
-            artist.setTextColor(resolved.onSurfaceVariant.toArgb())
+            val titleArgb = if (isHistory) {
+                ColorUtils.blendARGB(resolved.onSurface.toArgb(), opaqueHistoryColor, 0.18f)
+            } else {
+                resolved.onSurface.toArgb()
+            }
+            val artistArgb = if (isHistory) {
+                ColorUtils.blendARGB(resolved.onSurfaceVariant.toArgb(), opaqueHistoryColor, 0.24f)
+            } else {
+                resolved.onSurfaceVariant.toArgb()
+            }
+            title.setTextColor(titleArgb)
+            artist.setTextColor(artistArgb)
             title.textSize = 16f
             artist.textSize = 14f
             artwork.setImageResource(android.R.drawable.ic_menu_gallery)
@@ -850,12 +893,12 @@ private class PracticalQueueAdapter(
                         .build()
                 )
             }
-            handle.dotColor = resolved.onSurfaceVariant.toArgb()
+            handle.dotColor = artistArgb
             handle.setOnTouchListener { _, event ->
                 if (event.actionMasked == MotionEvent.ACTION_DOWN) onStartDrag()
                 false
             }
-            close.setColorFilter(resolved.onSurfaceVariant.toArgb())
+            close.setColorFilter(artistArgb)
             close.setOnClickListener { onRemove() }
             root.setOnClickListener { onClick() }
         }
