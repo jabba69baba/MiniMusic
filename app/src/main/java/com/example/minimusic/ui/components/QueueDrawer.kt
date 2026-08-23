@@ -646,9 +646,10 @@ private class PracticalQueueAdapter(
                     autoScrollRunning = false
                     return
                 }
-                // Start one full song-card (72dp) before the previous trigger
-                // so the second-to-last visible row can begin scrolling.
-                val edge = context.dp(168)
+                // Trigger only inside the marked upper-green/lower-yellow
+                // boundary bands. One card (72dp) is reserved outside them,
+                // avoiding the overly aggressive early scrolling behavior.
+                val edge = context.dp(96)
                 val top = holder.itemView.top + holder.itemView.translationY
                 val bottom = holder.itemView.bottom + holder.itemView.translationY
                 val delta = when {

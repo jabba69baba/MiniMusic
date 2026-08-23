@@ -109,11 +109,10 @@ class PlayerController(private val context: Context) {
         val selectedIndex = selectedId?.let { id ->
             orderedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
         }
-        val queueSongs = if (selectedIndex != null) {
-            orderedSongs.drop(selectedIndex) + orderedSongs.take(selectedIndex)
-        } else {
-            orderedSongs
-        }
+        // Keep the physical queue alphabetical. The selected item is the
+        // starting point, so playback proceeds from it through Z and ends;
+        // rows before it remain available as visible history-style entries.
+        val queueSongs = orderedSongs
 
         currentQueueEntries = queueSongs.map { song ->
             QueueEntry(entryId = nextQueueEntryId++, song = song)
@@ -126,7 +125,7 @@ class PlayerController(private val context: Context) {
         val mediaItems = currentQueueEntries.map { entry ->
             entry.song.toMediaItem(mediaId = entry.entryId.toString())
         }
-        c.setMediaItems(mediaItems, 0, 0L)
+        c.setMediaItems(mediaItems, selectedIndex ?: 0, 0L)
         c.prepare()
         c.play()
     }
@@ -213,36 +212,7 @@ class PlayerController(private val context: Context) {
     fun playQueueEntry(entryId: Long) {
         val c = controller ?: return
         val selectedEntry = currentQueueEntries.firstOrNull { it.entryId == entryId } ?: return
-        if (shuffleActive || manualQueueOrderEntryIds != null) {
-            val timelineIndex = currentQueueEntries.indexOf(selectedEntry)
-            if (timelineIndex < 0) return
-            holdPlaybackStateAcrossTransition()
-            _uiState.value = _uiState.value.copy(isPlaying = true)
-            c.seekTo(timelineIndex, 0L)
-            c.play()
-            return
-        }
-
-        val selectedIndex = currentQueueEntries.indexOfFirst { it.entryId == selectedEntry.entryId }
-        if (selectedIndex < 0) return
-        val rotatedEntries = if (selectedIndex == 0) {
-            currentQueueEntries
-        } else {
-            currentQueueEntries.drop(selectedIndex) + currentQueueEntries.take(selectedIndex)
-        }
-
-        if (selectedIndex > 0) {
-            runTimelineMutation {
-                // A single range move preserves playback continuity and avoids
-                // the callback storm caused by repeatedly moving every row.
-                c.moveMediaItems(0, selectedIndex, c.mediaItemCount)
-                currentQueueEntries = rotatedEntries
-                currentQueue = rotatedEntries.map { it.song }
-                refreshCurrentItem()
-            }
-        }
-
-        val timelineIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
+        val timelineIndex = currentQueueEntries.indexOfFirst { it.entryId == selectedEntry.entryId }
         if (timelineIndex < 0) return
         holdPlaybackStateAcrossTransition()
         _uiState.value = _uiState.value.copy(isPlaying = true)
