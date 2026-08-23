@@ -99,9 +99,11 @@ class PlayerController(private val context: Context) {
 
         val selectedId = songs.getOrNull(startIndex)?.id
         val orderedSongs = songs.sortedWith(alphabeticalSongComparator)
-        val selectedSong = selectedId?.let { id -> orderedSongs.firstOrNull { it.id == id } }
-        val queueSongs = if (selectedSong != null) {
-            listOf(selectedSong) + orderedSongs.filterNot { it.id == selectedSong.id }
+        val selectedIndex = selectedId?.let { id ->
+            orderedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+        }
+        val queueSongs = if (selectedIndex != null) {
+            orderedSongs.drop(selectedIndex) + orderedSongs.take(selectedIndex)
         } else {
             orderedSongs
         }
@@ -109,6 +111,7 @@ class PlayerController(private val context: Context) {
         currentQueueEntries = queueSongs.map { song ->
             QueueEntry(entryId = nextQueueEntryId++, song = song)
         }
+        c.shuffleModeEnabled = false
         shuffleActive = false
         currentQueue = currentQueueEntries.map { it.song }
         pendingSeekPositionMs = null
