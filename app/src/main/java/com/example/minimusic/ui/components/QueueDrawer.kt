@@ -646,7 +646,9 @@ private class PracticalQueueAdapter(
                     autoScrollRunning = false
                     return
                 }
-                val edge = context.dp(96)
+                // Start one full song-card (72dp) before the previous trigger
+                // so the second-to-last visible row can begin scrolling.
+                val edge = context.dp(168)
                 val top = holder.itemView.top + holder.itemView.translationY
                 val bottom = holder.itemView.bottom + holder.itemView.translationY
                 val delta = when {

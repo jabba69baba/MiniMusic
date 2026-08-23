@@ -282,12 +282,14 @@ class PlayerController(private val context: Context) {
             currentQueue = currentQueueEntries.map { it.song }
 
             if (preserveDisplayOrder) {
-                // Option 2: Shuffle is logically off, but the generated traversal
-                // remains authoritative after this one physical move. Media3 stays
-                // in native shuffle mode so Next/automatic transitions use it.
+                // The generated traversal remains authoritative after this one
+                // physical move. Media3 stays in native shuffle mode so Next and
+                // automatic transitions continue to use the edited shuffled order.
                 manualQueueOrderEntryIds = movedDisplayEntries.map { it.entryId }
-                shuffleActive = false
-                _uiState.value = _uiState.value.copy(isShuffled = false)
+                // The generated shuffled traversal remains active after a manual
+                // move, so the Player Shuffle button must remain visibly enabled.
+                shuffleActive = true
+                _uiState.value = _uiState.value.copy(isShuffled = true)
                 val physicalOrder = manualQueueOrderEntryIds.orEmpty().mapNotNull { id ->
                     currentQueueEntries.indexOfFirst { it.entryId == id }
                         .takeIf { it >= 0 }
