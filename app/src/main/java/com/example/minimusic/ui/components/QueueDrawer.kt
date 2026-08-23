@@ -504,6 +504,7 @@ private class PracticalQueueAdapter(
     private var isDragging = false
     private var draggedEntryId: Long? = null
     private var deferredSnapshot: QueueSnapshot? = null
+    private var awaitingReorderIds: List<Long>? = null
     private var releaseSubmitted = false
     var artColors: ArtColorRoles? = null
     var onEntryClick: (Long) -> Unit = {}
@@ -516,6 +517,11 @@ private class PracticalQueueAdapter(
     }
 
     fun submitSnapshot(snapshot: QueueSnapshot) {
+        val incomingIds = snapshot.visibleEntries.map { it.entryId }
+        awaitingReorderIds?.let { expectedIds ->
+            if (incomingIds != expectedIds) return
+            awaitingReorderIds = null
+        }
         if (isDragging) {
             deferredSnapshot = snapshot
             return
@@ -612,7 +618,14 @@ private class PracticalQueueAdapter(
             super.clearView(recyclerView, viewHolder)
             if (!releaseSubmitted) {
                 releaseSubmitted = true
-                onReorderEntries(entries.map { it.entryId })
+                val submittedIds = entries.map { it.entryId }
+                awaitingReorderIds = submittedIds
+                onReorderEntries(submittedIds)
+                // If the controller rejects the request because the queue changed
+                // concurrently, do not leave the adapter waiting forever.
+                viewHolder.itemView.postDelayed({
+                    if (awaitingReorderIds == submittedIds) awaitingReorderIds = null
+                }, 750L)
             }
             viewHolder.setIsRecyclable(true)
             endDrag()
