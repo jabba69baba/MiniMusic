@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 import kotlin.random.Random
 
 /**
@@ -40,6 +39,7 @@ class PlayerController(private val context: Context) {
     private var timelineMutationDepth = 0
     private var syncRequestedAfterMutation = false
     private var shuffleMutationInProgress = false
+    private var timelineReplacementInProgress = false
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
     }.thenBy { it.artist.trim().lowercase() }
@@ -161,6 +161,7 @@ class PlayerController(private val context: Context) {
     }
 
     fun skipToNext() {
+        if (shuffleMutationInProgress) return
         controller?.let {
             if (it.hasNextMediaItem()) {
                 holdPlaybackStateAcrossTransition()
@@ -170,6 +171,7 @@ class PlayerController(private val context: Context) {
     }
 
     fun skipToPrevious() {
+        if (shuffleMutationInProgress) return
         val c = controller ?: return
         // Restart the current song if we're more than 3s in, like most players do.
         if (c.currentPosition > 3000L || !c.hasPreviousMediaItem()) {
@@ -354,23 +356,16 @@ class PlayerController(private val context: Context) {
             }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
         }
 
-        // Publish the target order immediately. The active entry is resolved by
-        // stable media ID, so this does not disturb the current playback clock
-        // while the controller reconciles its physical timeline below.
+        // Publish the same target order that will be installed in Media3 so the
+        // queue UI changes immediately. The mutation guard prevents Next or a
+        // second queue edit from observing the old physical timeline in between.
         currentQueueEntries = targetEntries
         currentQueue = targetEntries.map { it.song }
         refreshCurrentItem()
 
-        // Move one existing item at a time and yield between moves. Media3 must
-        // receive these calls on the main thread, but keeping the whole loop in
-        // one synchronous callback starves Compose and the position ticker.
-        scope.launch {
+        scope.launch(Dispatchers.Main) {
             try {
-                runTimelineMutationSuspend {
-                    reorderTimelineEntriesWithoutBlocking(c, targetEntries)
-                    c.shuffleModeEnabled = false
-                    syncQueueFromController()
-                }
+                replaceTimelineAtomically(c, targetEntries)
             } catch (_: RuntimeException) {
                 // Keep the controller usable if Media3 rejects a transient move;
                 // restore the previous visual state and republish the timeline.
@@ -415,8 +410,10 @@ class PlayerController(private val context: Context) {
             // remain as a pending seek target while the new track progresses.
             // Otherwise the ticker keeps rendering 0 after shuffle/reorder.
             pendingSeekPositionMs = null
-            _uiState.value = _uiState.value.copy(positionMs = 0L)
-            holdPlaybackStateAcrossTransition()
+            if (!timelineReplacementInProgress) {
+                _uiState.value = _uiState.value.copy(positionMs = 0L)
+                holdPlaybackStateAcrossTransition()
+            }
             syncQueueFromController()
         }
 
@@ -488,19 +485,6 @@ class PlayerController(private val context: Context) {
         }
     }
 
-    private suspend fun runTimelineMutationSuspend(block: suspend () -> Unit) {
-        timelineMutationDepth += 1
-        try {
-            block()
-        } finally {
-            timelineMutationDepth -= 1
-            if (timelineMutationDepth == 0 && syncRequestedAfterMutation) {
-                syncRequestedAfterMutation = false
-                syncQueueFromController()
-            }
-        }
-    }
-
     private fun freshShuffleEntries(c: Player): List<QueueEntry> {
         val activeEntry = resolveCurrentEntry(c)
         val shuffledEntries = currentQueueEntries
@@ -513,20 +497,33 @@ class PlayerController(private val context: Context) {
         return shuffledEntries
     }
 
-    private suspend fun reorderTimelineEntriesWithoutBlocking(
-        c: Player,
-        targetEntries: List<QueueEntry>
-    ) {
+    private fun replaceTimelineAtomically(c: Player, targetEntries: List<QueueEntry>) {
         if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
-        pendingSeekPositionMs = null
-        targetEntries.forEachIndexed { targetIndex, targetEntry ->
-            val currentIndex = (targetIndex until c.mediaItemCount).firstOrNull { index ->
-                c.getMediaItemAt(index).mediaId == targetEntry.entryId.toString()
-            } ?: return@forEachIndexed
-            if (currentIndex != targetIndex) {
-                c.moveMediaItem(currentIndex, targetIndex)
-                yield()
-            }
+        val currentMediaId = c.currentMediaItem?.mediaId ?: return
+        val targetIndex = targetEntries.indexOfFirst { it.entryId.toString() == currentMediaId }
+        if (targetIndex < 0) return
+
+        val positionMs = c.currentPosition
+            .takeIf { it != C.TIME_UNSET && it >= 0L }
+            ?: 0L
+        val wasPlaying = c.isPlaying
+        val mediaItems = targetEntries.map { entry ->
+            entry.song.toMediaItem(mediaId = entry.entryId.toString())
+        }
+
+        timelineReplacementInProgress = true
+        try {
+            pendingSeekPositionMs = null
+            c.setMediaItems(mediaItems, targetIndex, positionMs)
+            c.shuffleModeEnabled = false
+            c.prepare()
+            if (wasPlaying) c.play() else c.pause()
+
+            currentQueueEntries = targetEntries
+            currentQueue = targetEntries.map { it.song }
+            refreshCurrentItem()
+        } finally {
+            timelineReplacementInProgress = false
         }
     }
 
