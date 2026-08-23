@@ -504,6 +504,9 @@ private class PracticalQueueAdapter(
     private var isDragging = false
     private var draggedEntryId: Long? = null
     private var deferredSnapshot: QueueSnapshot? = null
+    private var pendingSnapshot: QueueSnapshot? = null
+    private var snapshotPostPending = false
+    private var attachedRecyclerView: RecyclerView? = null
     private var awaitingReorderIds: List<Long>? = null
     private var releaseSubmitted = false
     var artColors: ArtColorRoles? = null
@@ -516,15 +519,52 @@ private class PracticalQueueAdapter(
         setHasStableIds(true)
     }
 
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        attachedRecyclerView = recyclerView
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        if (attachedRecyclerView === recyclerView) {
+            attachedRecyclerView = null
+            pendingSnapshot = null
+            snapshotPostPending = false
+        }
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
+
     fun submitSnapshot(snapshot: QueueSnapshot) {
+        if (isDragging) {
+            deferredSnapshot = snapshot
+            return
+        }
+        pendingSnapshot = snapshot
+        val recyclerView = attachedRecyclerView
+        if (recyclerView != null) {
+            if (!snapshotPostPending) {
+                snapshotPostPending = true
+                recyclerView.post {
+                    snapshotPostPending = false
+                    val nextSnapshot = pendingSnapshot ?: return@post
+                    pendingSnapshot = null
+                    if (isDragging) {
+                        deferredSnapshot = nextSnapshot
+                    } else {
+                        applySnapshot(nextSnapshot)
+                    }
+                }
+            }
+            return
+        }
+        pendingSnapshot = null
+        applySnapshot(snapshot)
+    }
+
+    private fun applySnapshot(snapshot: QueueSnapshot) {
         val incomingIds = snapshot.visibleEntries.map { it.entryId }
         awaitingReorderIds?.let { expectedIds ->
             if (incomingIds != expectedIds) return
             awaitingReorderIds = null
-        }
-        if (isDragging) {
-            deferredSnapshot = snapshot
-            return
         }
         val displayEntries = snapshot.visibleEntries
         val oldIds = entries.map { it.entryId }
@@ -586,6 +626,7 @@ private class PracticalQueueAdapter(
         // is committed. Drop them; the controller publishes one authoritative
         // snapshot after the deferred reorder completes.
         deferredSnapshot = null
+        pendingSnapshot = null
     }
 
     private fun moveLocal(from: Int, to: Int) {
@@ -620,7 +661,7 @@ private class PracticalQueueAdapter(
                 releaseSubmitted = true
                 val submittedIds = entries.map { it.entryId }
                 awaitingReorderIds = submittedIds
-                onReorderEntries(submittedIds)
+                viewHolder.itemView.post { onReorderEntries(submittedIds) }
                 // If the controller rejects the request because the queue changed
                 // concurrently, do not leave the adapter waiting forever.
                 viewHolder.itemView.postDelayed({
