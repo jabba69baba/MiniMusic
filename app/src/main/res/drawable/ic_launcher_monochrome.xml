@@ -1,32 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <!-- Monochrome version: concentric stroked rings remain legible when themed. -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
-        android:pathData="M54,26 A28,28 0,1 0,54,82 A28,28 0,1 0,54,26" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,32 A22,22 0,1 0,54,76 A22,22 0,1 0,54,32" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,38 A16,16 0,1 0,54,70 A16,16 0,1 0,54,38" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,44 A10,10 0,1 0,54,64 A10,10 0,1 0,54,44" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,51 A3,3 0,1 0,54,57 A3,3 0,1 0,54,51" />
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_exact"
+    android:gravity="fill" />
