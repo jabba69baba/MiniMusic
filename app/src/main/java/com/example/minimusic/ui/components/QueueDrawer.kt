@@ -476,15 +476,19 @@ private fun ColumnScope.QueueDrawerList(
             adapter.submitSnapshot(snapshot)
             if (snapshot.currentEntryId != previousCurrentEntryId) {
                 previousCurrentEntryId = snapshot.currentEntryId
-                recyclerView.post {
-                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+                // A current-item change can accompany removal, especially in
+                // shuffled playback. Let DiffUtil/ItemAnimator finish its fade
+                // and row movement before repositioning, otherwise the list
+                // visibly snaps while the removed card is animating.
+                recyclerView.postDelayed({
+                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@postDelayed
                     val currentPosition = snapshot.resolvedVisiblePosition
-                    if (currentPosition < 0) return@post
+                    if (currentPosition < 0) return@postDelayed
                     val lastVisible = layout.findLastVisibleItemPosition()
                     if (currentPosition > 0 && currentPosition >= lastVisible) {
                         layout.scrollToPositionWithOffset(currentPosition, 0)
                     }
-                }
+                }, 240L)
             }
             if (openRequest != previousOpenRequest) {
                 previousOpenRequest = openRequest
@@ -696,8 +700,12 @@ private class PracticalQueueAdapter(
                 // long-press alone.
                 val upBandTop = (firstVisible?.top ?: recyclerView.paddingTop).toFloat()
                 val upBandBottom = (firstVisible?.bottom ?: recyclerView.paddingTop).toFloat()
-                val downBandTop = (lastVisible?.top ?: recyclerView.height).toFloat()
-                val downBandBottom = (lastVisible?.bottom ?: recyclerView.height).toFloat()
+                // Give downward dragging a practical lower 40% of the
+                // viewport. This is deliberately wider than one card while
+                // still leaving the upper portion free for precise reordering.
+                val lowerTriggerHeight = (recyclerView.height * 0.40f).roundToInt()
+                val downBandTop = (recyclerView.height - lowerTriggerHeight).toFloat()
+                val downBandBottom = recyclerView.height.toFloat()
                 val top = if (draggedBottomPx > draggedTopPx) draggedTopPx else holder.itemView.top.toFloat()
                 val bottom = if (draggedBottomPx > draggedTopPx) draggedBottomPx else holder.itemView.bottom.toFloat()
                 val overlapsFirstBand = bottom > upBandTop && top < upBandBottom
