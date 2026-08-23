@@ -17,7 +17,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Sort order applied to the Songs tab's list. */
 enum class SongSortOrder {
@@ -79,12 +81,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val minDuration = settingsRepository.settings.first().minDurationSeconds
                 val songs = repository.loadSongs(minDuration)
+                val (albums, artists) = withContext(Dispatchers.Default) {
+                    repository.deriveAlbums(songs) to repository.deriveArtists(songs)
+                }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     loadError = null,
                     allSongs = songs,
-                    albums = repository.deriveAlbums(songs),
-                    artists = repository.deriveArtists(songs)
+                    albums = albums,
+                    artists = artists
                 )
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
@@ -123,9 +128,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             when (val result = repository.deleteSong(song)) {
                 is DeleteResult.Deleted -> {
+                    val nextSongs = _uiState.value.allSongs.filterNot { it.id == song.id }
+                    val (albums, artists) = withContext(Dispatchers.Default) {
+                        repository.deriveAlbums(nextSongs) to repository.deriveArtists(nextSongs)
+                    }
                     _uiState.value = _uiState.value.copy(
-                        allSongs = _uiState.value.allSongs.filterNot { it.id == song.id }
-                    ).let { it.copy(albums = repository.deriveAlbums(it.allSongs), artists = repository.deriveArtists(it.allSongs)) }
+                        allSongs = nextSongs,
+                        albums = albums,
+                        artists = artists
+                    )
                     _events.emit(LibraryEvent.SongDeleted(song))
                 }
                 is DeleteResult.NeedsPermission ->

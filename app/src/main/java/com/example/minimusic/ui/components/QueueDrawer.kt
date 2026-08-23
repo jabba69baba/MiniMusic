@@ -80,7 +80,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import coil.ImageLoader
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.playback.QueueEntry
@@ -623,7 +623,7 @@ private class PracticalQueueAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
         Holder(context, artColors)
 
-    override fun onBindViewHolder(holder: Holder, position: Int) {
+    private fun bindHolder(holder: Holder, position: Int, loadArtwork: Boolean) {
         val entry = entries[position]
         holder.bind(
             entry = entry,
@@ -631,19 +631,18 @@ private class PracticalQueueAdapter(
                 (currentEntryId == null && position == currentPosition),
             isHistory = currentPosition >= 0 && position < currentPosition,
             colors = artColors,
+            loadArtwork = loadArtwork,
             onClick = { onEntryClick(entry.entryId) },
             onRemove = { onRemoveEntry(entry.entryId) },
             onStartDrag = { startDrag?.invoke(holder) }
         )
     }
 
-    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
-        if (payloads.isNotEmpty()) {
-            onBindViewHolder(holder, position)
-        } else {
-            onBindViewHolder(holder, position)
-        }
-    }
+    override fun onBindViewHolder(holder: Holder, position: Int) =
+        bindHolder(holder, position, loadArtwork = true)
+
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) =
+        bindHolder(holder, position, loadArtwork = payloads.isEmpty())
 
     override fun getItemCount(): Int = entries.size
 
@@ -700,10 +699,10 @@ private class PracticalQueueAdapter(
                 // long-press alone.
                 val upBandTop = (firstVisible?.top ?: recyclerView.paddingTop).toFloat()
                 val upBandBottom = (firstVisible?.bottom ?: recyclerView.paddingTop).toFloat()
-                // Give downward dragging a practical lower 40% of the
-                // viewport. This is deliberately wider than one card while
-                // still leaving the upper portion free for precise reordering.
-                val lowerTriggerHeight = (recyclerView.height * 0.40f).roundToInt()
+                // Give downward dragging the requested lower 20% of the
+                // viewport while leaving the upper portion free for precise
+                // reordering.
+                val lowerTriggerHeight = (recyclerView.height * 0.20f).roundToInt()
                 val downBandTop = (recyclerView.height - lowerTriggerHeight).toFloat()
                 val downBandBottom = recyclerView.height.toFloat()
                 val top = if (draggedBottomPx > draggedTopPx) draggedTopPx else holder.itemView.top.toFloat()
@@ -848,7 +847,7 @@ private class PracticalQueueAdapter(
         private val artist = TextView(context)
         private val close = ImageButton(context)
         private val textColumn = LinearLayout(context)
-        private val imageLoader = ImageLoader(context)
+        private val imageLoader = context.imageLoader
 
         init {
             handle.layoutParams = LinearLayout.LayoutParams(context.dp(32), ViewGroup.LayoutParams.MATCH_PARENT)
@@ -883,6 +882,7 @@ private class PracticalQueueAdapter(
             isCurrent: Boolean,
             isHistory: Boolean,
             colors: ArtColorRoles?,
+            loadArtwork: Boolean,
             onClick: () -> Unit,
             onRemove: () -> Unit,
             onStartDrag: () -> Unit
@@ -929,14 +929,18 @@ private class PracticalQueueAdapter(
             artist.setTextColor(artistArgb)
             title.textSize = 16f
             artist.textSize = 14f
-            artwork.setImageResource(android.R.drawable.ic_menu_gallery)
-            entry.song.albumArtUri?.let { uri ->
-                imageLoader.enqueue(
-                    ImageRequest.Builder(root.context)
-                        .data(uri)
-                        .target(artwork)
-                        .build()
-                )
+            if (loadArtwork) {
+                artwork.setImageResource(android.R.drawable.ic_menu_gallery)
+                entry.song.albumArtUri?.let { uri ->
+                    imageLoader.enqueue(
+                        ImageRequest.Builder(root.context)
+                            .data(uri)
+                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                            .crossfade(140)
+                            .target(artwork)
+                            .build()
+                    )
+                }
             }
             handle.dotColor = artistArgb
             handle.setOnTouchListener { _, event ->

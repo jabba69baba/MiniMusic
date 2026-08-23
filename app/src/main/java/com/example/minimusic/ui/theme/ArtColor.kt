@@ -17,6 +17,8 @@ import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.android.material.color.utilities.DynamicScheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.google.android.material.color.utilities.Hct
 import com.google.android.material.color.utilities.SchemeVibrant
 import kotlin.math.abs
@@ -79,23 +81,28 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
         val bitmap: Bitmap? = result.drawable?.let { drawable ->
             (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
         }
-        val swatch = bitmap?.let {
-            val palette = Palette.from(it).generate()
-            // Score representative swatches rather than trusting the most
-            // saturated dominant pixel. Tonal Spot below creates the roles.
-            val candidates = listOfNotNull(
-                palette.dominantSwatch,
-                palette.mutedSwatch,
-                palette.darkMutedSwatch,
-                palette.lightMutedSwatch,
-                palette.vibrantSwatch,
-                palette.darkVibrantSwatch,
-                palette.lightVibrantSwatch
-            )
-            val expressiveCandidates = candidates.filter {
-                Hct.fromInt(it.rgb).chroma >= 14.0
+        val swatch = bitmap?.let { artwork ->
+            // Palette generation can be relatively expensive for large local
+            // album art. Keep it off the UI dispatcher so the player, home
+            // screen, and mini-player remain responsive while colors resolve.
+            withContext(Dispatchers.Default) {
+                val palette = Palette.from(artwork).generate()
+                // Score representative swatches rather than trusting the most
+                // saturated dominant pixel. Tonal Spot below creates the roles.
+                val candidates = listOfNotNull(
+                    palette.dominantSwatch,
+                    palette.mutedSwatch,
+                    palette.darkMutedSwatch,
+                    palette.lightMutedSwatch,
+                    palette.vibrantSwatch,
+                    palette.darkVibrantSwatch,
+                    palette.lightVibrantSwatch
+                )
+                val expressiveCandidates = candidates.filter {
+                    Hct.fromInt(it.rgb).chroma >= 14.0
+                }
+                (expressiveCandidates.ifEmpty { candidates }).maxByOrNull(::artworkSwatchScore)
             }
-            (expressiveCandidates.ifEmpty { candidates }).maxByOrNull(::artworkSwatchScore)
         }
         swatch?.let {
             val resolved = normalizeArtworkSeed(Color(it.rgb))
