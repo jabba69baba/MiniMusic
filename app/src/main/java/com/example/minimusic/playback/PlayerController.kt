@@ -506,7 +506,6 @@ class PlayerController(private val context: Context) {
         val positionMs = c.currentPosition
             .takeIf { it != C.TIME_UNSET && it >= 0L }
             ?: 0L
-        val wasPlaying = c.isPlaying
         val mediaItems = targetEntries.map { entry ->
             entry.song.toMediaItem(mediaId = entry.entryId.toString())
         }
@@ -514,10 +513,11 @@ class PlayerController(private val context: Context) {
         timelineReplacementInProgress = true
         try {
             pendingSeekPositionMs = null
+            // Keep the already-prepared player state intact. In particular, do
+            // not call prepare(), play(), or pause() here: that lifecycle cycle
+            // is what made the shuffle toggle rubber-band and briefly stop audio.
             c.setMediaItems(mediaItems, targetIndex, positionMs)
             c.shuffleModeEnabled = false
-            c.prepare()
-            if (wasPlaying) c.play() else c.pause()
 
             currentQueueEntries = targetEntries
             currentQueue = targetEntries.map { it.song }
