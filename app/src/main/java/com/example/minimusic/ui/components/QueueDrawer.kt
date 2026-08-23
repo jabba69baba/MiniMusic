@@ -635,6 +635,55 @@ private class PracticalQueueAdapter(
     }
 
     inner class MoveCallback : ItemTouchHelper.Callback() {
+        private var activeRecyclerView: RecyclerView? = null
+        private var activeViewHolder: RecyclerView.ViewHolder? = null
+        private var autoScrollRunning = false
+        private val autoScrollRunnable = object : Runnable {
+            override fun run() {
+                val recyclerView = activeRecyclerView
+                val holder = activeViewHolder
+                if (!isDragging || recyclerView == null || holder == null || !recyclerView.isAttachedToWindow) {
+                    autoScrollRunning = false
+                    return
+                }
+                val edge = context.dp(96)
+                val top = holder.itemView.top + holder.itemView.translationY
+                val bottom = holder.itemView.bottom + holder.itemView.translationY
+                val delta = when {
+                    bottom > recyclerView.height - edge -> {
+                        ((bottom - (recyclerView.height - edge)) / 4f)
+                            .roundToInt()
+                            .coerceIn(context.dp(10), context.dp(56))
+                    }
+                    top < edge -> {
+                        -((edge - top) / 4f)
+                            .roundToInt()
+                            .coerceIn(context.dp(10), context.dp(56))
+                    }
+                    else -> 0
+                }
+                if (delta != 0 && recyclerView.canScrollVertically(if (delta > 0) 1 else -1)) {
+                    recyclerView.scrollBy(0, delta)
+                }
+                recyclerView.postOnAnimation(this)
+            }
+        }
+
+        private fun startAutoScroll(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+            activeRecyclerView = recyclerView
+            activeViewHolder = viewHolder
+            if (!autoScrollRunning) {
+                autoScrollRunning = true
+                recyclerView.postOnAnimation(autoScrollRunnable)
+            }
+        }
+
+        private fun stopAutoScroll() {
+            activeRecyclerView?.removeCallbacks(autoScrollRunnable)
+            activeRecyclerView = null
+            activeViewHolder = null
+            autoScrollRunning = false
+        }
 
         override fun isLongPressDragEnabled(): Boolean = false
         override fun isItemViewSwipeEnabled(): Boolean = false
@@ -649,10 +698,14 @@ private class PracticalQueueAdapter(
             if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
                 viewHolder.setIsRecyclable(false)
                 beginDrag(viewHolder)
+                attachedRecyclerView?.let { startAutoScroll(it, viewHolder) }
+            } else if (actionState == ItemTouchHelper.ACTION_STATE_IDLE) {
+                stopAutoScroll()
             }
         }
 
         override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+            stopAutoScroll()
             super.clearView(recyclerView, viewHolder)
             if (!releaseSubmitted) {
                 releaseSubmitted = true
@@ -689,19 +742,15 @@ private class PracticalQueueAdapter(
 
         override fun getBoundingBoxMargin(): Int = context.dp(48)
 
+        // The continuous runnable above owns edge scrolling. Returning zero here
+        // prevents ItemTouchHelper from running a second competing scroll loop.
         override fun interpolateOutOfBoundsScroll(
             recyclerView: RecyclerView,
             viewSize: Int,
             viewSizeOutOfBounds: Int,
             totalSize: Int,
             msSinceStartScroll: Long
-        ): Int {
-            if (viewSizeOutOfBounds == 0) return 0
-            val direction = if (viewSizeOutOfBounds > 0) 1 else -1
-            val distance = abs(viewSizeOutOfBounds).coerceAtLeast(context.dp(12))
-            val step = (context.dp(12) + distance / 5).coerceAtMost(context.dp(48))
-            return direction * step
-        }
+        ): Int = 0
 
         override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) = Unit
     }

@@ -23,9 +23,12 @@ class MusicService : MediaSessionService() {
 
     companion object {
         const val ACTION_FRESH_SHUFFLE = "com.example.minimusic.action.FRESH_SHUFFLE"
+        const val ACTION_APPLY_SHUFFLE_ORDER = "com.example.minimusic.action.APPLY_SHUFFLE_ORDER"
+        const val EXTRA_SHUFFLE_ORDER = "shuffle_order"
     }
 
     private val freshShuffleCommand = SessionCommand(ACTION_FRESH_SHUFFLE, Bundle())
+    private val applyShuffleOrderCommand = SessionCommand(ACTION_APPLY_SHUFFLE_ORDER, Bundle())
     private var mediaSession: MediaSession? = null
 
     private val sessionCallback = object : MediaSession.Callback {
@@ -36,6 +39,7 @@ class MusicService : MediaSessionService() {
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
                 .buildUpon()
                 .add(freshShuffleCommand)
+                .add(applyShuffleOrderCommand)
                 .build()
             return MediaSession.ConnectionResult.accept(
                 commands,
@@ -57,6 +61,19 @@ class MusicService : MediaSessionService() {
                         )
                     }
                 }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == ACTION_APPLY_SHUFFLE_ORDER) {
+                val requestedOrder = args.getIntArray(EXTRA_SHUFFLE_ORDER)
+                val player = session.player as? ExoPlayer
+                if (player == null || requestedOrder == null ||
+                    requestedOrder.size != player.mediaItemCount ||
+                    requestedOrder.toSet().size != requestedOrder.size ||
+                    requestedOrder.any { it !in 0 until player.mediaItemCount }
+                ) {
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                }
+                player.setShuffleOrder(DefaultShuffleOrder(requestedOrder, System.nanoTime()))
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
