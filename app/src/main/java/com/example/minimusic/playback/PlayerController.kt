@@ -51,7 +51,6 @@ class PlayerController(private val context: Context) {
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
     private var pendingSeekPositionMs: Long? = null
-    private var reorderJob: Job? = null
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -239,29 +238,38 @@ class PlayerController(private val context: Context) {
         c.play()
     }
 
-    /** Move a queue entry by stable identity, keeping Media3 and the local mirror aligned. */
-    fun moveQueueEntry(entryId: Long, toIndex: Int) {
+    /**
+     * Moves one displayed queue entry by identity. The display list may be a
+     * native shuffled traversal, so its indices are translated back to the
+     * physical Media3 timeline before the single move is issued.
+     */
+    fun moveQueueEntry(entryId: Long, toDisplayIndex: Int) {
         val c = controller ?: return
-        val fromIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
-        if (fromIndex < 0 || currentQueueEntries.isEmpty()) return
+        val displayEntries = if (c.shuffleModeEnabled) nativePlaybackOrder(c) else currentQueueEntries
+        val fromDisplayIndex = displayEntries.indexOfFirst { it.entryId == entryId }
+        if (fromDisplayIndex < 0 || toDisplayIndex !in displayEntries.indices || fromDisplayIndex == toDisplayIndex) {
+            return
+        }
 
-        val destinationEntry = currentQueueEntries.getOrNull(toIndex)
-        val destination = destinationEntry?.let { entry ->
-            currentQueueEntries.indexOfFirst { it.entryId == entry.entryId }
-        }?.takeIf { it >= 0 } ?: currentQueueEntries.lastIndex
-        if (fromIndex == destination) return
+        val targetEntry = displayEntries[toDisplayIndex]
+        val fromPhysicalIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
+        val toPhysicalIndex = currentQueueEntries.indexOfFirst { it.entryId == targetEntry.entryId }
+        if (fromPhysicalIndex < 0 || toPhysicalIndex < 0 || fromPhysicalIndex == toPhysicalIndex) return
 
         runTimelineMutation {
-            c.moveMediaItem(fromIndex, destination)
-            currentQueueEntries = currentQueueEntries.toMutableList().apply {
-                add(destination, removeAt(fromIndex))
-            }
-            currentQueue = currentQueueEntries.map { it.song }
+            // Disable traversal mode without replacing the active playlist. The
+            // physical source/destination indices were resolved before this flag
+            // changed, so the one move remains deterministic.
             if (c.shuffleModeEnabled) {
                 c.shuffleModeEnabled = false
                 shuffleActive = false
                 _uiState.value = _uiState.value.copy(isShuffled = false)
             }
+            c.moveMediaItem(fromPhysicalIndex, toPhysicalIndex)
+            currentQueueEntries = currentQueueEntries.toMutableList().apply {
+                add(toPhysicalIndex, removeAt(fromPhysicalIndex))
+            }
+            currentQueue = currentQueueEntries.map { it.song }
             refreshCurrentItem()
         }
     }
@@ -269,42 +277,6 @@ class PlayerController(private val context: Context) {
     fun moveQueueItem(fromIndex: Int, toIndex: Int) {
         currentQueueEntries.getOrNull(fromIndex)?.let { entry ->
             moveQueueEntry(entry.entryId, toIndex)
-        }
-    }
-
-    /** Applies the complete released queue order, preserving active identity by media ID. */
-    fun reorderQueue(finalEntryIds: List<Long>) {
-        val requestedIds = finalEntryIds.toList()
-        val initialController = controller ?: return
-        if (requestedIds.size != currentQueueEntries.size ||
-            requestedIds.toSet().size != requestedIds.size ||
-            requestedIds.toSet() != currentQueueEntries.map { it.entryId }.toSet() ||
-            initialController.mediaItemCount != currentQueueEntries.size
-        ) return
-
-        // ItemTouchHelper calls this from clearView. Defer the Media3 timeline
-        // mutation until RecyclerView has fully returned from its release/layout
-        // pass; otherwise Media3 callbacks can synchronously re-enter the adapter.
-        reorderJob?.cancel()
-        reorderJob = scope.launch {
-            delay(32L)
-            val c = controller ?: return@launch
-            if (c.mediaItemCount != requestedIds.size) return@launch
-            val targetEntries = requestedIds.mapNotNull { id ->
-                currentQueueEntries.firstOrNull { it.entryId == id }
-            }
-            if (targetEntries.size != requestedIds.size) return@launch
-
-            runTimelineMutation {
-                reorderTimelineEntries(c, targetEntries)
-                if (c.shuffleModeEnabled) {
-                    c.shuffleModeEnabled = false
-                    shuffleActive = false
-                    _uiState.value = _uiState.value.copy(isShuffled = false)
-                }
-                refreshCurrentItem()
-            }
-            reorderJob = null
         }
     }
 

@@ -132,7 +132,7 @@ fun QueueScreen(
     artColors: ArtColorRoles,
     onBack: () -> Unit,
     onEntryClick: (Long) -> Unit,
-    onReorderEntries: (List<Long>) -> Unit,
+    onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
     onClearQueue: () -> Unit
 ) {
@@ -213,7 +213,7 @@ fun QueueScreen(
                 snapshot = snapshot,
                 artColors = artColors,
                 onEntryClick = onEntryClick,
-                onReorderEntries = onReorderEntries,
+                onReorderEntry = onReorderEntry,
                 onRemoveEntry = onRemoveEntry,
                 locateRequest = locateRequest,
                 queueTopRequest = 0
@@ -229,7 +229,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
     isOpen: Boolean,
     onOpenChange: (Boolean) -> Unit,
     onEntryClick: (Long) -> Unit,
-    onReorderEntries: (List<Long>) -> Unit,
+    onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
     onClearQueue: () -> Unit
 ) {
@@ -393,7 +393,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         snapshot = snapshot,
                         artColors = artColors,
                         onEntryClick = onEntryClick,
-                        onReorderEntries = onReorderEntries,
+                        onReorderEntry = onReorderEntry,
                         onRemoveEntry = onRemoveEntry,
                         locateRequest = locateRequest,
                         queueTopRequest = queueTopRequest
@@ -409,14 +409,14 @@ private fun ColumnScope.QueueDrawerList(
     snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
     onEntryClick: (Long) -> Unit,
-    onReorderEntries: (List<Long>) -> Unit,
+    onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
     locateRequest: Int,
     queueTopRequest: Int
 ) {
     val context = LocalContext.current
     val latestOnEntryClick by rememberUpdatedState(onEntryClick)
-    val latestOnReorderEntries by rememberUpdatedState(onReorderEntries)
+    val latestOnReorderEntry by rememberUpdatedState(onReorderEntry)
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
     val adapter = remember { PracticalQueueAdapter(context) }
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
@@ -432,7 +432,7 @@ private fun ColumnScope.QueueDrawerList(
     Spacer(modifier = Modifier.height(8.dp))
 
     adapter.onEntryClick = latestOnEntryClick
-    adapter.onReorderEntries = latestOnReorderEntries
+    adapter.onReorderEntry = latestOnReorderEntry
     adapter.onRemoveEntry = latestOnRemoveEntry
     adapter.artColors = artColors
     adapter.submitSnapshot(snapshot)
@@ -507,11 +507,11 @@ private class PracticalQueueAdapter(
     private var pendingSnapshot: QueueSnapshot? = null
     private var snapshotPostPending = false
     private var attachedRecyclerView: RecyclerView? = null
-    private var awaitingReorderIds: List<Long>? = null
+    private var dragStartEntries: List<QueueEntry> = emptyList()
     private var releaseSubmitted = false
     var artColors: ArtColorRoles? = null
     var onEntryClick: (Long) -> Unit = {}
-    var onReorderEntries: (List<Long>) -> Unit = {}
+    var onReorderEntry: (Long, Int) -> Unit = { _, _ -> }
     var onRemoveEntry: (Long) -> Unit = {}
     var startDrag: ((RecyclerView.ViewHolder) -> Unit)? = null
 
@@ -561,11 +561,6 @@ private class PracticalQueueAdapter(
     }
 
     private fun applySnapshot(snapshot: QueueSnapshot) {
-        val incomingIds = snapshot.visibleEntries.map { it.entryId }
-        awaitingReorderIds?.let { expectedIds ->
-            if (incomingIds != expectedIds) return
-            awaitingReorderIds = null
-        }
         val displayEntries = snapshot.visibleEntries
         val oldIds = entries.map { it.entryId }
         val newIds = displayEntries.map { it.entryId }
@@ -616,6 +611,8 @@ private class PracticalQueueAdapter(
             .takeIf { it != RecyclerView.NO_POSITION }
             ?.let { position -> entries.getOrNull(position)?.entryId }
         deferredSnapshot = null
+        pendingSnapshot = null
+        dragStartEntries = entries.toList()
         releaseSubmitted = false
     }
 
@@ -627,6 +624,7 @@ private class PracticalQueueAdapter(
         // snapshot after the deferred reorder completes.
         deferredSnapshot = null
         pendingSnapshot = null
+        dragStartEntries = emptyList()
     }
 
     private fun moveLocal(from: Int, to: Int) {
@@ -637,7 +635,6 @@ private class PracticalQueueAdapter(
     }
 
     inner class MoveCallback : ItemTouchHelper.Callback() {
-        private var autoScrollPosted = false
 
         override fun isLongPressDragEnabled(): Boolean = false
         override fun isItemViewSwipeEnabled(): Boolean = false
@@ -659,14 +656,18 @@ private class PracticalQueueAdapter(
             super.clearView(recyclerView, viewHolder)
             if (!releaseSubmitted) {
                 releaseSubmitted = true
-                val submittedIds = entries.map { it.entryId }
-                awaitingReorderIds = submittedIds
-                viewHolder.itemView.post { onReorderEntries(submittedIds) }
-                // If the controller rejects the request because the queue changed
-                // concurrently, do not leave the adapter waiting forever.
-                viewHolder.itemView.postDelayed({
-                    if (awaitingReorderIds == submittedIds) awaitingReorderIds = null
-                }, 750L)
+                val movedEntryId = draggedEntryId
+                val fromIndex = movedEntryId?.let { id ->
+                    dragStartEntries.indexOfFirst { it.entryId == id }
+                } ?: -1
+                val toIndex = movedEntryId?.let { id ->
+                    entries.indexOfFirst { it.entryId == id }
+                } ?: -1
+                if (movedEntryId != null && fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
+                    // Keep clearView visual-only; the one logical move is posted
+                    // after ItemTouchHelper has finished its release callback.
+                    viewHolder.itemView.post { onReorderEntry(movedEntryId, toIndex) }
+                }
             }
             viewHolder.setIsRecyclable(true)
             endDrag()
@@ -686,50 +687,7 @@ private class PracticalQueueAdapter(
             return true
         }
 
-        override fun getBoundingBoxMargin(): Int = context.dp(72)
-
-        override fun onChildDraw(
-            canvas: Canvas,
-            recyclerView: RecyclerView,
-            viewHolder: RecyclerView.ViewHolder,
-            dX: Float,
-            dY: Float,
-            actionState: Int,
-            isCurrentlyActive: Boolean
-        ) {
-            super.onChildDraw(canvas, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
-            if (actionState != ItemTouchHelper.ACTION_STATE_DRAG || !isCurrentlyActive || autoScrollPosted) {
-                return
-            }
-
-            val edge = context.dp(72)
-            val projectedTop = viewHolder.itemView.top + dY
-            val projectedBottom = viewHolder.itemView.bottom + dY
-            val scrollDistance = when {
-                projectedBottom > recyclerView.height - edge -> {
-                    ((projectedBottom - (recyclerView.height - edge)) / 3f)
-                        .roundToInt()
-                        .coerceIn(context.dp(8), context.dp(36))
-                }
-                projectedTop < edge -> {
-                    -((edge - projectedTop) / 3f)
-                        .roundToInt()
-                        .coerceIn(context.dp(8), context.dp(36))
-                }
-                else -> 0
-            }
-            if (scrollDistance == 0 || !recyclerView.canScrollVertically(if (scrollDistance > 0) 1 else -1)) {
-                return
-            }
-
-            autoScrollPosted = true
-            recyclerView.post {
-                autoScrollPosted = false
-                if (isDragging && recyclerView.isAttachedToWindow) {
-                    recyclerView.scrollBy(0, scrollDistance)
-                }
-            }
-        }
+        override fun getBoundingBoxMargin(): Int = context.dp(48)
 
         override fun interpolateOutOfBoundsScroll(
             recyclerView: RecyclerView,

@@ -134,7 +134,7 @@ fun MiniMusicNavGraph(
                 onOpenLyrics = { navController.navigate(Routes.LYRICS) },
                 onQueueItemClick = playerViewModel::playFromQueue,
                 onQueueEntryClick = playerViewModel::playQueueEntry,
-                onReorderQueue = playerViewModel::reorderQueue,
+                onReorderQueue = playerViewModel::moveQueueEntry,
                 onRemoveQueueEntry = playerViewModel::removeQueueEntry,
                 onClearQueue = {
                     playerViewModel.clearQueue()
