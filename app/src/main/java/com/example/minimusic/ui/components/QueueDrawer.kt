@@ -504,6 +504,7 @@ private class PracticalQueueAdapter(
     private var isDragging = false
     private var draggedEntryId: Long? = null
     private var deferredSnapshot: QueueSnapshot? = null
+    private var releaseSubmitted = false
     var artColors: ArtColorRoles? = null
     var onEntryClick: (Long) -> Unit = {}
     var onReorderEntries: (List<Long>) -> Unit = {}
@@ -569,14 +570,18 @@ private class PracticalQueueAdapter(
             .takeIf { it != RecyclerView.NO_POSITION }
             ?.let { position -> entries.getOrNull(position)?.entryId }
         deferredSnapshot = null
+        releaseSubmitted = false
     }
 
-    fun endDrag() {
+    fun endDrag(recyclerView: RecyclerView) {
         isDragging = false
         draggedEntryId = null
-        deferredSnapshot?.let {
-            deferredSnapshot = null
-            submitSnapshot(it)
+        val pendingSnapshot = deferredSnapshot
+        deferredSnapshot = null
+        // ItemTouchHelper invokes clearView while RecyclerView may still be in
+        // its layout/scroll pass. Never notify the adapter re-entrantly here.
+        if (pendingSnapshot != null) {
+            recyclerView.post { submitSnapshot(pendingSnapshot) }
         }
     }
 
@@ -606,10 +611,12 @@ private class PracticalQueueAdapter(
 
         override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
             super.clearView(recyclerView, viewHolder)
-            val finalIds = entries.map { it.entryId }
-            onReorderEntries(finalIds)
+            if (!releaseSubmitted) {
+                releaseSubmitted = true
+                onReorderEntries(entries.map { it.entryId })
+            }
             viewHolder.setIsRecyclable(true)
-            endDrag()
+            endDrag(recyclerView)
         }
 
         override fun onMove(
