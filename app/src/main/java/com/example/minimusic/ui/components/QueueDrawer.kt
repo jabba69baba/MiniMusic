@@ -103,7 +103,7 @@ private fun QueueActionPill(
     Row(
         modifier = modifier
             .height(44.dp)
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(16.dp))
             .background(artColors.primaryContainer)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
@@ -311,7 +311,10 @@ fun BoxWithConstraintsScope.QueueDrawer(
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Row(
-                                modifier = Modifier.clickable { queueTopRequest++ },
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable { queueTopRequest++ }
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -334,7 +337,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
                                 .fillMaxWidth()
                                 .height(44.dp)
                                 .padding(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             QueueActionPill(
@@ -358,11 +361,16 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(32.dp)
-                                .clickable { onOpenChange(true) },
+                                .height(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable { onOpenChange(true) }
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Icon(
                                     imageVector = Icons.Filled.QueueMusic,
                                     contentDescription = null,

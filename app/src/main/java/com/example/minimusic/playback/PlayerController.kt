@@ -39,7 +39,6 @@ class PlayerController(private val context: Context) {
     private var timelineMutationDepth = 0
     private var syncRequestedAfterMutation = false
     private var shuffleMutationInProgress = false
-    private var timelineReplacementInProgress = false
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
     }.thenBy { it.artist.trim().lowercase() }
@@ -204,9 +203,35 @@ class PlayerController(private val context: Context) {
 
     fun playQueueEntry(entryId: Long) {
         val c = controller ?: return
+        val selectedEntry = currentQueueEntries.firstOrNull { it.entryId == entryId } ?: return
+        if (shuffleActive) {
+            val timelineIndex = currentQueueEntries.indexOf(selectedEntry)
+            if (timelineIndex < 0) return
+            holdPlaybackStateAcrossTransition()
+            _uiState.value = _uiState.value.copy(isPlaying = true)
+            c.seekTo(timelineIndex, 0L)
+            c.play()
+            return
+        }
+
+        val alphabetical = currentQueueEntries.sortedWith(
+            compareBy<QueueEntry> { it.song.title.trim().lowercase() }
+                .thenBy { it.song.artist.trim().lowercase() }
+                .thenBy { it.song.id }
+        )
+        val selectedIndex = alphabetical.indexOfFirst { it.entryId == selectedEntry.entryId }
+        if (selectedIndex < 0) return
+        val rotatedEntries = alphabetical.drop(selectedIndex) + alphabetical.take(selectedIndex)
+
+        runTimelineMutation {
+            reorderTimelineEntries(c, rotatedEntries)
+            currentQueueEntries = rotatedEntries
+            currentQueue = rotatedEntries.map { it.song }
+            refreshCurrentItem()
+        }
+
         val timelineIndex = currentQueueEntries.indexOfFirst { it.entryId == entryId }
         if (timelineIndex < 0) return
-
         holdPlaybackStateAcrossTransition()
         _uiState.value = _uiState.value.copy(isPlaying = true)
         c.seekTo(timelineIndex, 0L)
@@ -356,25 +381,24 @@ class PlayerController(private val context: Context) {
             }.thenBy { it.song.artist.trim().lowercase() }.thenBy { it.song.id })
         }
 
-        // Publish the same target order that will be installed in Media3 so the
-        // queue UI changes immediately. The mutation guard prevents Next or a
-        // second queue edit from observing the old physical timeline in between.
-        currentQueueEntries = targetEntries
-        currentQueue = targetEntries.map { it.song }
-        refreshCurrentItem()
-
-        scope.launch(Dispatchers.Main) {
-            try {
-                replaceTimelineAtomically(c, targetEntries)
-            } catch (_: RuntimeException) {
-                // Keep the controller usable if Media3 rejects a transient move;
-                // restore the previous visual state and republish the timeline.
-                shuffleActive = previousShuffleActive
-                _uiState.value = _uiState.value.copy(isShuffled = previousShuffleActive)
-                syncQueueFromController()
-            } finally {
-                shuffleMutationInProgress = false
+        val previousEntries = currentQueueEntries
+        try {
+            runTimelineMutation {
+                reorderTimelineEntries(c, targetEntries)
+                c.shuffleModeEnabled = false
+                currentQueueEntries = targetEntries
+                currentQueue = targetEntries.map { it.song }
+                refreshCurrentItem()
             }
+        } catch (_: RuntimeException) {
+            // Keep the controller usable if a transient Media3 mutation fails.
+            shuffleActive = previousShuffleActive
+            currentQueueEntries = previousEntries
+            currentQueue = previousEntries.map { it.song }
+            _uiState.value = _uiState.value.copy(isShuffled = previousShuffleActive)
+            syncQueueFromController()
+        } finally {
+            shuffleMutationInProgress = false
         }
     }
 
@@ -410,10 +434,8 @@ class PlayerController(private val context: Context) {
             // remain as a pending seek target while the new track progresses.
             // Otherwise the ticker keeps rendering 0 after shuffle/reorder.
             pendingSeekPositionMs = null
-            if (!timelineReplacementInProgress) {
-                _uiState.value = _uiState.value.copy(positionMs = 0L)
-                holdPlaybackStateAcrossTransition()
-            }
+            _uiState.value = _uiState.value.copy(positionMs = 0L)
+            holdPlaybackStateAcrossTransition()
             syncQueueFromController()
         }
 
@@ -497,32 +519,6 @@ class PlayerController(private val context: Context) {
         return shuffledEntries
     }
 
-    private fun replaceTimelineAtomically(c: Player, targetEntries: List<QueueEntry>) {
-        if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
-        val currentMediaId = c.currentMediaItem?.mediaId ?: return
-        if (targetEntries.none { it.entryId.toString() == currentMediaId }) return
-        val mediaItems = targetEntries.map { entry ->
-            entry.song.toMediaItem(mediaId = entry.entryId.toString())
-        }
-
-        timelineReplacementInProgress = true
-        try {
-            pendingSeekPositionMs = null
-            // Keep the already-prepared player state intact. The false flag
-            // preserves the current media item and playback position; do not
-            // select a new index/position and do not call prepare(), play(), or
-            // pause(), because that lifecycle cycle causes the rubber-band and
-            // brief audio interruption.
-            c.setMediaItems(mediaItems, false)
-            c.shuffleModeEnabled = false
-
-            currentQueueEntries = targetEntries
-            currentQueue = targetEntries.map { it.song }
-            refreshCurrentItem()
-        } finally {
-            timelineReplacementInProgress = false
-        }
-    }
 
     private fun reorderTimelineEntries(c: Player, targetEntries: List<QueueEntry>) {
         if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
