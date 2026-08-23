@@ -1,11 +1,18 @@
 package com.example.minimusic.playback
 
+import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionCommands
+import androidx.media3.session.SessionResult
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 
 /**
  * Background service that owns the single ExoPlayer instance and exposes it through
@@ -15,7 +22,47 @@ import androidx.media3.session.MediaSessionService
  */
 class MusicService : MediaSessionService() {
 
+    companion object {
+        const val ACTION_FRESH_SHUFFLE = "com.example.minimusic.action.FRESH_SHUFFLE"
+    }
+
+    private val freshShuffleCommand = SessionCommand(ACTION_FRESH_SHUFFLE, Bundle())
     private var mediaSession: MediaSession? = null
+
+    private val sessionCallback = object : MediaSession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val commands = SessionCommands.Builder()
+                .addAllPredefinedCommands()
+                .add(freshShuffleCommand)
+                .build()
+            return MediaSession.ConnectionResult.accept(
+                commands,
+                MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+            )
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == ACTION_FRESH_SHUFFLE) {
+                (session.player as? ExoPlayer)?.let { player ->
+                    if (player.mediaItemCount > 1) {
+                        player.setShuffleOrder(
+                            DefaultShuffleOrder(player.mediaItemCount, System.nanoTime())
+                        )
+                    }
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            return super.onCustomCommand(session, controller, customCommand, args)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -31,7 +78,9 @@ class MusicService : MediaSessionService() {
                 repeatMode = Player.REPEAT_MODE_OFF
             }
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession.Builder(this, player)
+            .setCallback(sessionCallback)
+            .build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession

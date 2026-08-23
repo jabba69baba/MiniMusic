@@ -502,6 +502,7 @@ private class PracticalQueueAdapter(
     private var currentPosition: Int = -1
     private var isPlaying = false
     private var isDragging = false
+    private var draggedEntryId: Long? = null
     private var deferredSnapshot: QueueSnapshot? = null
     var artColors: ArtColorRoles? = null
     var onEntryClick: (Long) -> Unit = {}
@@ -562,13 +563,17 @@ private class PracticalQueueAdapter(
 
     override fun getItemCount(): Int = entries.size
 
-    fun beginDrag() {
+    fun beginDrag(holder: RecyclerView.ViewHolder) {
         isDragging = true
+        draggedEntryId = holder.bindingAdapterPosition
+            .takeIf { it != RecyclerView.NO_POSITION }
+            ?.let { position -> entries.getOrNull(position)?.entryId }
         deferredSnapshot = null
     }
 
     fun endDrag() {
         isDragging = false
+        draggedEntryId = null
         deferredSnapshot?.let {
             deferredSnapshot = null
             submitSnapshot(it)
@@ -593,12 +598,17 @@ private class PracticalQueueAdapter(
 
         override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
             super.onSelectedChanged(viewHolder, actionState)
-            if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) beginDrag()
+            if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
+                viewHolder.setIsRecyclable(false)
+                beginDrag(viewHolder)
+            }
         }
 
         override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
             super.clearView(recyclerView, viewHolder)
-            onReorderEntries(entries.map { it.entryId })
+            val finalIds = entries.map { it.entryId }
+            onReorderEntries(finalIds)
+            viewHolder.setIsRecyclable(true)
             endDrag()
         }
 
@@ -607,12 +617,19 @@ private class PracticalQueueAdapter(
             viewHolder: RecyclerView.ViewHolder,
             target: RecyclerView.ViewHolder
         ): Boolean {
-            val from = viewHolder.bindingAdapterPosition
+            val from = draggedEntryId?.let { id ->
+                entries.indexOfFirst { it.entryId == id }
+            } ?: viewHolder.bindingAdapterPosition
             val to = target.bindingAdapterPosition
-            if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
+            if (from !in entries.indices || to !in entries.indices) return false
             moveLocal(from, to)
             return true
         }
+
+        override fun getBoundingBoxMargin(
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder
+        ): Int = context.dp(24)
 
         override fun interpolateOutOfBoundsScroll(
             recyclerView: RecyclerView,

@@ -1,12 +1,14 @@
 package com.example.minimusic.playback
 
 import android.content.ComponentName
+import android.os.Bundle
 import android.content.Context
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.example.minimusic.data.model.Song
 import com.google.common.util.concurrent.MoreExecutors
@@ -37,6 +39,10 @@ class PlayerController(private val context: Context) {
     private var nextQueueEntryId = 1L
     private var timelineMutationDepth = 0
     private var syncRequestedAfterMutation = false
+    private val freshShuffleCommand = SessionCommand(
+        MusicService.ACTION_FRESH_SHUFFLE,
+        Bundle()
+    )
     private val alphabeticalSongComparator = compareBy<Song> {
         it.title.trim().lowercase()
     }.thenBy { it.artist.trim().lowercase() }
@@ -247,6 +253,11 @@ class PlayerController(private val context: Context) {
                 add(destination, removeAt(fromIndex))
             }
             currentQueue = currentQueueEntries.map { it.song }
+            if (c.shuffleModeEnabled) {
+                c.shuffleModeEnabled = false
+                shuffleActive = false
+                _uiState.value = _uiState.value.copy(isShuffled = false)
+            }
             refreshCurrentItem()
         }
     }
@@ -273,6 +284,11 @@ class PlayerController(private val context: Context) {
 
         runTimelineMutation {
             reorderTimelineEntries(c, targetEntries)
+            if (c.shuffleModeEnabled) {
+                c.shuffleModeEnabled = false
+                shuffleActive = false
+                _uiState.value = _uiState.value.copy(isShuffled = false)
+            }
             refreshCurrentItem()
         }
     }
@@ -351,12 +367,17 @@ class PlayerController(private val context: Context) {
         if (c.mediaItemCount < 2) return
         val enabled = !c.shuffleModeEnabled
         try {
-            // Native shuffle changes only Media3's next/previous traversal order.
-            // It does not replace the playlist, seek, prepare, or toggle playback.
+            // Native shuffle changes only Media3's traversal metadata. The active
+            // playlist, item, position, duration, and play state remain untouched.
             c.shuffleModeEnabled = enabled
             shuffleActive = enabled
             _uiState.value = _uiState.value.copy(isShuffled = enabled)
-            refreshCurrentItem()
+            if (enabled) {
+                c.sendCustomCommand(freshShuffleCommand, Bundle())
+                    .addListener({ refreshCurrentItem() }, MoreExecutors.directExecutor())
+            } else {
+                refreshCurrentItem()
+            }
         } catch (_: RuntimeException) {
             // Restore the button state if the controller rejects the mode change.
             shuffleActive = c.shuffleModeEnabled
