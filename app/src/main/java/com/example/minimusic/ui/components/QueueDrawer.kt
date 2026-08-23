@@ -626,10 +626,7 @@ private class PracticalQueueAdapter(
             return true
         }
 
-        override fun getBoundingBoxMargin(
-            recyclerView: RecyclerView,
-            viewHolder: RecyclerView.ViewHolder
-        ): Int = context.dp(24)
+        override fun getBoundingBoxMargin(): Int = context.dp(24)
 
         override fun interpolateOutOfBoundsScroll(
             recyclerView: RecyclerView,
