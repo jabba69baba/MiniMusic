@@ -463,7 +463,7 @@ private fun ColumnScope.QueueDrawerList(
                 previousCurrentEntryId = snapshot.currentEntryId
                 recyclerView.post {
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
-                    val currentPosition = snapshot.resolvedCurrentPosition
+                    val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition < 0) return@post
                     val lastVisible = layout.findLastVisibleItemPosition()
                     if (currentPosition > 0 && currentPosition >= lastVisible) {
@@ -475,7 +475,7 @@ private fun ColumnScope.QueueDrawerList(
                 previousLocateRequest = locateRequest
                 recyclerView.post {
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
-                    val currentPosition = snapshot.resolvedCurrentPosition
+                    val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
                         layout.scrollToPositionWithOffset(currentPosition, 0)
                     }
@@ -523,10 +523,10 @@ private class PracticalQueueAdapter(
         val newIds = displayEntries.map { it.entryId }
         val orderChanged = oldIds != newIds
         val stateChanged = currentEntryId != snapshot.currentEntryId ||
-            currentPosition != snapshot.resolvedCurrentPosition
+            currentPosition != snapshot.resolvedVisiblePosition
         entries = displayEntries
         currentEntryId = snapshot.currentEntryId
-        currentPosition = snapshot.resolvedCurrentPosition
+        currentPosition = snapshot.resolvedVisiblePosition
         if (orderChanged) notifyDataSetChanged()
         else if (stateChanged && entries.isNotEmpty()) {
             notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)
