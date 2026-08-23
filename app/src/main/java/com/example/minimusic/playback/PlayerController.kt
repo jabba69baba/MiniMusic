@@ -500,12 +500,7 @@ class PlayerController(private val context: Context) {
     private fun replaceTimelineAtomically(c: Player, targetEntries: List<QueueEntry>) {
         if (targetEntries.size != c.mediaItemCount || targetEntries.isEmpty()) return
         val currentMediaId = c.currentMediaItem?.mediaId ?: return
-        val targetIndex = targetEntries.indexOfFirst { it.entryId.toString() == currentMediaId }
-        if (targetIndex < 0) return
-
-        val positionMs = c.currentPosition
-            .takeIf { it != C.TIME_UNSET && it >= 0L }
-            ?: 0L
+        if (targetEntries.none { it.entryId.toString() == currentMediaId }) return
         val mediaItems = targetEntries.map { entry ->
             entry.song.toMediaItem(mediaId = entry.entryId.toString())
         }
@@ -513,10 +508,12 @@ class PlayerController(private val context: Context) {
         timelineReplacementInProgress = true
         try {
             pendingSeekPositionMs = null
-            // Keep the already-prepared player state intact. In particular, do
-            // not call prepare(), play(), or pause() here: that lifecycle cycle
-            // is what made the shuffle toggle rubber-band and briefly stop audio.
-            c.setMediaItems(mediaItems, targetIndex, positionMs)
+            // Keep the already-prepared player state intact. The false flag
+            // preserves the current media item and playback position; do not
+            // select a new index/position and do not call prepare(), play(), or
+            // pause(), because that lifecycle cycle causes the rubber-band and
+            // brief audio interruption.
+            c.setMediaItems(mediaItems, false)
             c.shuffleModeEnabled = false
 
             currentQueueEntries = targetEntries
