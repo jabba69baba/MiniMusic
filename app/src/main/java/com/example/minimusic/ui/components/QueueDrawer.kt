@@ -75,6 +75,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.ColorUtils
 import com.example.minimusic.R
+import androidx.recyclerview.widget.DefaultItemAnimator
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -217,7 +219,8 @@ fun QueueScreen(
                 onReorderEntry = onReorderEntry,
                 onRemoveEntry = onRemoveEntry,
                 locateRequest = locateRequest,
-                queueTopRequest = 0
+                queueTopRequest = 0,
+                openRequest = 1
             )
         }
     }
@@ -243,11 +246,13 @@ fun BoxWithConstraintsScope.QueueDrawer(
     val offsetY = remember { Animatable(closedOffsetPx) }
     var locateRequest by remember { mutableStateOf(0) }
     var queueTopRequest by remember { mutableStateOf(0) }
+    var openRequest by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(isOpen, fullHeightPx) {
         val target = if (isOpen) openOffsetPx else closedOffsetPx
         offsetY.animateTo(target, animationSpec = tween(280, easing = FastOutSlowInEasing))
+        if (isOpen) openRequest++
     }
 
     Box(
@@ -397,7 +402,8 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         onReorderEntry = onReorderEntry,
                         onRemoveEntry = onRemoveEntry,
                         locateRequest = locateRequest,
-                        queueTopRequest = queueTopRequest
+                        queueTopRequest = queueTopRequest,
+                        openRequest = openRequest
                     )
                 }
             }
@@ -413,7 +419,8 @@ private fun ColumnScope.QueueDrawerList(
     onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
     locateRequest: Int,
-    queueTopRequest: Int
+    queueTopRequest: Int,
+    openRequest: Int
 ) {
     val context = LocalContext.current
     val latestOnEntryClick by rememberUpdatedState(onEntryClick)
@@ -423,6 +430,7 @@ private fun ColumnScope.QueueDrawerList(
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
     var previousLocateRequest by remember { mutableStateOf(0) }
     var previousQueueTopRequest by remember { mutableStateOf(0) }
+    var previousOpenRequest by remember { mutableStateOf(0) }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
     // boundary prevents rows from painting over the Queue title or controls.
@@ -450,6 +458,13 @@ private fun ColumnScope.QueueDrawerList(
                 setHasFixedSize(true)
                 overScrollMode = View.OVER_SCROLL_NEVER
                 clipToPadding = true
+                itemAnimator = DefaultItemAnimator().apply {
+                    removeDuration = 220L
+                    moveDuration = 220L
+                    addDuration = 180L
+                    changeDuration = 180L
+                    supportsChangeAnimations = false
+                }
             }
             val touchHelper = ItemTouchHelper(adapter.MoveCallback())
             adapter.startDrag = { holder -> touchHelper.startDrag(holder) }
@@ -458,7 +473,6 @@ private fun ColumnScope.QueueDrawerList(
             recyclerView
         },
         update = { recyclerView ->
-            recyclerView.itemAnimator = null
             adapter.submitSnapshot(snapshot)
             if (snapshot.currentEntryId != previousCurrentEntryId) {
                 previousCurrentEntryId = snapshot.currentEntryId
@@ -468,6 +482,16 @@ private fun ColumnScope.QueueDrawerList(
                     if (currentPosition < 0) return@post
                     val lastVisible = layout.findLastVisibleItemPosition()
                     if (currentPosition > 0 && currentPosition >= lastVisible) {
+                        layout.scrollToPositionWithOffset(currentPosition, 0)
+                    }
+                }
+            }
+            if (openRequest != previousOpenRequest) {
+                previousOpenRequest = openRequest
+                recyclerView.post {
+                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+                    val currentPosition = snapshot.resolvedVisiblePosition
+                    if (currentPosition >= 0) {
                         layout.scrollToPositionWithOffset(currentPosition, 0)
                     }
                 }
@@ -563,7 +587,8 @@ private class PracticalQueueAdapter(
 
     private fun applySnapshot(snapshot: QueueSnapshot) {
         val displayEntries = snapshot.visibleEntries
-        val oldIds = entries.map { it.entryId }
+        val oldEntries = entries
+        val oldIds = oldEntries.map { it.entryId }
         val newIds = displayEntries.map { it.entryId }
         val orderChanged = oldIds != newIds
         val stateChanged = currentEntryId != snapshot.currentEntryId ||
@@ -571,8 +596,20 @@ private class PracticalQueueAdapter(
         entries = displayEntries
         currentEntryId = snapshot.currentEntryId
         currentPosition = snapshot.resolvedVisiblePosition
-        if (orderChanged) notifyDataSetChanged()
-        else if (stateChanged && entries.isNotEmpty()) {
+        if (orderChanged) {
+            // DiffUtil emits a real remove operation, allowing RecyclerView's
+            // animator to fade the dismissed card instead of snapping the whole
+            // list with notifyDataSetChanged(). It also preserves stable row
+            // identity during the single-move reorder flow.
+            DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                override fun getOldListSize(): Int = oldEntries.size
+                override fun getNewListSize(): Int = displayEntries.size
+                override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                    oldEntries[oldItemPosition].entryId == displayEntries[newItemPosition].entryId
+                override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                    oldEntries[oldItemPosition] == displayEntries[newItemPosition]
+            }).dispatchUpdatesTo(this)
+        } else if (stateChanged && entries.isNotEmpty()) {
             notifyItemRangeChanged(0, entries.size, PAYLOAD_STATE)
         }
     }
@@ -649,25 +686,25 @@ private class PracticalQueueAdapter(
                     autoScrollRunning = false
                     return
                 }
-                // Trigger only inside the marked upper-green/lower-yellow
-                // boundary bands. One card (72dp) is reserved outside them,
-                // avoiding the overly aggressive early scrolling behavior.
-                // Use ItemTouchHelper's actual dY position, not the holder's
-                // static layout bounds, so the trigger follows the finger.
-                val edge = context.dp(96)
+                val layout = recyclerView.layoutManager as? LinearLayoutManager
+                val firstVisible = layout?.findViewByPosition(layout.findFirstVisibleItemPosition())
+                val lastVisible = layout?.findViewByPosition(layout.findLastVisibleItemPosition())
+                // The trigger is a reachable card-height band. Upward scrolling
+                // is eligible across the first visible row; downward scrolling
+                // is eligible across the last visible row. The second row is
+                // therefore outside the upper band instead of auto-scrolling on
+                // long-press alone.
+                val upBandTop = (firstVisible?.top ?: recyclerView.paddingTop).toFloat()
+                val upBandBottom = (firstVisible?.bottom ?: recyclerView.paddingTop).toFloat()
+                val downBandTop = (lastVisible?.top ?: recyclerView.height).toFloat()
+                val downBandBottom = (lastVisible?.bottom ?: recyclerView.height).toFloat()
                 val top = if (draggedBottomPx > draggedTopPx) draggedTopPx else holder.itemView.top.toFloat()
                 val bottom = if (draggedBottomPx > draggedTopPx) draggedBottomPx else holder.itemView.bottom.toFloat()
+                val overlapsFirstBand = bottom > upBandTop && top < upBandBottom
+                val overlapsLastBand = bottom > downBandTop && top < downBandBottom
                 val delta = when {
-                    bottom > recyclerView.height - edge -> {
-                        ((bottom - (recyclerView.height - edge)) / 4f)
-                            .roundToInt()
-                            .coerceIn(context.dp(10), context.dp(56))
-                    }
-                    top < edge -> {
-                        -((edge - top) / 4f)
-                            .roundToInt()
-                            .coerceIn(context.dp(10), context.dp(56))
-                    }
+                    overlapsFirstBand -> -context.dp(14)
+                    overlapsLastBand -> context.dp(14)
                     else -> 0
                 }
                 if (delta != 0 && recyclerView.canScrollVertically(if (delta > 0) 1 else -1)) {
