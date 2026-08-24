@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,8 +44,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.ContainedLoadingIndicator
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -67,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -742,18 +742,55 @@ private fun SortMenuOption(
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LoadingState() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        ContainedLoadingIndicator(
-            modifier = Modifier.size(48.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
-        )
+        M3ExpressiveContainedLoadingIndicator()
+    }
+}
+
+/**
+ * Local spec-matched fallback for the contained M3 Expressive indicator. The
+ * project is pinned to Material 3 1.4.0, whose Android artifact does not yet
+ * expose ContainedLoadingIndicator, so this keeps the documented 48dp overall
+ * footprint, 38dp container, contained color roles, and expressive motion
+ * without adding a network dependency or changing the project version.
+ */
+@Composable
+private fun M3ExpressiveContainedLoadingIndicator() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(
+        label = "libraryLoadingIndicator"
+    )
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(
+                durationMillis = 1200,
+                easing = androidx.compose.animation.core.LinearEasing
+            )
+        ),
+        label = "libraryLoadingRotation"
+    )
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(22.dp)) {
+            rotate(rotation) {
+                drawRoundRect(
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * 0.22f),
+                    size = size
+                )
+            }
+        }
     }
 }
 
