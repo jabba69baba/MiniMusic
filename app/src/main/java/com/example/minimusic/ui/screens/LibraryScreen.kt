@@ -53,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -761,6 +763,8 @@ private fun LoadingState() {
  */
 @Composable
 private fun M3ExpressiveContainedLoadingIndicator() {
+    val containerColor = MaterialTheme.colorScheme.primaryContainer
+    val indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
     val transition = androidx.compose.animation.core.rememberInfiniteTransition(
         label = "libraryLoadingIndicator"
     )
@@ -769,9 +773,10 @@ private fun M3ExpressiveContainedLoadingIndicator() {
         targetValue = 360f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             animation = androidx.compose.animation.core.tween(
-                durationMillis = 1200,
+                                durationMillis = 1200,
                 easing = androidx.compose.animation.core.LinearEasing
             )
+
         ),
         label = "libraryLoadingRotation"
     )
@@ -779,13 +784,13 @@ private fun M3ExpressiveContainedLoadingIndicator() {
         modifier = Modifier
             .size(38.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(containerColor),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(22.dp)) {
             rotate(rotation) {
                 drawRoundRect(
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = indicatorColor,
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * 0.22f),
                     size = size
                 )
