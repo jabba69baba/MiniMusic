@@ -43,7 +43,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -138,6 +139,9 @@ fun LibraryScreen(
         onDispose { }
     }
     var footerHeight by remember { mutableStateOf(0.dp) }
+    val filteredSongs = remember(uiState.allSongs, uiState.searchQuery, uiState.sortOrder) {
+        uiState.filteredSongs
+    }
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
     // doesn't own the underlying file for: launch the system confirmation dialog,
@@ -327,9 +331,9 @@ fun LibraryScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
                                     onClick = {
-                                        if (uiState.filteredSongs.isNotEmpty()) {
-                                            val startSong = uiState.filteredSongs.random()
-                                            onShufflePlayFrom(startSong, uiState.filteredSongs)
+                                        if (filteredSongs.isNotEmpty()) {
+                                            val startSong = filteredSongs.random()
+                                            onShufflePlayFrom(startSong, filteredSongs)
                                         }
                                     },
                                     horizontalPadding = 12.dp,
@@ -392,14 +396,14 @@ fun LibraryScreen(
                             uiState.allSongs.isEmpty() -> EmptyLibraryState()
                             else -> when (selectedTab) {
                                 LibraryTab.SONGS -> SongsTab(
-                                    songs = uiState.filteredSongs,
+                                    songs = filteredSongs,
                                     currentSongId = playbackState.currentSong?.id,
                                     jumpToCurrentRequest = jumpToCurrentRequest,
                                     bottomContentPadding = footerHeight,
-                                    onPlaySong = { song -> onPlaySong(song, uiState.filteredSongs) },
+                                    onPlaySong = { song -> onPlaySong(song, filteredSongs) },
                                     onPlayNext = onPlayNext,
                                     onAddToQueue = onAddToQueue,
-                                    onShufflePlayFrom = { song -> onShufflePlayFrom(song, uiState.filteredSongs) },
+                                    onShufflePlayFrom = { song -> onShufflePlayFrom(song, filteredSongs) },
                                     onDelete = onDeleteSong
                                 )
                                 LibraryTab.ALBUMS -> AlbumsTab(
@@ -738,37 +742,17 @@ private fun SortMenuOption(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LoadingState() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Filled.MusicNote,
-            contentDescription = null,
+        ContainedLoadingIndicator(
             modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Loading your library",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        CircularProgressIndicator(
-            modifier = Modifier.size(32.dp),
-            strokeWidth = 3.dp
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Scanning music stored on this device…",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }

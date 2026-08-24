@@ -79,12 +79,13 @@ fun SongListItem(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                if (song.albumArtUri != null) {
+                if (song.albumArtUri == null) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                } else {
                     AsyncImage(
                         model = song.albumArtUri,
                         contentDescription = null,

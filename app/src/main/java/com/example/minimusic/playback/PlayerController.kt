@@ -292,9 +292,25 @@ class PlayerController(private val context: Context) {
             // We only remove the stable entry and let the transition callback publish
             // the new visible order.
             if (wasCurrent) holdPlaybackStateAcrossTransition()
+            val displayedOrderBeforeRemoval = if (c.shuffleModeEnabled) {
+                _queueSnapshot.value.visibleEntries
+                    .map { it.entryId }
+                    .takeIf { it.isNotEmpty() }
+                    ?: currentQueueEntries.map { it.entryId }
+            } else {
+                emptyList()
+            }
             c.removeMediaItem(removedPosition)
             currentQueueEntries = currentQueueEntries.toMutableList().apply { removeAt(removedPosition) }
-            manualQueueOrderEntryIds = manualQueueOrderEntryIds?.filterNot { it == entryId }
+            manualQueueOrderEntryIds = if (c.shuffleModeEnabled) {
+                // Keep the exact visible traversal and remove only the dismissed
+                // identity. Re-deriving nativePlaybackOrder here can move every
+                // remaining row while RecyclerView is trying to animate one
+                // deletion, which caused the shuffled-only jump.
+                displayedOrderBeforeRemoval.filterNot { it == entryId }
+            } else {
+                manualQueueOrderEntryIds?.filterNot { it == entryId }
+            }
             currentQueue = currentQueueEntries.map { it.song }
             refreshCurrentItem()
         }

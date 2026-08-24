@@ -428,8 +428,8 @@ private fun ColumnScope.QueueDrawerList(
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
     val adapter = remember { PracticalQueueAdapter(context) }
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
-    var previousLocateRequest by remember { mutableStateOf(0) }
-    var previousQueueTopRequest by remember { mutableStateOf(0) }
+    var previousLocateRequest by remember { mutableStateOf(locateRequest) }
+    var previousQueueTopRequest by remember { mutableStateOf(queueTopRequest) }
     var previousOpenRequest by remember { mutableStateOf(0) }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
@@ -454,8 +454,14 @@ private fun ColumnScope.QueueDrawerList(
         factory = { viewContext ->
 
             val recyclerView = RecyclerView(viewContext).apply {
-                layoutManager = LinearLayoutManager(viewContext)
+                val initialLayout = LinearLayoutManager(viewContext)
+                layoutManager = initialLayout
                 setHasFixedSize(true)
+                setItemViewCacheSize(8)
+                val initialPosition = snapshot.resolvedVisiblePosition
+                if (initialPosition >= 0) {
+                    initialLayout.scrollToPositionWithOffset(initialPosition, 0)
+                }
                 overScrollMode = View.OVER_SCROLL_NEVER
                 clipToPadding = true
                 itemAnimator = DefaultItemAnimator().apply {
@@ -936,7 +942,7 @@ private class PracticalQueueAdapter(
                         ImageRequest.Builder(root.context)
                             .data(uri)
                             .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
-                            .crossfade(140)
+                            .crossfade(false)
                             .target(artwork)
                             .build()
                     )
