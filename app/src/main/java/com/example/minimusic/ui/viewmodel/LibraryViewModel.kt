@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.viewmodel
 
 import android.app.Application
+import android.os.SystemClock
 import android.content.IntentSender
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -35,24 +37,28 @@ data class LibraryUiState(
     val albums: List<Album> = emptyList(),
     val artists: List<Artist> = emptyList(),
     val searchQuery: String = "",
-    val sortOrder: SongSortOrder = SongSortOrder.NAME_A_Z
-) {
-    val filteredSongs: List<Song>
-        get() {
-            val base = if (searchQuery.isBlank()) allSongs else allSongs.filter {
-                it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true) ||
-                    it.album.contains(searchQuery, ignoreCase = true)
-            }
-            return when (sortOrder) {
-                SongSortOrder.NAME_A_Z -> base.sortedBy { it.title.lowercase() }
-                SongSortOrder.NAME_Z_A -> base.sortedByDescending { it.title.lowercase() }
-                SongSortOrder.ARTIST_A_Z -> base.sortedBy { it.artist.lowercase() }
-                SongSortOrder.ARTIST_Z_A -> base.sortedByDescending { it.artist.lowercase() }
-                SongSortOrder.DATE_ADDED_NEWEST -> base.sortedByDescending { it.dateAddedSeconds }
-                SongSortOrder.DATE_ADDED_OLDEST -> base.sortedBy { it.dateAddedSeconds }
-            }
-        }
+    val sortOrder: SongSortOrder = SongSortOrder.NAME_A_Z,
+    val filteredSongs: List<Song> = emptyList()
+)
+
+private fun filterAndSortSongs(
+    songs: List<Song>,
+    query: String,
+    sortOrder: SongSortOrder
+): List<Song> {
+    val base = if (query.isBlank()) songs else songs.filter {
+        it.title.contains(query, ignoreCase = true) ||
+            it.artist.contains(query, ignoreCase = true) ||
+            it.album.contains(query, ignoreCase = true)
+    }
+    return when (sortOrder) {
+        SongSortOrder.NAME_A_Z -> base.sortedBy { it.title.lowercase() }
+        SongSortOrder.NAME_Z_A -> base.sortedByDescending { it.title.lowercase() }
+        SongSortOrder.ARTIST_A_Z -> base.sortedBy { it.artist.lowercase() }
+        SongSortOrder.ARTIST_Z_A -> base.sortedByDescending { it.artist.lowercase() }
+        SongSortOrder.DATE_ADDED_NEWEST -> base.sortedByDescending { it.dateAddedSeconds }
+        SongSortOrder.DATE_ADDED_OLDEST -> base.sortedBy { it.dateAddedSeconds }
+    }
 }
 
 /** One-off events the Library screen should react to but shouldn't be replayed on recomposition. */
@@ -77,19 +83,28 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     /** Call once the READ_MEDIA_AUDIO / READ_EXTERNAL_STORAGE permission has been granted. */
     fun loadLibrary() {
         viewModelScope.launch {
+            val loadStartedAt = SystemClock.uptimeMillis()
             _uiState.value = _uiState.value.copy(isLoading = true, loadError = null)
             try {
                 val minDuration = settingsRepository.settings.first().minDurationSeconds
                 val songs = repository.loadSongs(minDuration)
-                val (albums, artists) = withContext(Dispatchers.Default) {
-                    repository.deriveAlbums(songs) to repository.deriveArtists(songs)
+                val currentState = _uiState.value
+                val (albums, artists, filteredSongs) = withContext(Dispatchers.Default) {
+                    Triple(
+                        repository.deriveAlbums(songs),
+                        repository.deriveArtists(songs),
+                        filterAndSortSongs(songs, currentState.searchQuery, currentState.sortOrder)
+                    )
                 }
+                val remainingIndicatorTime = 240L - (SystemClock.uptimeMillis() - loadStartedAt)
+                if (remainingIndicatorTime > 0L) delay(remainingIndicatorTime)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     loadError = null,
                     allSongs = songs,
                     albums = albums,
-                    artists = artists
+                    artists = artists,
+                    filteredSongs = filteredSongs
                 )
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
@@ -105,11 +120,28 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun rescanLibrary() = loadLibrary()
 
     fun onSearchQueryChange(query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
+        val state = _uiState.value
+        _uiState.value = state.copy(searchQuery = query)
+        recomputeFilteredSongs(query, state.sortOrder, state.allSongs)
     }
 
     fun onSortOrderChange(sortOrder: SongSortOrder) {
-        _uiState.value = _uiState.value.copy(sortOrder = sortOrder)
+        val state = _uiState.value
+        _uiState.value = state.copy(sortOrder = sortOrder)
+        recomputeFilteredSongs(state.searchQuery, sortOrder, state.allSongs)
+    }
+
+    private fun recomputeFilteredSongs(
+        query: String,
+        sortOrder: SongSortOrder,
+        songs: List<Song>
+    ) {
+        viewModelScope.launch(Dispatchers.Default) {
+            val filtered = filterAndSortSongs(songs, query, sortOrder)
+            if (_uiState.value.searchQuery == query && _uiState.value.sortOrder == sortOrder) {
+                _uiState.value = _uiState.value.copy(filteredSongs = filtered)
+            }
+        }
     }
 
     fun songsForAlbum(albumId: Long): List<Song> =
@@ -128,14 +160,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             when (val result = repository.deleteSong(song)) {
                 is DeleteResult.Deleted -> {
-                    val nextSongs = _uiState.value.allSongs.filterNot { it.id == song.id }
-                    val (albums, artists) = withContext(Dispatchers.Default) {
-                        repository.deriveAlbums(nextSongs) to repository.deriveArtists(nextSongs)
+                    val state = _uiState.value
+                    val nextSongs = state.allSongs.filterNot { it.id == song.id }
+                    val (albums, artists, filteredSongs) = withContext(Dispatchers.Default) {
+                        Triple(
+                            repository.deriveAlbums(nextSongs),
+                            repository.deriveArtists(nextSongs),
+                            filterAndSortSongs(nextSongs, state.searchQuery, state.sortOrder)
+                        )
                     }
-                    _uiState.value = _uiState.value.copy(
+                    _uiState.value = state.copy(
                         allSongs = nextSongs,
                         albums = albums,
-                        artists = artists
+                        artists = artists,
+                        filteredSongs = filteredSongs
                     )
                     _events.emit(LibraryEvent.SongDeleted(song))
                 }

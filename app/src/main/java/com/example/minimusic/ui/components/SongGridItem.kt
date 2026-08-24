@@ -24,10 +24,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.minimusic.data.model.Song
 
 /**
@@ -48,6 +51,14 @@ fun SongGridItem(
 ) {
     val contentColor = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val artworkRequest = remember(song.albumArtUri) {
+        ImageRequest.Builder(context)
+            .data(song.albumArtUri)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .crossfade(false)
+            .build()
+    }
 
     Column(
         modifier = modifier
@@ -70,7 +81,7 @@ fun SongGridItem(
                 )
             } else {
                 AsyncImage(
-                    model = song.albumArtUri,
+                    model = artworkRequest,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()

@@ -9,6 +9,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -220,7 +221,9 @@ fun QueueScreen(
                 onRemoveEntry = onRemoveEntry,
                 locateRequest = locateRequest,
                 queueTopRequest = 0,
-                openRequest = 1
+                openRequest = 1,
+                onTopCloseDrag = {},
+                onTopCloseDragEnd = {}
             )
         }
     }
@@ -403,7 +406,22 @@ fun BoxWithConstraintsScope.QueueDrawer(
                         onRemoveEntry = onRemoveEntry,
                         locateRequest = locateRequest,
                         queueTopRequest = queueTopRequest,
-                        openRequest = openRequest
+                        openRequest = openRequest,
+                        onTopCloseDrag = { deltaY ->
+                            scope.launch {
+                                offsetY.snapTo((offsetY.value + deltaY).coerceIn(openOffsetPx, closedOffsetPx))
+                            }
+                        },
+                        onTopCloseDragEnd = { totalDistance ->
+                            val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
+                            scope.launch {
+                                offsetY.animateTo(
+                                    if (shouldClose) closedOffsetPx else openOffsetPx,
+                                    animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                )
+                            }
+                            if (shouldClose) onOpenChange(false)
+                        }
                     )
                 }
             }
@@ -420,12 +438,16 @@ private fun ColumnScope.QueueDrawerList(
     onRemoveEntry: (Long) -> Unit,
     locateRequest: Int,
     queueTopRequest: Int,
-    openRequest: Int
+    openRequest: Int,
+    onTopCloseDrag: (Float) -> Unit,
+    onTopCloseDragEnd: (Float) -> Unit
 ) {
     val context = LocalContext.current
     val latestOnEntryClick by rememberUpdatedState(onEntryClick)
     val latestOnReorderEntry by rememberUpdatedState(onReorderEntry)
     val latestOnRemoveEntry by rememberUpdatedState(onRemoveEntry)
+    val latestOnTopCloseDrag by rememberUpdatedState(onTopCloseDrag)
+    val latestOnTopCloseDragEnd by rememberUpdatedState(onTopCloseDragEnd)
     val adapter = remember { PracticalQueueAdapter(context) }
     var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
     var previousLocateRequest by remember { mutableStateOf(locateRequest) }
@@ -453,7 +475,11 @@ private fun ColumnScope.QueueDrawerList(
             .clipToBounds(),
         factory = { viewContext ->
 
-            val recyclerView = RecyclerView(viewContext).apply {
+            val recyclerView = QueueRecyclerView(
+                context = viewContext,
+                onTopCloseDrag = latestOnTopCloseDrag,
+                onTopCloseDragEnd = latestOnTopCloseDragEnd
+            ).apply {
                 val initialLayout = LinearLayoutManager(viewContext)
                 layoutManager = initialLayout
                 setHasFixedSize(true)
@@ -498,7 +524,9 @@ private fun ColumnScope.QueueDrawerList(
             }
             if (openRequest != previousOpenRequest) {
                 previousOpenRequest = openRequest
+                recyclerView.stopScroll()
                 recyclerView.post {
+                    recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
@@ -508,7 +536,9 @@ private fun ColumnScope.QueueDrawerList(
             }
             if (locateRequest != previousLocateRequest) {
                 previousLocateRequest = locateRequest
+                recyclerView.stopScroll()
                 recyclerView.post {
+                    recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
@@ -518,7 +548,9 @@ private fun ColumnScope.QueueDrawerList(
             }
             if (queueTopRequest != previousQueueTopRequest) {
                 previousQueueTopRequest = queueTopRequest
+                recyclerView.stopScroll()
                 recyclerView.post {
+                    recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     if (adapter.itemCount > 0) {
                         layout.scrollToPositionWithOffset(0, 0)
@@ -527,6 +559,60 @@ private fun ColumnScope.QueueDrawerList(
             }
         }
     )
+}
+
+private class QueueRecyclerView(
+    context: Context,
+    private val onTopCloseDrag: (Float) -> Unit,
+    private val onTopCloseDragEnd: (Float) -> Unit
+) : RecyclerView(context) {
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var interceptingTopClose = false
+    private var lastY = 0f
+    private var totalDownDistance = 0f
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                interceptingTopClose = false
+                lastY = event.y
+                totalDownDistance = 0f
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = event.y - lastY
+                if (!interceptingTopClose &&
+                    deltaY > touchSlop &&
+                    !canScrollVertically(-1)
+                ) {
+                    interceptingTopClose = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return true
+                }
+            }
+        }
+        return super.onInterceptTouchEvent(event)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!interceptingTopClose) return super.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = (event.y - lastY).coerceAtLeast(0f)
+                if (deltaY > 0f) {
+                    totalDownDistance += deltaY
+                    onTopCloseDrag(deltaY)
+                }
+                lastY = event.y
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                onTopCloseDragEnd(totalDownDistance)
+                interceptingTopClose = false
+                parent?.requestDisallowInterceptTouchEvent(false)
+                return true
+            }
+        }
+        return true
+    }
 }
 
 private class PracticalQueueAdapter(

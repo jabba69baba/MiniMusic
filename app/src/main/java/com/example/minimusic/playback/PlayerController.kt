@@ -400,7 +400,12 @@ class PlayerController(private val context: Context) {
 
     fun cycleRepeatMode() {
         val c = controller ?: return
-        val next = when (_uiState.value.repeatMode) {
+        val current = when (c.repeatMode) {
+            Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+            Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+            else -> RepeatMode.OFF
+        }
+        val next = when (current) {
             RepeatMode.OFF -> RepeatMode.ALL
             RepeatMode.ALL -> RepeatMode.ONE
             RepeatMode.ONE -> RepeatMode.OFF
@@ -574,16 +579,21 @@ class PlayerController(private val context: Context) {
             add(currentIndex)
         }
         val followingSeen = orderedIndices.toMutableSet()
+        val nextRepeatMode = if (c.repeatMode == Player.REPEAT_MODE_ALL) {
+            Player.REPEAT_MODE_ALL
+        } else {
+            Player.REPEAT_MODE_OFF
+        }
         var nextIndex = timeline.getNextWindowIndex(
             currentIndex,
-            Player.REPEAT_MODE_OFF,
+            nextRepeatMode,
             true
         )
         while (nextIndex >= 0 && followingSeen.add(nextIndex)) {
             orderedIndices += nextIndex
             nextIndex = timeline.getNextWindowIndex(
                 nextIndex,
-                Player.REPEAT_MODE_OFF,
+                nextRepeatMode,
                 true
             )
         }

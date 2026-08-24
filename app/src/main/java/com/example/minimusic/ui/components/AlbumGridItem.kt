@@ -14,16 +14,28 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.minimusic.data.model.Album
 
 @Composable
 fun AlbumGridItem(album: Album, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val artworkRequest = remember(album.albumArtUri) {
+        ImageRequest.Builder(context)
+            .data(album.albumArtUri)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .crossfade(false)
+            .build()
+    }
     Column(
         modifier = modifier
             .clickable(onClick = onClick)
@@ -37,19 +49,22 @@ fun AlbumGridItem(album: Album, onClick: () -> Unit, modifier: Modifier = Modifi
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.Album,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            AsyncImage(
-                model = album.albumArtUri,
+            if (album.albumArtUri == null) {
+                Icon(
+                    imageVector = Icons.Filled.Album,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            } else {
+                AsyncImage(
+                    model = artworkRequest,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(20.dp))
-            )
+                        .clip(RoundedCornerShape(20.dp))
+                )
+            }
         }
         Text(
             text = album.title,

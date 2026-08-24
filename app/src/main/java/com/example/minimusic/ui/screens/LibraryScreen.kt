@@ -141,9 +141,7 @@ fun LibraryScreen(
         onDispose { }
     }
     var footerHeight by remember { mutableStateOf(0.dp) }
-    val filteredSongs = remember(uiState.allSongs, uiState.searchQuery, uiState.sortOrder) {
-        uiState.filteredSongs
-    }
+    val filteredSongs = uiState.filteredSongs
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
     // doesn't own the underlying file for: launch the system confirmation dialog,
@@ -528,7 +526,7 @@ private fun SongsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                listState.requestScrollToItem(index = index, scrollOffset = 0)
+                listState.scrollToItem(index = index, scrollOffset = 0)
             },
             // The top remains aligned with the first song container. The bottom
             // Keep the same 3dp visual inset at both ends: the top is 8dp
@@ -571,7 +569,7 @@ private fun AlbumsTab(
             currentIndex = gridState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                gridState.requestScrollToItem(index = index, scrollOffset = 0)
+                gridState.scrollToItem(index = index, scrollOffset = 0)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -605,7 +603,7 @@ private fun ArtistsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                listState.requestScrollToItem(index = index, scrollOffset = 0)
+                listState.scrollToItem(index = index, scrollOffset = 0)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
