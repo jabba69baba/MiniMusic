@@ -496,7 +496,7 @@ private fun SongsTab(
             // Locate is an explicit position reset, not a smooth navigation gesture. A
             // zero-offset request makes the selected row share the exact same leading
             // edge as item zero and eliminates the previous-row sliver.
-            listState.scrollToItem(index = index, scrollOffset = 0)
+            listState.requestScrollToItem(index = index, scrollOffset = 0)
         }
     }
 
@@ -526,7 +526,7 @@ private fun SongsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                listState.scrollToItem(index = index, scrollOffset = 0)
+                listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             // The top remains aligned with the first song container. The bottom
             // Keep the same 3dp visual inset at both ends: the top is 8dp
@@ -569,7 +569,7 @@ private fun AlbumsTab(
             currentIndex = gridState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                gridState.scrollToItem(index = index, scrollOffset = 0)
+                gridState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -603,7 +603,7 @@ private fun ArtistsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                listState.scrollToItem(index = index, scrollOffset = 0)
+                listState.requestScrollToItem(index = index, scrollOffset = 0)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)

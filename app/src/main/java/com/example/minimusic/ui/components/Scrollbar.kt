@@ -60,7 +60,7 @@ fun AlphabetScrollbar(
     itemCount: Int,
     currentIndex: Int,
     letterForIndex: (Int) -> Char?,
-    onScrollToIndex: suspend (Int) -> Unit,
+    onScrollToIndex: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (itemCount <= 0) return
@@ -70,7 +70,7 @@ fun AlphabetScrollbar(
     var trackHeightPx by remember { mutableStateOf(0f) }
     var lastRequestedIndex by remember(itemCount) { mutableStateOf(-1) }
 
-    suspend fun updateFromOffsetY(y: Float) {
+    fun updateFromOffsetY(y: Float) {
         if (trackHeightPx <= 0f) return
         val fraction = (y / trackHeightPx).coerceIn(0f, 1f)
         val index = (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
