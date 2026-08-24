@@ -18,6 +18,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -61,12 +62,15 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,6 +93,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
@@ -114,6 +119,7 @@ import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -159,7 +165,7 @@ private val FunctionSectionGap = 26.dp
 private val CapsuleToQueueGap = 19.dp
 
 /** Preset durations offered in the sleep timer menu. */
-private val SleepTimerPresetsMinutes = listOf(5, 15, 30, 45, 60)
+private val SleepTimerPresetsMinutes = listOf(5, 10, 15, 20, 30, 45, 60)
 
 /**
  * Player screen. Header: chevron-down collapse (left), centered "Now Playing"
@@ -182,6 +188,7 @@ fun PlayerScreen(
     showAudioQualityBadge: Boolean = true,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
+    onSwipeToMiniplayer: () -> Unit = onBack,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
@@ -194,7 +201,7 @@ fun PlayerScreen(
     onReorderQueue: (Long, Int) -> Unit = { _, _ -> },
     onRemoveQueueEntry: (Long) -> Unit = {},
     onClearQueue: () -> Unit = {},
-    onStartSleepTimer: (Long) -> Unit = {},
+    onStartSleepTimer: (Long, Boolean) -> Unit = { _, _ -> },
     onCancelSleepTimer: () -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
@@ -290,7 +297,8 @@ fun PlayerScreen(
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipNext = onSkipNext,
                     onCycleRepeat = onCycleRepeat,
-                    onOpenLyrics = onOpenLyrics
+                    onOpenLyrics = onOpenLyrics,
+                    onSwipeToMiniplayer = onSwipeToMiniplayer
                 )
             }
         }
@@ -316,19 +324,19 @@ fun PlayerScreen(
 @Composable
 private fun SleepTimerButton(
     sleepTimerState: SleepTimerState?,
-    onStart: (Long) -> Unit,
+    onStart: (Long, Boolean) -> Unit,
     onCancel: () -> Unit,
     artColors: ArtColorRoles,
     modifier: Modifier = Modifier
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var dialogOpen by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         if (sleepTimerState != null) {
             Surface(
                 shape = RoundedCornerShape(50),
                 color = artColors.primaryContainer,
-                modifier = Modifier.clickable { menuExpanded = true }
+                modifier = Modifier.clickable { dialogOpen = true }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -349,27 +357,149 @@ private fun SleepTimerButton(
                 }
             }
         } else {
-            IconButton(onClick = { menuExpanded = true }) {
+            IconButton(onClick = { dialogOpen = true }) {
                 Icon(Icons.Filled.Timer, contentDescription = "Sleep timer", tint = artColors.onBackground)
             }
         }
 
-        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-            if (sleepTimerState != null) {
-                DropdownMenuItem(
-                    text = { Text("Cancel timer") },
-                    onClick = { onCancel(); menuExpanded = false }
-                )
-            } else {
-                SleepTimerPresetsMinutes.forEach { minutes ->
-                    DropdownMenuItem(
-                        text = { Text("$minutes min") },
-                        onClick = { onStart(minutes * 60_000L); menuExpanded = false }
-                    )
-                }
-            }
+        if (dialogOpen) {
+            SleepTimerDialog(
+                activeTimer = sleepTimerState,
+                onDismiss = { dialogOpen = false },
+                onStart = { durationMs, waitUntilSongEnd ->
+                    onStart(durationMs, waitUntilSongEnd)
+                    dialogOpen = false
+                },
+                onCancel = {
+                    onCancel()
+                    dialogOpen = false
+                },
+                artColors = artColors
+            )
         }
     }
+}
+
+@Composable
+private fun SleepTimerDialog(
+    activeTimer: SleepTimerState?,
+    onDismiss: () -> Unit,
+    onStart: (Long, Boolean) -> Unit,
+    onCancel: () -> Unit,
+    artColors: ArtColorRoles
+) {
+    var selectedIndex by remember {
+        mutableStateOf(
+            activeTimer?.totalMs?.let { totalMs ->
+                SleepTimerPresetsMinutes.indices.minByOrNull { index ->
+                    kotlin.math.abs(SleepTimerPresetsMinutes[index] * 60_000L - totalMs)
+                }
+            } ?: 0
+        )
+    }
+    var endOfCurrentSong by remember { mutableStateOf(activeTimer?.endOfCurrentSong == true) }
+    var waitUntilSongEnd by remember { mutableStateOf(activeTimer?.waitUntilSongEnd == true) }
+    val selectedMinutes = SleepTimerPresetsMinutes[selectedIndex]
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        containerColor = artColors.surface,
+        titleContentColor = artColors.onSurface,
+        textContentColor = artColors.onSurfaceVariant,
+        title = { Text("Sleep timer") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = if (endOfCurrentSong) "End of current song" else "$selectedMinutes minutes",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = artColors.onSurface
+                )
+                Slider(
+                    value = selectedIndex.toFloat(),
+                    onValueChange = { value ->
+                        selectedIndex = value.roundToInt().coerceIn(SleepTimerPresetsMinutes.indices)
+                        endOfCurrentSong = false
+                    },
+                    valueRange = 0f..(SleepTimerPresetsMinutes.lastIndex.toFloat()),
+                    steps = SleepTimerPresetsMinutes.size - 2,
+                    enabled = !endOfCurrentSong,
+                    colors = androidx.compose.material3.SliderDefaults.colors(
+                        thumbColor = artColors.primary,
+                        activeTrackColor = artColors.primary,
+                        inactiveTrackColor = artColors.surfaceVariant
+                    )
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { endOfCurrentSong = !endOfCurrentSong },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = endOfCurrentSong,
+                        onClick = { endOfCurrentSong = true },
+                        colors = androidx.compose.material3.RadioButtonDefaults.colors(
+                            selectedColor = artColors.primary,
+                            unselectedColor = artColors.onSurfaceVariant
+                        )
+                    )
+                    Text("End of current song", color = artColors.onSurface)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { waitUntilSongEnd = !waitUntilSongEnd },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Wait for song to end", color = artColors.onSurface)
+                    Switch(
+                        checked = waitUntilSongEnd,
+                        onCheckedChange = { waitUntilSongEnd = it },
+                        enabled = !endOfCurrentSong,
+                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                            checkedThumbColor = artColors.onPrimaryContainer,
+                            checkedTrackColor = artColors.primary,
+                            uncheckedThumbColor = artColors.onSurfaceVariant,
+                            uncheckedTrackColor = artColors.surfaceVariant
+                        )
+                    )
+                }
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TextButton(
+                        onClick = onCancel,
+                        enabled = activeTimer != null
+                    ) {
+                        Text("Cancel timer", color = if (activeTimer != null) artColors.primary else artColors.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (endOfCurrentSong) {
+                        onStart(0L, true)
+                    } else {
+                        onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
+                    }
+                }
+            ) {
+                Text("Set", color = artColors.primary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Dismiss", color = artColors.onSurfaceVariant)
+            }
+        }
+    )
 }
 
 private fun formatRemaining(ms: Long): String {
@@ -401,7 +531,8 @@ private fun NowPlayingPanel(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onCycleRepeat: () -> Unit,
-    onOpenLyrics: () -> Unit
+    onOpenLyrics: () -> Unit,
+    onSwipeToMiniplayer: () -> Unit
 ) {
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
@@ -410,6 +541,7 @@ private fun NowPlayingPanel(
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
     val latestSong by rememberUpdatedState(song)
+    val minPlayerSwipeDistancePx = with(androidx.compose.ui.platform.LocalDensity.current) { 64.dp.toPx() }
 
     LaunchedEffect(song.id) {
         badgeReady = false
@@ -480,7 +612,23 @@ private fun NowPlayingPanel(
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
-                .background(artColors.primaryContainer),
+                .background(artColors.primaryContainer)
+                .pointerInput(song.id) {
+                    var verticalDragDistance = 0f
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            verticalDragDistance += dragAmount
+                        },
+                        onDragEnd = {
+                            if (verticalDragDistance > minPlayerSwipeDistancePx) {
+                                onSwipeToMiniplayer()
+                            }
+                            verticalDragDistance = 0f
+                        },
+                        onDragCancel = { verticalDragDistance = 0f }
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(

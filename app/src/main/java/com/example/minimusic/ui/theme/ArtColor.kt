@@ -24,7 +24,7 @@ import com.google.android.material.color.utilities.SchemeVibrant
 import kotlin.math.abs
 import kotlin.math.ln
 
-/** Album-art-derived Material roles used only by PlayerScreen and LyricsScreen. */
+/** Album-art-derived Material roles used by player, queue, lyrics, and miniplayer surfaces. */
 data class ArtColorRoles(
     val primary: Color,
     val onPrimary: Color,
@@ -142,31 +142,6 @@ private fun normalizeArtworkSeed(color: Color): Color {
     return Color(CoreColorUtils.HSLToColor(hsl))
 }
 
-/** Blend a controlled amount of album-art color into an app Material role. */
-private fun softenedRole(base: Color, art: Color, amount: Float): Color {
-    val fraction = amount.coerceIn(0f, 1f)
-    return Color(
-        red = base.red + (art.red - base.red) * fraction,
-        green = base.green + (art.green - base.green) * fraction,
-        blue = base.blue + (art.blue - base.blue) * fraction,
-        alpha = base.alpha + (art.alpha - base.alpha) * fraction
-    )
-}
-
-/** The softened art-derived Material primary used by the miniplayer ring. */
-@Composable
-fun rememberArtAccentColor(albumArtUri: Uri?): Color {
-    val seed = rememberArtworkSeedColor(albumArtUri)
-    val appScheme = MaterialTheme.colorScheme
-    val isDark = appScheme.background.luminance() < 0.5f
-    val scheme = remember(seed, isDark) { artScheme(seed, isDark) }
-    return softenedRole(
-        base = appScheme.primary,
-        art = Color(scheme.getPrimary()),
-        amount = 0.62f
-    )
-}
-
 @Composable
 fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
     val seed = rememberArtworkSeedColor(albumArtUri)
@@ -187,23 +162,23 @@ fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
     val artOnSurfaceVariant = Color(scheme.getOnSurfaceVariant())
 
     return ArtColorRoles(
-        primary = softenedRole(appScheme.primary, artPrimary, 0.60f),
+        primary = artPrimary,
         onPrimary = Color(scheme.getOnPrimary()),
-        primaryContainer = softenedRole(appScheme.primaryContainer, artPrimaryContainer, 0.52f),
+        primaryContainer = artPrimaryContainer,
         onPrimaryContainer = Color(scheme.getOnPrimaryContainer()),
-        secondary = softenedRole(appScheme.secondary, artSecondary, 0.48f),
+        secondary = artSecondary,
         onSecondary = Color(scheme.getOnSecondary()),
-        secondaryContainer = softenedRole(appScheme.secondaryContainer, artSecondaryContainer, 0.42f),
+        secondaryContainer = artSecondaryContainer,
         onSecondaryContainer = Color(scheme.getOnSecondaryContainer()),
-        tertiary = softenedRole(appScheme.tertiary, artTertiary, 0.48f),
+        tertiary = artTertiary,
         onTertiary = Color(scheme.getOnTertiary()),
-        tertiaryContainer = softenedRole(appScheme.tertiaryContainer, artTertiaryContainer, 0.42f),
+        tertiaryContainer = artTertiaryContainer,
         onTertiaryContainer = Color(scheme.getOnTertiaryContainer()),
-        background = softenedRole(appScheme.background, artBackground, 0.38f),
+        background = artBackground,
         onBackground = artOnBackground,
-        surface = softenedRole(appScheme.surface, artSurface, 0.44f),
+        surface = artSurface,
         onSurface = artOnSurface,
-        surfaceVariant = softenedRole(appScheme.surfaceContainerHigh, artSurfaceVariant, 0.40f),
+        surfaceVariant = artSurfaceVariant,
         onSurfaceVariant = artOnSurfaceVariant
     )
 }

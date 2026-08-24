@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -40,12 +42,13 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
-import com.example.minimusic.ui.theme.rememberArtAccentColor
+import com.example.minimusic.ui.theme.rememberArtColorRoles
 
 /** Corner shape for the mini player bar — rounded on top to match the app's
  *  Material Expressive shape scale, but square on the bottom two corners so
@@ -78,6 +81,7 @@ fun MiniPlayer(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onClick: () -> Unit,
+    onSwipeToPlayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val progress by remember(positionMs, durationMs) {
@@ -85,19 +89,16 @@ fun MiniPlayer(
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
         }
     }
-    val artAccent = rememberArtAccentColor(song?.albumArtUri)
-    val miniPlayerColor = artAccent
-        .copy(alpha = 0.30f)
-        .compositeOver(MaterialTheme.colorScheme.surface)
-    val controlTint = if (song != null) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val artColors = rememberArtColorRoles(song?.albumArtUri)
+    val miniPlayerColor = artColors.surfaceVariant
+    val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
+    var verticalDragDistance = 0f
+    val density = LocalDensity.current
+    val minSwipeDistancePx = with(density) { 48.dp.toPx() }
     val progressRingColor = readableProgressColor(
-        accent = artAccent,
+        accent = artColors.primary,
         background = miniPlayerColor,
-        primary = MaterialTheme.colorScheme.primary,
+        primary = artColors.primary,
         onSurface = controlTint
     )
 
@@ -106,6 +107,19 @@ fun MiniPlayer(
             .fillMaxWidth()
             .clip(MiniPlayerShape)
             .background(miniPlayerColor)
+            .pointerInput(song?.id) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        verticalDragDistance += dragAmount
+                    },
+                    onDragEnd = {
+                        if (verticalDragDistance < -minSwipeDistancePx) onSwipeToPlayer()
+                        verticalDragDistance = 0f
+                    },
+                    onDragCancel = { verticalDragDistance = 0f }
+                )
+            }
             .clickable(enabled = song != null, onClick = onClick)
     ) {
         Row(

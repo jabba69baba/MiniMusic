@@ -28,7 +28,9 @@ sealed interface LyricsState {
 /** Sleep timer state exposed to the Player screen: null when no timer is running. */
 data class SleepTimerState(
     val remainingMs: Long,
-    val totalMs: Long
+    val totalMs: Long,
+    val waitUntilSongEnd: Boolean = false,
+    val endOfCurrentSong: Boolean = false
 )
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,6 +46,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _sleepTimerState = MutableStateFlow<SleepTimerState?>(null)
     val sleepTimerState: StateFlow<SleepTimerState?> = _sleepTimerState.asStateFlow()
     private var sleepTimerJob: Job? = null
+    private var sleepTimerWaitForSongEnd = false
 
     init {
         // Reload lyrics automatically whenever the currently-playing song changes.
@@ -91,9 +94,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * when it reaches zero, pauses playback (only if currently playing — never toggles
      * an already-paused state back on) and clears the timer.
      */
-    fun startSleepTimer(durationMs: Long) {
+    fun startSleepTimer(durationMs: Long, waitUntilSongEnd: Boolean = false) {
         sleepTimerJob?.cancel()
-        _sleepTimerState.value = SleepTimerState(remainingMs = durationMs, totalMs = durationMs)
+        sleepTimerWaitForSongEnd = waitUntilSongEnd
+        if (durationMs <= 0L) {
+            _sleepTimerState.value = SleepTimerState(
+                remainingMs = 0L,
+                totalMs = 0L,
+                waitUntilSongEnd = true,
+                endOfCurrentSong = true
+            )
+            controller.pauseAtEndOfCurrentSong()
+            return
+        }
+        _sleepTimerState.value = SleepTimerState(
+            remainingMs = durationMs,
+            totalMs = durationMs,
+            waitUntilSongEnd = waitUntilSongEnd
+        )
         sleepTimerJob = viewModelScope.launch {
             var remaining = durationMs
             while (remaining > 0) {
@@ -101,10 +119,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 remaining = (remaining - 1_000).coerceAtLeast(0)
                 _sleepTimerState.value = _sleepTimerState.value?.copy(remainingMs = remaining)
             }
-            if (uiState.value.isPlaying) {
-                controller.togglePlayPause()
+            if (sleepTimerWaitForSongEnd) {
+                controller.pauseAtEndOfCurrentSong()
+            } else {
+                if (uiState.value.isPlaying) controller.togglePlayPause()
+                _sleepTimerState.value = null
             }
-            _sleepTimerState.value = null
         }
     }
 
@@ -112,11 +132,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun cancelSleepTimer() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
+        sleepTimerWaitForSongEnd = false
         _sleepTimerState.value = null
+        controller.cancelPauseAtEndOfCurrentSong()
     }
 
     override fun onCleared() {
         sleepTimerJob?.cancel()
+        controller.cancelPauseAtEndOfCurrentSong()
         controller.release()
         super.onCleared()
     }

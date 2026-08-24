@@ -1,5 +1,7 @@
 package com.example.minimusic.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -117,7 +119,33 @@ fun MiniMusicNavGraph(
             )
         }
 
-        composable(Routes.PLAYER) {
+        composable(
+            route = Routes.PLAYER,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(280)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(240)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(240)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(240)
+                )
+            }
+        ) {
             val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
             PlayerScreen(
                 playbackState = playbackState,
@@ -125,6 +153,7 @@ fun MiniMusicNavGraph(
                 showAudioQualityBadge = appSettings.showAudioQualityBadge,
                 sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
+                onSwipeToMiniplayer = { navController.popBackStack() },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
                 onSkipPrevious = playerViewModel::skipToPrevious,

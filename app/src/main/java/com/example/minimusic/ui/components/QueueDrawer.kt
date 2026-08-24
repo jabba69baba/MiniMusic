@@ -949,6 +949,11 @@ private class PracticalQueueAdapter(
                 marginEnd = context.dp(8)
             }
             artwork.scaleType = ImageView.ScaleType.CENTER_CROP
+            artwork.background = GradientDrawable().apply {
+                setColor(android.graphics.Color.TRANSPARENT)
+                cornerRadius = context.dp(10).toFloat()
+            }
+            artwork.clipToOutline = true
             root.addView(artwork)
 
             textColumn.orientation = LinearLayout.VERTICAL

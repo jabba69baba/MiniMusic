@@ -27,6 +27,8 @@ import kotlinx.coroutines.withContext
 enum class SongSortOrder {
     NAME_A_Z, NAME_Z_A,
     ARTIST_A_Z, ARTIST_Z_A,
+    ALBUM_A_Z, ALBUM_Z_A,
+    DURATION_SHORTEST, DURATION_LONGEST,
     DATE_ADDED_NEWEST, DATE_ADDED_OLDEST
 }
 
@@ -56,6 +58,10 @@ private fun filterAndSortSongs(
         SongSortOrder.NAME_Z_A -> base.sortedByDescending { it.title.lowercase() }
         SongSortOrder.ARTIST_A_Z -> base.sortedBy { it.artist.lowercase() }
         SongSortOrder.ARTIST_Z_A -> base.sortedByDescending { it.artist.lowercase() }
+        SongSortOrder.ALBUM_A_Z -> base.sortedBy { it.album.lowercase() }
+        SongSortOrder.ALBUM_Z_A -> base.sortedByDescending { it.album.lowercase() }
+        SongSortOrder.DURATION_SHORTEST -> base.sortedBy { it.durationMs }
+        SongSortOrder.DURATION_LONGEST -> base.sortedByDescending { it.durationMs }
         SongSortOrder.DATE_ADDED_NEWEST -> base.sortedByDescending { it.dateAddedSeconds }
         SongSortOrder.DATE_ADDED_OLDEST -> base.sortedBy { it.dateAddedSeconds }
     }

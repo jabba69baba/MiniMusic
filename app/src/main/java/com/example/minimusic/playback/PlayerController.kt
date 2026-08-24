@@ -58,6 +58,7 @@ class PlayerController(private val context: Context) {
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
     private var pendingSeekPositionMs: Long? = null
+    private var pauseAtNextTransition = false
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -398,6 +399,19 @@ class PlayerController(private val context: Context) {
         }
     }
 
+    fun pauseAtEndOfCurrentSong() {
+        val c = controller ?: return
+        pauseAtNextTransition = true
+        if (c.playbackState == Player.STATE_ENDED) {
+            pauseAtNextTransition = false
+            c.pause()
+        }
+    }
+
+    fun cancelPauseAtEndOfCurrentSong() {
+        pauseAtNextTransition = false
+    }
+
     fun cycleRepeatMode() {
         val c = controller ?: return
         val current = when (c.repeatMode) {
@@ -426,6 +440,8 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val pauseAfterTransition = pauseAtNextTransition
+            pauseAtNextTransition = false
             // Queue history is derived from the active entry's position in the
             // complete order; it is not an event log that can drop skipped songs.
             // A new media item always starts its UI position at zero. Keeping a
@@ -438,6 +454,14 @@ class PlayerController(private val context: Context) {
             _uiState.value = _uiState.value.copy(positionMs = 0L)
             holdPlaybackStateAcrossTransition()
             syncQueueFromController()
+            if (pauseAfterTransition) controller?.pause()
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED && pauseAtNextTransition) {
+                pauseAtNextTransition = false
+                controller?.pause()
+            }
         }
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {

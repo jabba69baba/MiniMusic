@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +54,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -445,7 +448,8 @@ fun LibraryScreen(
                 durationMs = playbackState.durationMs,
                 onTogglePlayPause = onTogglePlayPause,
                 onSkipNext = onSkipNext,
-                onClick = onOpenPlayer
+                onClick = onOpenPlayer,
+                onSwipeToPlayer = onOpenPlayer
             )
         }
     }
@@ -688,6 +692,26 @@ private object PillGroupShapes {
     val Last = RoundedCornerShape(topStart = Meeting, topEnd = Full, bottomEnd = Full, bottomStart = Meeting)
 }
 
+private enum class SortField {
+    NAME, ARTIST, ALBUM, DURATION, DATE_ADDED
+}
+
+private fun sortFieldOf(order: SongSortOrder): SortField = when (order) {
+    SongSortOrder.NAME_A_Z, SongSortOrder.NAME_Z_A -> SortField.NAME
+    SongSortOrder.ARTIST_A_Z, SongSortOrder.ARTIST_Z_A -> SortField.ARTIST
+    SongSortOrder.ALBUM_A_Z, SongSortOrder.ALBUM_Z_A -> SortField.ALBUM
+    SongSortOrder.DURATION_SHORTEST, SongSortOrder.DURATION_LONGEST -> SortField.DURATION
+    SongSortOrder.DATE_ADDED_NEWEST, SongSortOrder.DATE_ADDED_OLDEST -> SortField.DATE_ADDED
+}
+
+private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = when (field) {
+    SortField.NAME -> if (ascending) SongSortOrder.NAME_A_Z else SongSortOrder.NAME_Z_A
+    SortField.ARTIST -> if (ascending) SongSortOrder.ARTIST_A_Z else SongSortOrder.ARTIST_Z_A
+    SortField.ALBUM -> if (ascending) SongSortOrder.ALBUM_A_Z else SongSortOrder.ALBUM_Z_A
+    SortField.DURATION -> if (ascending) SongSortOrder.DURATION_SHORTEST else SongSortOrder.DURATION_LONGEST
+    SortField.DATE_ADDED -> if (ascending) SongSortOrder.DATE_ADDED_OLDEST else SongSortOrder.DATE_ADDED_NEWEST
+}
+
 @Composable
 private fun SortMenu(
     expanded: Boolean,
@@ -695,50 +719,77 @@ private fun SortMenu(
     onDismiss: () -> Unit,
     onSelect: (SongSortOrder) -> Unit
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        SortMenuGroup(title = "Name") {
-            SortMenuOption("A to Z", SongSortOrder.NAME_A_Z, selected, onSelect)
-            SortMenuOption("Z to A", SongSortOrder.NAME_Z_A, selected, onSelect)
-        }
-        SortMenuGroup(title = "Artist") {
-            SortMenuOption("A to Z", SongSortOrder.ARTIST_A_Z, selected, onSelect)
-            SortMenuOption("Z to A", SongSortOrder.ARTIST_Z_A, selected, onSelect)
-        }
-        SortMenuGroup(title = "Date added") {
-            SortMenuOption("Newest first", SongSortOrder.DATE_ADDED_NEWEST, selected, onSelect)
-            SortMenuOption("Oldest first", SongSortOrder.DATE_ADDED_OLDEST, selected, onSelect)
-        }
-    }
-}
-
-@Composable
-private fun SortMenuGroup(title: String, content: @Composable () -> Unit) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-    )
-    content()
-}
-
-@Composable
-private fun SortMenuOption(
-    label: String,
-    value: SongSortOrder,
-    selected: SongSortOrder,
-    onSelect: (SongSortOrder) -> Unit
-) {
-    val isSelected = value == selected
-    DropdownMenuItem(
-        text = {
-            Text(
-                text = label,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+    if (!expanded) return
+    var selectedField by remember(selected) { mutableStateOf(sortFieldOf(selected)) }
+    var ascending by remember(selected) {
+        mutableStateOf(
+            selected in setOf(
+                SongSortOrder.NAME_A_Z,
+                SongSortOrder.ARTIST_A_Z,
+                SongSortOrder.ALBUM_A_Z,
+                SongSortOrder.DURATION_SHORTEST,
+                SongSortOrder.DATE_ADDED_OLDEST
             )
+        )
+    }
+    val fields = listOf(
+        SortField.NAME to "Name",
+        SortField.ARTIST to "Artist",
+        SortField.ALBUM to "Album",
+        SortField.DURATION to "Duration",
+        SortField.DATE_ADDED to "Date added"
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        title = { Text("Sort by") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                fields.forEach { (field, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { selectedField = field },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedField == field,
+                            onClick = { selectedField = field }
+                        )
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                Text(
+                    text = "Direction",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(
+                        onClick = { ascending = true },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Ascending") }
+                    TextButton(
+                        onClick = { ascending = false },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Descending") }
+                }
+            }
         },
-        onClick = { onSelect(value) }
+        confirmButton = {
+            TextButton(onClick = { onSelect(sortOrderOf(selectedField, ascending)) }) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
     )
 }
 
