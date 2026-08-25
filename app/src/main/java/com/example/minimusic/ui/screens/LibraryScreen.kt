@@ -555,11 +555,7 @@ private fun AlbumsTab(
                 bottom = bottomContentPadding + 12.dp
             )
         ) {
-            items(
-                items = albums,
-                key = { it.id },
-                contentType = { "album-grid" }
-            ) { album ->
+            gridItems(albums, key = { it.id }) { album ->
                 AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
             }
         }
