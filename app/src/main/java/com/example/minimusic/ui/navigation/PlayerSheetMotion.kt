@@ -57,7 +57,8 @@ class PlayerSheetMotionState internal constructor(
         velocityPxPerSecond: Float,
         targetProgressOverride: Float? = null,
         onExpanded: () -> Unit,
-        onCollapsed: () -> Unit
+        onCollapsed: () -> Unit,
+        onCollapseStarted: () -> Unit = {}
     ) {
         scope.launch {
             mutex.mutate {
@@ -70,6 +71,7 @@ class PlayerSheetMotionState internal constructor(
                 val targetProgress = targetProgressOverride
                     ?: if (abs(velocityPxPerSecond) > 900f) fastDirection else if (progress >= 0.5f) 1f else 0f
                 val target = bounds.collapsedOffsetPx - bounds.rangePx * targetProgress
+                if (targetProgress == 0f) onCollapseStarted()
                 offset.animateTo(
                     target,
                     animationSpec = tween(

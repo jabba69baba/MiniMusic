@@ -94,12 +94,22 @@ fun MiniMusicNavGraph(
                 sheetState.settle(
                     velocityPxPerSecond = velocity,
                     onExpanded = { if (currentRoute != Routes.PLAYER) openPlayer() },
-                    onCollapsed = {
+                    onCollapsed = {},
+                    onCollapseStarted = {
                         if (currentRoute == Routes.PLAYER) navController.popBackStack()
                     }
                 )
             }
         )
+
+        fun openPlayerWithSheetTransition() {
+            sheetState.settle(
+                velocityPxPerSecond = 0f,
+                targetProgressOverride = 1f,
+                onExpanded = { if (currentRoute != Routes.PLAYER) openPlayer() },
+                onCollapsed = {}
+            )
+        }
 
         LaunchedEffect(fullHeightPx, collapsedOffsetPx) {
             sheetState.updateBounds(
@@ -294,7 +304,7 @@ fun MiniMusicNavGraph(
                     durationMs = playbackState.durationMs,
                     onTogglePlayPause = playerViewModel::togglePlayPause,
                     onSkipNext = playerViewModel::skipToNext,
-                    onClick = ::openPlayer,
+                    onClick = ::openPlayerWithSheetTransition,
                     onSwipeToPlayer = {}
                 )
             }
