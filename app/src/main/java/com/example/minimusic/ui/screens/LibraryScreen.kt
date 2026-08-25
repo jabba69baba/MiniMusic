@@ -323,7 +323,7 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Right controls: Shuffle, Locate, Sort — three
+                        // Right controls: Locate, Shuffle, Sort — three
                         // segments of one continuous pill silhouette, same
                         // shape/height treatment as the left selector, but a
                         // more neutral fill: these are one-off action taps,
@@ -333,6 +333,20 @@ fun LibraryScreen(
                         Box {
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
+                                    onClick = { jumpToCurrentRequest++ },
+                                    horizontalPadding = 12.dp,
+                                    shape = PillGroupShapes.First,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    modifier = Modifier.width(ControlSegmentWidth)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.MyLocation,
+                                        contentDescription = "Jump to current song",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                PillButton(
                                     onClick = {
                                         if (filteredSongs.isNotEmpty()) {
                                             val startSong = filteredSongs.random()
@@ -340,27 +354,13 @@ fun LibraryScreen(
                                         }
                                     },
                                     horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.First,
+                                    shape = PillGroupShapes.Middle,
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.Shuffle,
                                         contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                PillButton(
-                                    onClick = { jumpToCurrentRequest++ },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Middle,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.MyLocation,
-                                        contentDescription = "Jump to current song",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(22.dp)
                                     )
@@ -733,11 +733,11 @@ private fun SortMenu(
         )
     }
     val fields = listOf(
-        SortField.NAME to "Name",
+        SortField.NAME to "Title",
         SortField.ARTIST to "Artist",
         SortField.ALBUM to "Album",
-        SortField.DURATION to "Duration",
-        SortField.DATE_ADDED to "Date added"
+        SortField.DATE_ADDED to "Date added",
+        SortField.DURATION to "Duration"
     )
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -745,40 +745,46 @@ private fun SortMenu(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         title = { Text("Sort by") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SortDirectionPill(
+                    ascending = ascending,
+                    onAscending = { ascending = true },
+                    onDescending = { ascending = false }
+                )
                 fields.forEach { (field, label) ->
-                    Row(
+                    val selectedFieldRow = selectedField == field
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { selectedField = field },
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (selectedFieldRow) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
                     ) {
-                        RadioButton(
-                            selected = selectedField == field,
-                            onClick = { selectedField = field }
-                        )
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (selectedFieldRow) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            RadioButton(
+                                selected = selectedFieldRow,
+                                onClick = { selectedField = field }
+                            )
+                        }
                     }
-                }
-                Text(
-                    text = "Direction",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TextButton(
-                        onClick = { ascending = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Ascending") }
-                    TextButton(
-                        onClick = { ascending = false },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Descending") }
                 }
             }
         },
@@ -791,6 +797,69 @@ private fun SortMenu(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun SortDirectionPill(
+    ascending: Boolean,
+    onAscending: () -> Unit,
+    onDescending: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SortDirectionOption(
+            label = "Ascending",
+            selected = ascending,
+            onClick = onAscending,
+            modifier = Modifier.weight(1f)
+        )
+        SortDirectionOption(
+            label = "Descending",
+            selected = !ascending,
+            onClick = onDescending,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun SortDirectionOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+    }
 }
 
 @Composable

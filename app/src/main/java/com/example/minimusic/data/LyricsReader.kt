@@ -7,7 +7,15 @@ import kotlinx.coroutines.withContext
 import java.io.InputStream
 
 private val LrcMetadataTagRegex = Regex(
-    "\\[(?:ti|ar|al|by|offset|re|ve|length|la|au|id|tool)\\s*:[^]]*]",
+    "\\[(?:ti|ar|al|by|offset|re|ve|length|la|au|id|tool|title|artist|album|composer|genre|language)\\s*:[^]]*]",
+    RegexOption.IGNORE_CASE
+)
+private val PlainMetadataLineRegex = Regex(
+    "^\\s*(?:title|artist|album|album artist|composer|genre|language|lyrics|by|offset|length|copyright|comment|encoded by)\\s*[:=].*$",
+    RegexOption.IGNORE_CASE
+)
+private val LrcCommentLineRegex = Regex(
+    "^\\s*\\[(?:comment|meta|metadata)\\s*:.*]\\s*$",
     RegexOption.IGNORE_CASE
 )
 
@@ -92,9 +100,10 @@ class LyricsReader(private val context: Context) {
      */
     internal fun cleanLyricsText(text: String): String? = text
         .lineSequence()
-        .map { line ->
-            LrcMetadataTagRegex.replace(line.trim('\u0000', '\uFEFF').trim(), "").trim()
-        }
+        .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
+        .filter { it.isNotBlank() }
+        .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
+        .map { LrcMetadataTagRegex.replace(it, "").trim() }
         .filter { it.isNotBlank() }
         .joinToString("\n")
         .trim()

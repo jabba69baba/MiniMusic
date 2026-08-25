@@ -18,7 +18,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -79,6 +79,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
@@ -409,13 +410,14 @@ private fun SleepTimerDialog(
         textContentColor = artColors.onSurfaceVariant,
         title = { Text("Sleep timer") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = if (endOfCurrentSong) "End of current song" else "$selectedMinutes minutes",
                     style = MaterialTheme.typography.titleMedium,
                     color = artColors.onSurface
                 )
                 Slider(
+                    modifier = Modifier.height(32.dp),
                     value = selectedIndex.toFloat(),
                     onValueChange = { value ->
                         selectedIndex = value.roundToInt().coerceIn(SleepTimerPresetsMinutes.indices)
@@ -424,82 +426,109 @@ private fun SleepTimerDialog(
                     valueRange = 0f..(SleepTimerPresetsMinutes.lastIndex.toFloat()),
                     steps = SleepTimerPresetsMinutes.size - 2,
                     enabled = !endOfCurrentSong,
+                    thumb = {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .background(artColors.primary, CircleShape)
+                        )
+                    },
                     colors = androidx.compose.material3.SliderDefaults.colors(
                         thumbColor = artColors.primary,
                         activeTrackColor = artColors.primary,
                         inactiveTrackColor = artColors.surfaceVariant
                     )
                 )
+                SleepTimerSwitchRow(
+                    label = "End of current song",
+                    checked = endOfCurrentSong,
+                    onCheckedChange = { enabled ->
+                        endOfCurrentSong = enabled
+                        if (enabled) waitUntilSongEnd = false
+                    },
+                    artColors = artColors
+                )
+                SleepTimerSwitchRow(
+                    label = "Wait for song to end",
+                    checked = waitUntilSongEnd,
+                    onCheckedChange = { enabled ->
+                        waitUntilSongEnd = enabled
+                        if (enabled) endOfCurrentSong = false
+                    },
+                    artColors = artColors
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { endOfCurrentSong = !endOfCurrentSong },
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
-                        selected = endOfCurrentSong,
-                        onClick = { endOfCurrentSong = true },
-                        colors = androidx.compose.material3.RadioButtonDefaults.colors(
-                            selectedColor = artColors.primary,
-                            unselectedColor = artColors.onSurfaceVariant
-                        )
-                    )
-                    Text("End of current song", color = artColors.onSurface)
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { waitUntilSongEnd = !waitUntilSongEnd },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Wait for song to end", color = artColors.onSurface)
-                    Switch(
-                        checked = waitUntilSongEnd,
-                        onCheckedChange = { waitUntilSongEnd = it },
-                        enabled = !endOfCurrentSong,
-                        colors = androidx.compose.material3.SwitchDefaults.colors(
-                            checkedThumbColor = artColors.onPrimaryContainer,
-                            checkedTrackColor = artColors.primary,
-                            uncheckedThumbColor = artColors.onSurfaceVariant,
-                            uncheckedTrackColor = artColors.surfaceVariant
-                        )
-                    )
-                }
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Dismiss", color = artColors.onSurfaceVariant)
+                    }
                     TextButton(
                         onClick = onCancel,
                         enabled = activeTimer != null
                     ) {
                         Text("Cancel timer", color = if (activeTimer != null) artColors.primary else artColors.onSurfaceVariant)
                     }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (endOfCurrentSong) {
-                        onStart(0L, true)
-                    } else {
-                        onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
+                    TextButton(
+                        onClick = {
+                            if (endOfCurrentSong) {
+                                onStart(0L, true)
+                            } else {
+                                onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
+                            }
+                        }
+                    ) {
+                        Text("Set", color = artColors.primary)
                     }
                 }
-            ) {
-                Text("Set", color = artColors.primary)
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Dismiss", color = artColors.onSurfaceVariant)
-            }
-        }
+        confirmButton = {},
+        dismissButton = {}
     )
+}
+
+@Composable
+private fun SleepTimerSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    artColors: ArtColorRoles
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = if (checked) artColors.primaryContainer else artColors.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCheckedChange(!checked) }
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                color = if (checked) artColors.onPrimaryContainer else artColors.onSurface,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = androidx.compose.material3.SwitchDefaults.colors(
+                    checkedThumbColor = artColors.onPrimaryContainer,
+                    checkedTrackColor = artColors.primary,
+                    uncheckedThumbColor = artColors.onSurfaceVariant,
+                    uncheckedTrackColor = artColors.surface
+                )
+            )
+        }
+    }
 }
 
 private fun formatRemaining(ms: Long): String {
@@ -613,20 +642,21 @@ private fun NowPlayingPanel(
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
                 .background(artColors.primaryContainer)
-                .pointerInput(song.id) {
-                    var verticalDragDistance = 0f
-                    detectVerticalDragGestures(
-                        onVerticalDrag = { change, dragAmount ->
+                .pointerInput(song.id, minPlayerSwipeDistancePx) {
+                    val verticalDragDistance = mutableFloatStateOf(0f)
+                    detectDragGestures(
+                        onDragStart = { verticalDragDistance.floatValue = 0f },
+                        onDrag = { change, dragAmount ->
                             change.consume()
-                            verticalDragDistance += dragAmount
+                            verticalDragDistance.floatValue += dragAmount.y
                         },
                         onDragEnd = {
-                            if (verticalDragDistance > minPlayerSwipeDistancePx) {
+                            if (verticalDragDistance.floatValue > minPlayerSwipeDistancePx) {
                                 onSwipeToMiniplayer()
                             }
-                            verticalDragDistance = 0f
+                            verticalDragDistance.floatValue = 0f
                         },
-                        onDragCancel = { verticalDragDistance = 0f }
+                        onDragCancel = { verticalDragDistance.floatValue = 0f }
                     )
                 },
             contentAlignment = Alignment.Center

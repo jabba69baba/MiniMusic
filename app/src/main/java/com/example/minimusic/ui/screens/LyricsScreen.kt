@@ -245,7 +245,7 @@ fun LyricsScreen(
                             ) { index, line ->
                                 val isActive = index == activeIndex
                                 val color by animateColorAsState(
-                                    targetValue = if (isActive) activeColor else inactiveColor,
+                                    targetValue = if (!hasTimedLines || isActive) activeColor else inactiveColor,
                                     animationSpec = tween(
                                         durationMillis = SCROLL_ANIMATION_DURATION_MS,
                                         easing = GramophoneMotionEasing
@@ -253,7 +253,7 @@ fun LyricsScreen(
                                     label = "lyricsLineColor"
                                 )
                                 val emphasis by animateFloatAsState(
-                                    targetValue = if (isActive) 1.015f else 1f,
+                                    targetValue = if (hasTimedLines && isActive) 1.015f else 1f,
                                     animationSpec = tween(
                                         durationMillis = SCROLL_ANIMATION_DURATION_MS,
                                         easing = GramophoneMotionEasing
@@ -264,14 +264,14 @@ fun LyricsScreen(
                                     text = line.text,
                                     color = color,
                                     style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                        fontWeight = if (!hasTimedLines || isActive) FontWeight.SemiBold else FontWeight.Normal,
                                         letterSpacing = (-0.1).sp,
                                         lineHeight = 38.sp
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 14.dp)
-                                        .clickable(enabled = line.startMs != null) {
+                                        .clickable(enabled = hasTimedLines && line.startMs != null) {
                                             line.startMs?.let(onSeekTo)
                                         }
                                         .graphicsLayer {

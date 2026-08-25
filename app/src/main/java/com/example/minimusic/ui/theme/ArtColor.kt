@@ -20,7 +20,7 @@ import com.google.android.material.color.utilities.DynamicScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.google.android.material.color.utilities.Hct
-import com.google.android.material.color.utilities.SchemeVibrant
+import com.google.android.material.color.utilities.SchemeTonalSpot
 import kotlin.math.abs
 import kotlin.math.ln
 
@@ -125,9 +125,10 @@ private fun artworkSwatchScore(swatch: Palette.Swatch): Double {
         chromaScore.coerceAtLeast(0.0) * 0.50
 }
 
-private fun artScheme(seed: Color, isDark: Boolean): DynamicScheme =
-    SchemeVibrant(Hct.fromInt(seed.toArgb()), isDark, 0.0)
-
+private fun artScheme(seed: Color, isDark: Boolean): DynamicScheme {
+    val hct = Hct.fromInt(seed.toArgb())
+    return SchemeTonalSpot(hct, isDark, 0.0)
+}
 /**
  * Normalize a palette seed before it reaches Material scheme generation.
  * Album art can contain nearly-black or highly saturated pixels that are useful

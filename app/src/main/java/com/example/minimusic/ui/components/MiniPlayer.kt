@@ -7,7 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -92,7 +93,7 @@ fun MiniPlayer(
     val artColors = rememberArtColorRoles(song?.albumArtUri)
     val miniPlayerColor = artColors.surfaceVariant
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
-    var verticalDragDistance = 0f
+    val verticalDragDistance = remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val minSwipeDistancePx = with(density) { 48.dp.toPx() }
     val progressRingColor = readableProgressColor(
@@ -107,17 +108,18 @@ fun MiniPlayer(
             .fillMaxWidth()
             .clip(MiniPlayerShape)
             .background(miniPlayerColor)
-            .pointerInput(song?.id) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { change, dragAmount ->
+            .pointerInput(song?.id, minSwipeDistancePx) {
+                detectDragGestures(
+                    onDragStart = { verticalDragDistance.floatValue = 0f },
+                    onDrag = { change, dragAmount ->
                         change.consume()
-                        verticalDragDistance += dragAmount
+                        verticalDragDistance.floatValue += dragAmount.y
                     },
                     onDragEnd = {
-                        if (verticalDragDistance < -minSwipeDistancePx) onSwipeToPlayer()
-                        verticalDragDistance = 0f
+                        if (verticalDragDistance.floatValue < -minSwipeDistancePx) onSwipeToPlayer()
+                        verticalDragDistance.floatValue = 0f
                     },
-                    onDragCancel = { verticalDragDistance = 0f }
+                    onDragCancel = { verticalDragDistance.floatValue = 0f }
                 )
             }
             .clickable(enabled = song != null, onClick = onClick)
@@ -136,7 +138,8 @@ fun MiniPlayer(
                     text = song?.title ?: "What's the vibe?",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface,
+                                            color = artColors.onSurface,
+
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Clip,
@@ -151,7 +154,7 @@ fun MiniPlayer(
                     text = song?.artist ?: "Tap a song to listen",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = artColors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
