@@ -1,5 +1,6 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.foundation.animateItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,12 +58,13 @@ fun SongGridItem(
         ImageRequest.Builder(context)
             .data(song.albumArtUri)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .crossfade(false)
+            .crossfade(180)
             .build()
     }
 
     Column(
         modifier = modifier
+            .animateItem()
             .clickable(onClick = onClick)
             .padding(8.dp)
     ) {

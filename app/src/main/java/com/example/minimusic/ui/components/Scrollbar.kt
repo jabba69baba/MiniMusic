@@ -3,6 +3,8 @@ package com.example.minimusic.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -29,6 +31,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -182,8 +185,10 @@ fun AlphabetScrollbar(
         val bubbleSize = 48.dp
         AnimatedVisibility(
             visible = showBubble,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = MiniMusicMotion.fastEffects()) +
+                scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
+            exit = fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
+                scaleOut(targetScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .offset {

@@ -1,6 +1,12 @@
 package com.example.minimusic.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +60,7 @@ import coil.compose.AsyncImage
 import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import java.util.Locale
 
@@ -149,31 +156,45 @@ fun DetailsScreen(
         Spacer(Modifier.height(16.dp))
 
         val loaded = details
-        if (loaded == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = artColors.primary)
-            }
-        } else {
-            DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs), artColors)
-            DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.genre ?: "Unknown", artColors)
-            DetailCard(Icons.Filled.Album, "Album", song.album, artColors)
-            DetailCard(Icons.Filled.Person, "Artist", song.artist, artColors)
-            DetailCard(Icons.Filled.Badge, "Album artist", loaded.albumArtist ?: song.artist, artColors)
-            DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", artColors)
+        AnimatedContent(
+            targetState = loaded != null,
+            transitionSpec = {
+                (fadeIn(animationSpec = MiniMusicMotion.defaultEffects()) +
+                    scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects())) togetherWith
+                    (fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
+                        scaleOut(targetScale = 0.96f, animationSpec = MiniMusicMotion.fastEffects()))
+            },
+            label = "detailsContentTransition"
+        ) { hasDetails ->
+            if (!hasDetails) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = artColors.primary)
+                }
+            } else {
+                val resolved = loaded ?: return@AnimatedContent
+                Column {
+                    DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs), artColors)
+                    DetailCard(Icons.Filled.GraphicEq, "Genre", resolved.genre ?: "Unknown", artColors)
+                    DetailCard(Icons.Filled.Album, "Album", song.album, artColors)
+                    DetailCard(Icons.Filled.Person, "Artist", song.artist, artColors)
+                    DetailCard(Icons.Filled.Badge, "Album artist", resolved.albumArtist ?: song.artist, artColors)
+                    DetailCard(Icons.Filled.Info, "Year", resolved.year ?: "Unknown", artColors)
 
-            val format = loaded.formatInfo
-            val audioInfo = buildList {
-                format?.sampleRateHz?.let { add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz") }
-                format?.bitrateKbps?.let { add("$it kbps") }
-                format?.mimeLabel?.let { add(it) }
-            }.joinToString(" • ").ifBlank { "Unknown" }
-            DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo, artColors)
-            DetailCard(Icons.Filled.Storage, "Path", loaded.path ?: song.contentUri.toString(), artColors)
+                    val format = resolved.formatInfo
+                    val audioInfo = buildList {
+                        format?.sampleRateHz?.let { add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz") }
+                        format?.bitrateKbps?.let { add("$it kbps") }
+                        format?.mimeLabel?.let { add(it) }
+                    }.joinToString(" • ").ifBlank { "Unknown" }
+                    DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo, artColors)
+                    DetailCard(Icons.Filled.Storage, "Path", resolved.path ?: song.contentUri.toString(), artColors)
+                }
+            }
         }
     }
 }

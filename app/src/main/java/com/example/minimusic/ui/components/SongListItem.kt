@@ -1,5 +1,6 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.foundation.animateItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +68,7 @@ fun SongListItem(
         ImageRequest.Builder(context)
             .data(song.albumArtUri)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .crossfade(false)
+            .crossfade(180)
             .build()
     }
 
@@ -75,6 +76,7 @@ fun SongListItem(
         shape = RoundedCornerShape(18.dp),
         color = containerColor,
         modifier = Modifier
+            .animateItem()
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 5.dp)
             .clickable(onClick = onClick)

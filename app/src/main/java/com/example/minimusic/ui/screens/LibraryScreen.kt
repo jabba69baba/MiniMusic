@@ -4,6 +4,11 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,6 +92,7 @@ import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.SongListItem
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LibraryEvent
@@ -221,7 +227,13 @@ fun LibraryScreen(
                 placeholder = { Text("Search....") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
-                    if (uiState.searchQuery.isNotEmpty()) {
+                    AnimatedVisibility(
+                        visible = uiState.searchQuery.isNotEmpty(),
+                        enter = fadeIn(animationSpec = MiniMusicMotion.fastEffects()) +
+                            scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
+                        exit = fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
+                            scaleOut(targetScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects())
+                    ) {
                         IconButton(onClick = { onSearchQueryChange("") }) {
                             Icon(Icons.Filled.Clear, contentDescription = "Clear search")
                         }
@@ -856,11 +868,20 @@ private fun SortDirectionOption(
 
 @Composable
 private fun LoadingState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(animationSpec = MiniMusicMotion.defaultEffects()) +
+            scaleIn(initialScale = 0.94f, animationSpec = MiniMusicMotion.selectionEffects()),
+        exit = fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
+            scaleOut(targetScale = 0.94f, animationSpec = MiniMusicMotion.fastEffects()),
+        modifier = Modifier.fillMaxSize()
     ) {
-        M3ExpressiveContainedLoadingIndicator()
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            M3ExpressiveContainedLoadingIndicator()
+        }
     }
 }
 
