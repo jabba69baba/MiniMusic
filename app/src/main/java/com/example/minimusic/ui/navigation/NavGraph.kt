@@ -229,65 +229,75 @@ fun MiniMusicNavGraph(
         }
     }
 
-        Box(
-            modifier = androidx.compose.ui.Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationY = (1f - sheetState.progress) * fullHeightPx
-                    alpha = sheetState.progress
-                }
-                .zIndex(2f)
-                .then(sheetDragModifier)
-        ) {
-            PlayerScreen(
-                playbackState = playbackState,
-                queueSnapshot = queueSnapshot,
-                showAudioQualityBadge = appSettings.showAudioQualityBadge,
-                sleepTimerState = sleepTimerState,
-                onBack = { navController.popBackStack() },
-                onSwipeToMiniplayer = {},
-                onTogglePlayPause = playerViewModel::togglePlayPause,
-                onSkipNext = playerViewModel::skipToNext,
-                onSkipPrevious = playerViewModel::skipToPrevious,
-                onSeekTo = playerViewModel::seekTo,
-                onToggleShuffle = playerViewModel::toggleShuffle,
-                onCycleRepeat = playerViewModel::cycleRepeatMode,
-                onOpenLyrics = { navController.navigate(Routes.LYRICS) },
-                onQueueItemClick = playerViewModel::playFromQueue,
-                onQueueEntryClick = playerViewModel::playQueueEntry,
-                onReorderQueue = playerViewModel::moveQueueEntry,
-                onRemoveQueueEntry = playerViewModel::removeQueueEntry,
-                onClearQueue = {
-                    playerViewModel.clearQueue()
-                    navController.popBackStack(Routes.LIBRARY, inclusive = false)
-                },
-                onStartSleepTimer = playerViewModel::startSleepTimer,
-                onCancelSleepTimer = playerViewModel::cancelSleepTimer
-            )
+        if (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f) {
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationY = (1f - sheetState.progress) * fullHeightPx
+                        alpha = sheetState.progress
+                    }
+                    .zIndex(2f)
+                    .then(
+                        if (sheetState.progress > 0.001f) {
+                            sheetDragModifier
+                        } else {
+                            androidx.compose.ui.Modifier
+                        }
+                    )
+            ) {
+                PlayerScreen(
+                    playbackState = playbackState,
+                    queueSnapshot = queueSnapshot,
+                    showAudioQualityBadge = appSettings.showAudioQualityBadge,
+                    sleepTimerState = sleepTimerState,
+                    onBack = { navController.popBackStack() },
+                    onSwipeToMiniplayer = {},
+                    onTogglePlayPause = playerViewModel::togglePlayPause,
+                    onSkipNext = playerViewModel::skipToNext,
+                    onSkipPrevious = playerViewModel::skipToPrevious,
+                    onSeekTo = playerViewModel::seekTo,
+                    onToggleShuffle = playerViewModel::toggleShuffle,
+                    onCycleRepeat = playerViewModel::cycleRepeatMode,
+                    onOpenLyrics = { navController.navigate(Routes.LYRICS) },
+                    onQueueItemClick = playerViewModel::playFromQueue,
+                    onQueueEntryClick = playerViewModel::playQueueEntry,
+                    onReorderQueue = playerViewModel::moveQueueEntry,
+                    onRemoveQueueEntry = playerViewModel::removeQueueEntry,
+                    onClearQueue = {
+                        playerViewModel.clearQueue()
+                        navController.popBackStack(Routes.LIBRARY, inclusive = false)
+                    },
+                    onStartSleepTimer = playerViewModel::startSleepTimer,
+                    onCancelSleepTimer = playerViewModel::cancelSleepTimer
+                )
+            }
         }
 
-        Box(
-            modifier = androidx.compose.ui.Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .graphicsLayer {
-                    translationY = sheetState.progress * miniPlayerHeightPx
-                    alpha = (1f - sheetState.progress).coerceIn(0f, 1f)
-                }
-                .zIndex(1f)
-                .then(sheetDragModifier)
-        ) {
-            MiniPlayer(
-                song = playbackState.currentSong,
-                isPlaying = playbackState.isPlaying,
-                positionMs = playbackState.positionMs,
-                durationMs = playbackState.durationMs,
-                onTogglePlayPause = playerViewModel::togglePlayPause,
-                onSkipNext = playerViewModel::skipToNext,
-                onClick = ::openPlayer,
-                onSwipeToPlayer = {}
-            )
+        if (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f) {
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .graphicsLayer {
+                        translationY = sheetState.progress * miniPlayerHeightPx
+                        alpha = (1f - sheetState.progress).coerceIn(0f, 1f)
+                    }
+                    .zIndex(1f)
+                    .then(sheetDragModifier)
+            ) {
+                MiniPlayer(
+                    song = playbackState.currentSong,
+                    isPlaying = playbackState.isPlaying,
+                    positionMs = playbackState.positionMs,
+                    durationMs = playbackState.durationMs,
+                    onTogglePlayPause = playerViewModel::togglePlayPause,
+                    onSkipNext = playerViewModel::skipToNext,
+                    onClick = ::openPlayer,
+                    onSwipeToPlayer = {}
+                )
+            }
         }
     }
 }
