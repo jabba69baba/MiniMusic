@@ -1,15 +1,8 @@
 package com.example.minimusic.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,9 +10,14 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -27,14 +25,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import com.example.minimusic.ui.screens.DetailsScreen
 import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.components.MiniPlayer
+import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.screens.SettingsScreen
-import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
@@ -76,7 +77,47 @@ fun MiniMusicNavGraph(
         }
     }
 
-    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+        val scope = rememberCoroutineScope()
+        val density = LocalDensity.current
+        val sheetState = rememberPlayerSheetMotionState(scope)
+        val fullHeightPx = with(density) { maxHeight.toPx() }
+        val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+        val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
+        val collapsedOffsetPx = (fullHeightPx - miniPlayerHeightPx).coerceAtLeast(0f)
+        val sheetDragState = rememberDraggableState { delta -> sheetState.dragBy(delta) }
+        val sheetDragModifier = androidx.compose.ui.Modifier.draggable(
+            orientation = Orientation.Vertical,
+            state = sheetDragState,
+            startDragImmediately = false,
+            onDragStopped = { velocity ->
+                sheetState.settle(
+                    velocityPxPerSecond = velocity,
+                    onExpanded = { if (currentRoute != Routes.PLAYER) openPlayer() },
+                    onCollapsed = {
+                        if (currentRoute == Routes.PLAYER) navController.popBackStack()
+                    }
+                )
+            }
+        )
+
+        LaunchedEffect(fullHeightPx, collapsedOffsetPx) {
+            sheetState.updateBounds(
+                PlayerSheetMotionBounds(
+                    expandedOffsetPx = 0f,
+                    collapsedOffsetPx = collapsedOffsetPx
+                )
+            )
+        }
+        LaunchedEffect(currentRoute) {
+            sheetState.settle(
+                velocityPxPerSecond = 0f,
+                targetProgressOverride = if (currentRoute == Routes.PLAYER) 1f else 0f,
+                onExpanded = {},
+                onCollapsed = {}
+            )
+        }
+
         NavHost(
             navController = navController,
         startDestination = Routes.LIBRARY,
@@ -188,17 +229,15 @@ fun MiniMusicNavGraph(
         }
     }
 
-        AnimatedVisibility(
-            visible = currentRoute == Routes.PLAYER,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = MiniMusicMotion.trackChangeEffects()
-            ) + fadeIn(animationSpec = MiniMusicMotion.trackChangeEffects()),
-            exit = slideOutVertically(
-                targetOffsetY = { it },
-                animationSpec = MiniMusicMotion.trackChangeExitEffects()
-            ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()),
-            modifier = androidx.compose.ui.Modifier.fillMaxSize()
+        Box(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationY = (1f - sheetState.progress) * fullHeightPx
+                    alpha = sheetState.progress
+                }
+                .zIndex(2f)
+                .then(sheetDragModifier)
         ) {
             PlayerScreen(
                 playbackState = playbackState,
@@ -206,11 +245,7 @@ fun MiniMusicNavGraph(
                 showAudioQualityBadge = appSettings.showAudioQualityBadge,
                 sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
-                onSwipeToMiniplayer = {
-                    if (navController.currentDestination?.route == Routes.PLAYER) {
-                        navController.popBackStack()
-                    }
-                },
+                onSwipeToMiniplayer = {},
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
                 onSkipPrevious = playerViewModel::skipToPrevious,
@@ -231,34 +266,28 @@ fun MiniMusicNavGraph(
             )
         }
 
-        AnimatedVisibility(
-            visible = currentRoute == Routes.LIBRARY,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = MiniMusicMotion.trackChangeEffects()
-            ) + fadeIn(animationSpec = MiniMusicMotion.trackChangeEffects()),
-            exit = slideOutVertically(
-                targetOffsetY = { it },
-                animationSpec = MiniMusicMotion.trackChangeExitEffects()
-            ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()),
-            modifier = androidx.compose.ui.Modifier.align(Alignment.BottomCenter)
+        Box(
+            modifier = androidx.compose.ui.Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .graphicsLayer {
+                    translationY = sheetState.progress * miniPlayerHeightPx
+                    alpha = (1f - sheetState.progress).coerceIn(0f, 1f)
+                }
+                .zIndex(1f)
+                .then(sheetDragModifier)
         ) {
-            Box(
-                modifier = androidx.compose.ui.Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-            ) {
-                MiniPlayer(
-                    song = playbackState.currentSong,
-                    isPlaying = playbackState.isPlaying,
-                    positionMs = playbackState.positionMs,
-                    durationMs = playbackState.durationMs,
-                    onTogglePlayPause = playerViewModel::togglePlayPause,
-                    onSkipNext = playerViewModel::skipToNext,
-                    onClick = ::openPlayer,
-                    onSwipeToPlayer = ::openPlayer
-                )
-            }
+            MiniPlayer(
+                song = playbackState.currentSong,
+                isPlaying = playbackState.isPlaying,
+                positionMs = playbackState.positionMs,
+                durationMs = playbackState.durationMs,
+                onTogglePlayPause = playerViewModel::togglePlayPause,
+                onSkipNext = playerViewModel::skipToNext,
+                onClick = ::openPlayer,
+                onSwipeToPlayer = {}
+            )
         }
     }
 }

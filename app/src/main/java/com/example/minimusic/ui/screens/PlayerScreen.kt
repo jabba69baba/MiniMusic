@@ -18,7 +18,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -80,7 +79,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
@@ -95,8 +93,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
@@ -589,7 +587,6 @@ private fun NowPlayingPanel(
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
     val latestSong by rememberUpdatedState(song)
-    val minPlayerSwipeDistancePx = with(androidx.compose.ui.platform.LocalDensity.current) { 64.dp.toPx() }
 
     LaunchedEffect(song.id) {
         badgeReady = false
@@ -657,24 +654,7 @@ private fun NowPlayingPanel(
                 .padding(top = 4.dp)
                 .aspectRatio(1f)
                 .clip(ArtCornerShape)
-                .background(artColors.primaryContainer)
-                .pointerInput(song.id, minPlayerSwipeDistancePx) {
-                    val verticalDragDistance = mutableFloatStateOf(0f)
-                    detectDragGestures(
-                        onDragStart = { verticalDragDistance.floatValue = 0f },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            verticalDragDistance.floatValue += dragAmount.y
-                        },
-                        onDragEnd = {
-                            if (verticalDragDistance.floatValue > minPlayerSwipeDistancePx) {
-                                onSwipeToMiniplayer()
-                            }
-                            verticalDragDistance.floatValue = 0f
-                        },
-                        onDragCancel = { verticalDragDistance.floatValue = 0f }
-                    )
-                },
+                .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
@@ -963,9 +943,18 @@ private fun TransportButton(
         },
         label = "transportPressIllumination"
     )
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = if (isPressed) MiniMusicMotion.fastEffects() else MiniMusicMotion.defaultEffects(),
+        label = "transportPressScale"
+    )
 
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clip(shape)
             .background(containerColor)
             .clickable(
@@ -1008,9 +997,18 @@ private fun PlayPauseButton(
         },
         label = "playPausePressIllumination"
     )
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = if (isPressed) MiniMusicMotion.fastEffects() else MiniMusicMotion.defaultEffects(),
+        label = "playPausePressScale"
+    )
 
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .fillMaxHeight()
             .clip(PlayButtonShape)
             .background(containerColor)
@@ -1101,6 +1099,32 @@ private fun CapsuleSegment(
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabInset"
     )
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val density = LocalDensity.current
+    val tabScale by animateFloatAsState(
+        targetValue = when {
+            isPressed -> 0.96f
+            active -> 1.03f
+            else -> 1f
+        },
+        animationSpec = when {
+            isPressed -> MiniMusicMotion.fastEffects()
+            active -> MiniMusicMotion.selectionEffects()
+            else -> MiniMusicMotion.defaultEffects()
+        },
+        label = "functionTabScale"
+    )
+    val neighborNudge by animateDpAsState(
+        targetValue = when {
+            !active -> 0.dp
+            isFirst -> 1.dp
+            isLast -> (-1).dp
+            else -> 0.dp
+        },
+        animationSpec = MiniMusicMotion.selectionEffects(),
+        label = "functionTabNeighborNudge"
+    )
     // Keep every inner tab pill-shaped. The animated inset and background
     // provide the active transition without exposing rectangular tab corners.
     val tabShape = RoundedCornerShape(50)
@@ -1108,11 +1132,16 @@ private fun CapsuleSegment(
     Box(
         modifier = modifier
             .fillMaxHeight()
+            .graphicsLayer {
+                scaleX = tabScale
+                scaleY = tabScale
+                translationX = with(density) { neighborNudge.toPx() }
+            }
             .padding(horizontal = inset)
             .clip(tabShape)
             .background(backgroundColor)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),

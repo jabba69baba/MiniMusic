@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,13 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -45,7 +41,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -98,10 +93,6 @@ fun MiniPlayer(
     val artColors = rememberArtColorRoles(song?.albumArtUri)
     val miniPlayerColor = artColors.surfaceVariant
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
-    val verticalDragDistance = remember { mutableFloatStateOf(0f) }
-    var dragConsumed by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val minSwipeDistancePx = with(density) { 48.dp.toPx() }
     val progressRingColor = readableProgressColor(
         accent = artColors.primary,
         background = miniPlayerColor,
@@ -114,33 +105,7 @@ fun MiniPlayer(
             .fillMaxWidth()
             .clip(MiniPlayerShape)
             .background(miniPlayerColor)
-            .pointerInput(song?.id, minSwipeDistancePx) {
-                detectDragGestures(
-                    onDragStart = {
-                        verticalDragDistance.floatValue = 0f
-                        dragConsumed = false
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        verticalDragDistance.floatValue += dragAmount.y
-                        if (kotlin.math.abs(verticalDragDistance.floatValue) > 4f) {
-                            dragConsumed = true
-                        }
-                    },
-                    onDragEnd = {
-                        if (verticalDragDistance.floatValue < -minSwipeDistancePx) {
-                            dragConsumed = true
-                            onSwipeToPlayer()
-                        }
-                        verticalDragDistance.floatValue = 0f
-                    },
-                    onDragCancel = { verticalDragDistance.floatValue = 0f }
-                )
-            }
-            .clickable(enabled = song != null, onClick = {
-                if (!dragConsumed) onClick()
-                dragConsumed = false
-            })
+            .clickable(enabled = song != null, onClick = onClick)
     ) {
         Row(
             modifier = Modifier
