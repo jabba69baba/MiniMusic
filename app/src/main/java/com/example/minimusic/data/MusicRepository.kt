@@ -73,9 +73,17 @@ class MusicRepository(private val context: Context) {
 
                 songs += Song(
                     id = id,
-                    title = cursor.getString(titleCol) ?: "Unknown title",
-                    artist = cursor.getString(artistCol)?.takeIf { it.isNotBlank() } ?: "Unknown artist",
-                    album = cursor.getString(albumCol)?.takeIf { it.isNotBlank() } ?: "Unknown album",
+                    title = cursor.getString(titleCol)
+                        ?.let(::repairLikelyMojibake)
+                        ?: "Unknown title",
+                    artist = cursor.getString(artistCol)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let(::repairLikelyMojibake)
+                        ?: "Unknown artist",
+                    album = cursor.getString(albumCol)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let(::repairLikelyMojibake)
+                        ?: "Unknown album",
                     albumId = albumId,
                     durationMs = cursor.getLong(durationCol),
                     trackNumber = cursor.getInt(trackCol).let { if (it > 1000) it % 1000 else it },

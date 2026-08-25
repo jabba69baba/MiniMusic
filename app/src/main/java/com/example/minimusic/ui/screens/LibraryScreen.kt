@@ -43,7 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
@@ -52,8 +52,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -324,23 +322,15 @@ fun LibraryScreen(
                                     )
                                 }
                             }
-                            DropdownMenu(expanded = tabMenuExpanded, onDismissRequest = { tabMenuExpanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Songs") },
-                                    leadingIcon = { Icon(Icons.Filled.MusicNote, contentDescription = null) },
-                                    onClick = { selectedTab = LibraryTab.SONGS; tabMenuExpanded = false }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Artists") },
-                                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
-                                    onClick = { selectedTab = LibraryTab.ARTISTS; tabMenuExpanded = false }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Albums") },
-                                    leadingIcon = { Icon(Icons.Filled.Album, contentDescription = null) },
-                                    onClick = { selectedTab = LibraryTab.ALBUMS; tabMenuExpanded = false }
-                                )
-                            }
+                            LibraryTabDialog(
+                                expanded = tabMenuExpanded,
+                                selected = selectedTab,
+                                onDismiss = { tabMenuExpanded = false },
+                                onSelect = {
+                                    selectedTab = it
+                                    tabMenuExpanded = false
+                                }
+                            )
                         }
 
                         // Right controls: Locate, Shuffle, Sort — three
@@ -393,7 +383,7 @@ fun LibraryScreen(
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
-                                        Icons.Filled.FilterList,
+                                        Icons.Filled.Sort,
                                         contentDescription = "Sort songs",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(22.dp)
@@ -509,7 +499,11 @@ private fun SongsTab(
             // player + nav bar, without reserving more space than needed.
             contentPadding = PaddingValues(bottom = bottomContentPadding + 8.dp, end = 28.dp)
         ) {
-            items(songs, key = { it.id }) { song ->
+            items(
+                items = songs,
+                key = { it.id },
+                contentType = { "song-row" }
+            ) { song ->
                 SongListItem(
                     song = song,
                     isPlaying = song.id == currentSongId,
@@ -561,7 +555,11 @@ private fun AlbumsTab(
                 bottom = bottomContentPadding + 12.dp
             )
         ) {
-            gridItems(albums, key = { it.id }) { album ->
+            items(
+                items = albums,
+                key = { it.id },
+                contentType = { "album-grid" }
+            ) { album ->
                 AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
             }
         }
@@ -595,7 +593,11 @@ private fun ArtistsTab(
             state = listState,
             contentPadding = PaddingValues(bottom = bottomContentPadding + 8.dp, end = 28.dp)
         ) {
-            items(artists, key = { it.name }) { artist ->
+            items(
+                items = artists,
+                key = { it.name },
+                contentType = { "artist-row" }
+            ) { artist ->
                 ArtistListItem(artist = artist, onClick = { onArtistClick(artist) })
             }
         }
@@ -708,6 +710,80 @@ private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = w
     SortField.ALBUM -> if (ascending) SongSortOrder.ALBUM_A_Z else SongSortOrder.ALBUM_Z_A
     SortField.DURATION -> if (ascending) SongSortOrder.DURATION_SHORTEST else SongSortOrder.DURATION_LONGEST
     SortField.DATE_ADDED -> if (ascending) SongSortOrder.DATE_ADDED_OLDEST else SongSortOrder.DATE_ADDED_NEWEST
+}
+
+@Composable
+private fun LibraryTabDialog(
+    expanded: Boolean,
+    selected: LibraryTab,
+    onDismiss: () -> Unit,
+    onSelect: (LibraryTab) -> Unit
+) {
+    if (!expanded) return
+    val tabs = listOf(
+        LibraryTab.SONGS,
+        LibraryTab.ARTISTS,
+        LibraryTab.ALBUMS
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        title = { Text("View by") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                tabs.forEach { tab ->
+                    val selectedRow = selected == tab
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onSelect(tab) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (selectedRow) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = null,
+                                tint = if (selectedRow) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = tab.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (selectedRow) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 12.dp)
+                            )
+                            RadioButton(
+                                selected = selectedRow,
+                                onClick = { onSelect(tab) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {}
+    )
 }
 
 @Composable

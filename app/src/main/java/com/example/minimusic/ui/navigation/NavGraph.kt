@@ -222,10 +222,12 @@ fun MiniMusicNavGraph(
         }
 
         composable(Routes.PLAYER) {
-            Box(
-                modifier = androidx.compose.ui.Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
+            HomeTransitionBackdrop(
+                songs = libraryState.filteredSongs,
+                currentSongId = playbackState.currentSong?.id,
+                bottomPadding = MiniPlayerReservedHeight + with(density) {
+                    navigationBarHeightPx.toDp()
+                }
             )
         }
 
@@ -284,7 +286,9 @@ fun MiniMusicNavGraph(
             }
         }
 
-        if (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f) {
+        if (currentRoute != Routes.LYRICS &&
+            (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
+        ) {
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .align(Alignment.BottomCenter)

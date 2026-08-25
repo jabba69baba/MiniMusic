@@ -18,6 +18,15 @@ private val LrcCommentLineRegex = Regex(
     "^\\s*\\[(?:comment|meta|metadata)\\s*:.*]\\s*$",
     RegexOption.IGNORE_CASE
 )
+private val ProviderControlTagRegex = Regex(
+    "\\[(?:id|hash|sign|qq|total|offset|language|tool|source)\\s*:[^]]*]",
+    RegexOption.IGNORE_CASE
+)
+private val WordTimingTokenRegex = Regex("<\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*>")
+private val WordTimingLinePrefixRegex = Regex("^\\[\\s*\\d+\\s*,\\s*\\d+\\s*\\]")
+private val InstrumentalPlaceholderRegex = Regex(
+    "^(?:纯音乐[,，]?请欣赏|純音樂[,，]?請欣賞)$"
+)
 
 /**
  * Reads lyrics straight out of a song's own embedded ID3v2 tag (the "USLT" frame —
@@ -25,8 +34,8 @@ private val LrcCommentLineRegex = Regex(
  *
  * Current scope: ID3v2.3 / v2.4 tags on MP3-family files (the overwhelming majority
  * of locally-tagged lyrics in the wild). ID3v2.2 (3-char frame IDs) and container
- * formats that store lyrics differently (FLAC "LYRICS" comment, M4A "\xa9lyr" atom)
- * aren't read yet — see the suggestions at the end for extending this.
+ * formats that store lyrics differently (FLAC "LYRICS" comment, M4A "©lyr" atom)
+ * aren't read yet.
  */
 class LyricsReader(private val context: Context) {
 
@@ -53,7 +62,7 @@ class LyricsReader(private val context: Context) {
             if (read < 10) break
             remaining -= read
 
-            if (frameHeader[0] == 0.toByte()) break // padding reached, no more frames
+            if (frameHeader[0] == 0.toByte()) break
 
             val frameId = String(frameHeader, 0, 4, Charsets.US_ASCII)
             val frameSize = if (majorVersion >= 4) {
@@ -95,19 +104,26 @@ class LyricsReader(private val context: Context) {
     }
 
     /**
-     * Removes LRC metadata headers such as [ti:], [ar:], [by:] and [offset:]
-     * without touching ordinary lyric text or timestamp tags like [00:12.34].
+     * Removes provider metadata and nonstandard word-timing markup without removing
+     * genuine Unicode combining marks, including Zalgo-style text.
      */
-    internal fun cleanLyricsText(text: String): String? = text
-        .lineSequence()
-        .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
-        .filter { it.isNotBlank() }
-        .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
-        .map { LrcMetadataTagRegex.replace(it, "").trim() }
-        .filter { it.isNotBlank() }
-        .joinToString("\n")
-        .trim()
-        .ifBlank { null }
+    internal fun cleanLyricsText(text: String): String? {
+        val cleaned = text
+            .lineSequence()
+            .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
+            .map { ProviderControlTagRegex.replace(it, "") }
+            .map { LrcMetadataTagRegex.replace(it, "") }
+            .map { WordTimingLinePrefixRegex.replace(WordTimingTokenRegex.replace(it, ""), "") }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { InstrumentalPlaceholderRegex.matches(it) }
+            .joinToString("\n")
+            .trim()
+            .ifBlank { null }
+        return cleaned?.let(::repairLikelyMojibake)
+    }
 
     private fun indexAfterNullTerminator(body: ByteArray, start: Int, nullWidth: Int): Int {
         var i = start

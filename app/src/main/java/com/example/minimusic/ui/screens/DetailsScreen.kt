@@ -61,6 +61,7 @@ import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.MiniMusicMotion
+import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import java.util.Locale
 
@@ -85,7 +86,7 @@ fun DetailsScreen(
             .windowInsetsPadding(WindowInsets.systemBars)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(bottom = 20.dp)
+            .padding(bottom = MiniPlayerReservedHeight + 12.dp)
     ) {
         Row(
             modifier = Modifier

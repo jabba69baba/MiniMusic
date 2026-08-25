@@ -9,7 +9,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -25,11 +24,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,7 +47,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -67,7 +63,7 @@ private val MiniPlayerShape = RoundedCornerShape(
 )
 
 /** Reserved content height used by the library while the shared host overlays the bar. */
-val MiniPlayerReservedHeight = 64.dp
+val MiniPlayerReservedHeight = 68.dp
 
 /**
  * Permanent mini player bar — always present at the bottom regardless of
@@ -117,7 +113,7 @@ fun MiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -300,26 +296,11 @@ private fun MiniPlayerArt(
     artUri: android.net.Uri?,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-        if (artUri != null) {
-            AsyncImage(
-                model = artUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(10.dp))
-            )
-        }
-    }
+    AlbumArtImage(
+        model = artUri,
+        contentDescription = null,
+        modifier = modifier.size(44.dp),
+        shape = RoundedCornerShape(10.dp),
+        iconSize = 26.dp
+    )
 }
