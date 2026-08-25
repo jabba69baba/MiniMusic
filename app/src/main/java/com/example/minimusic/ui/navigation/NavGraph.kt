@@ -64,6 +64,7 @@ fun MiniMusicNavGraph(
     val queueSnapshot by playerViewModel.queueSnapshot.collectAsState()
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
+    val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
@@ -169,62 +170,36 @@ fun MiniMusicNavGraph(
             DetailsScreen(song = song, onBack = { navController.popBackStack() })
         }
 
-        composable(
-            route = Routes.PLAYER,
-            enterTransition = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(
-                        MiniMusicMotion.sheetDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + fadeIn(animationSpec = tween(
-                        MiniMusicMotion.sheetDurationMillis,
-                        easing = FastOutSlowInEasing
-                    ))
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(
-                        MiniMusicMotion.sheetDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + fadeOut(
-                    animationSpec = tween(
-                        MiniMusicMotion.fastEffectDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                )
-            },
-            popEnterTransition = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(
-                        MiniMusicMotion.sheetDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + fadeIn(animationSpec = tween(
-                        MiniMusicMotion.sheetDurationMillis,
-                        easing = FastOutSlowInEasing
-                    ))
-            },
-            popExitTransition = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(
-                        MiniMusicMotion.sheetDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + fadeOut(
-                    animationSpec = tween(
-                        MiniMusicMotion.fastEffectDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                )
-            }
+        composable(Routes.PLAYER) {
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            )
+        }
+
+        composable(Routes.LYRICS) {
+            LyricsScreen(
+                playbackState = playbackState,
+                lyricsState = lyricsState,
+                onSeekTo = playerViewModel::seekTo,
+                onBack = { navController.popBackStack() }
+            )
+        }
+    }
+
+        AnimatedVisibility(
+            visible = currentRoute == Routes.PLAYER,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = MiniMusicMotion.trackChangeEffects()
+            ) + fadeIn(animationSpec = MiniMusicMotion.trackChangeEffects()),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = MiniMusicMotion.trackChangeExitEffects()
+            ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()),
+            modifier = androidx.compose.ui.Modifier.fillMaxSize()
         ) {
-            val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
             PlayerScreen(
                 playbackState = playbackState,
                 queueSnapshot = queueSnapshot,
@@ -255,16 +230,6 @@ fun MiniMusicNavGraph(
                 onCancelSleepTimer = playerViewModel::cancelSleepTimer
             )
         }
-
-        composable(Routes.LYRICS) {
-            LyricsScreen(
-                playbackState = playbackState,
-                lyricsState = lyricsState,
-                onSeekTo = playerViewModel::seekTo,
-                onBack = { navController.popBackStack() }
-            )
-        }
-    }
 
         AnimatedVisibility(
             visible = currentRoute == Routes.LIBRARY,
