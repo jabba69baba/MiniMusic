@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils as CoreColorUtils
+import androidx.core.graphics.ColorUtils
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.CachePolicy
@@ -181,6 +182,33 @@ fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
         onSurface = artOnSurface,
         surfaceVariant = artSurfaceVariant,
         onSurfaceVariant = artOnSurfaceVariant
+    )
+}
+
+/** Interpolates every playback color role together for a coordinated track change. */
+fun ArtColorRoles.lerpTo(target: ArtColorRoles, fraction: Float): ArtColorRoles {
+    fun blend(from: Color, to: Color): Color =
+        Color(ColorUtils.blendARGB(from.toArgb(), to.toArgb(), fraction.coerceIn(0f, 1f)))
+
+    return ArtColorRoles(
+        primary = blend(primary, target.primary),
+        onPrimary = blend(onPrimary, target.onPrimary),
+        primaryContainer = blend(primaryContainer, target.primaryContainer),
+        onPrimaryContainer = blend(onPrimaryContainer, target.onPrimaryContainer),
+        secondary = blend(secondary, target.secondary),
+        onSecondary = blend(onSecondary, target.onSecondary),
+        secondaryContainer = blend(secondaryContainer, target.secondaryContainer),
+        onSecondaryContainer = blend(onSecondaryContainer, target.onSecondaryContainer),
+        tertiary = blend(tertiary, target.tertiary),
+        onTertiary = blend(onTertiary, target.onTertiary),
+        tertiaryContainer = blend(tertiaryContainer, target.tertiaryContainer),
+        onTertiaryContainer = blend(onTertiaryContainer, target.onTertiaryContainer),
+        background = blend(background, target.background),
+        onBackground = blend(onBackground, target.onBackground),
+        surface = blend(surface, target.surface),
+        onSurface = blend(onSurface, target.onSurface),
+        surfaceVariant = blend(surfaceVariant, target.surfaceVariant),
+        onSurfaceVariant = blend(onSurfaceVariant, target.onSurfaceVariant)
     )
 }
 

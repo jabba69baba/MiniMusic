@@ -119,6 +119,7 @@ import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.MiniMusicMotion
+import com.example.minimusic.ui.theme.lerpTo
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
@@ -628,10 +629,7 @@ private fun NowPlayingPanel(
             badgeReady = true
             badgeAlpha.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = TrackTransitionDurationMillis / 2,
-                    easing = FastOutSlowInEasing
-                )
+                animationSpec = MiniMusicMotion.trackChangeExitEffects()
             )
         }
     }
@@ -685,24 +683,15 @@ private fun NowPlayingPanel(
                     val direction = transitionDirection
                     (slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                        animationSpec = MiniMusicMotion.trackChangeEffects()
                     ) + fadeIn(
-                        animationSpec = tween(
-                            TrackTransitionDurationMillis,
-                            easing = FastOutSlowInEasing
-                        )
+                        animationSpec = MiniMusicMotion.trackChangeEffects()
                     )) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = tween(
-                                TrackTransitionDurationMillis,
-                                easing = FastOutSlowInEasing
-                            )
+                            animationSpec = MiniMusicMotion.trackChangeEffects()
                         ) + fadeOut(
-                            animationSpec = tween(
-                                TrackTransitionDurationMillis / 2,
-                                easing = FastOutSlowInEasing
-                            )
+                            animationSpec = MiniMusicMotion.trackChangeExitEffects()
                         ))
 
                 },
@@ -739,15 +728,15 @@ private fun NowPlayingPanel(
                 val direction = transitionDirection
                 (slideInHorizontally(
                     initialOffsetX = { width -> direction * (width / 8) },
-                    animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                    animationSpec = MiniMusicMotion.trackChangeEffects()
                 ) + fadeIn(
-                    animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                    animationSpec = MiniMusicMotion.trackChangeEffects()
                 )) togetherWith
                     (slideOutHorizontally(
                         targetOffsetX = { width -> -direction * (width / 8) },
-                        animationSpec = tween(TrackTransitionDurationMillis, easing = FastOutSlowInEasing)
+                        animationSpec = MiniMusicMotion.trackChangeEffects()
                     ) + fadeOut(
-                        animationSpec = tween(TrackTransitionDurationMillis / 2, easing = FastOutSlowInEasing)
+                        animationSpec = MiniMusicMotion.trackChangeExitEffects()
                     ))
             },
             contentKey = { it.id },
@@ -935,33 +924,22 @@ private fun NowPlayingPanel(
 
 @Composable
 private fun animateArtColorRoles(target: ArtColorRoles): ArtColorRoles {
-    @Composable
-    fun animated(color: Color, label: String): Color = animateColorAsState(
-        targetValue = color,
-        animationSpec = tween(durationMillis = TrackTransitionDurationMillis, easing = FastOutSlowInEasing),
-        label = label
-    ).value
+    val progress = remember { Animatable(1f) }
+    var fromRoles by remember { mutableStateOf(target) }
+    var toRoles by remember { mutableStateOf(target) }
 
-    return ArtColorRoles(
-        primary = animated(target.primary, "playerPrimaryColor"),
-        onPrimary = animated(target.onPrimary, "playerOnPrimaryColor"),
-        primaryContainer = animated(target.primaryContainer, "playerPrimaryContainerColor"),
-        onPrimaryContainer = animated(target.onPrimaryContainer, "playerOnPrimaryContainerColor"),
-        secondary = animated(target.secondary, "playerSecondaryColor"),
-        onSecondary = animated(target.onSecondary, "playerOnSecondaryColor"),
-        secondaryContainer = animated(target.secondaryContainer, "playerSecondaryContainerColor"),
-        onSecondaryContainer = animated(target.onSecondaryContainer, "playerOnSecondaryContainerColor"),
-        tertiary = animated(target.tertiary, "playerTertiaryColor"),
-        onTertiary = animated(target.onTertiary, "playerOnTertiaryColor"),
-        tertiaryContainer = animated(target.tertiaryContainer, "playerTertiaryContainerColor"),
-        onTertiaryContainer = animated(target.onTertiaryContainer, "playerOnTertiaryContainerColor"),
-        background = animated(target.background, "playerBackgroundColor"),
-        onBackground = animated(target.onBackground, "playerOnBackgroundColor"),
-        surface = animated(target.surface, "playerSurfaceColor"),
-        onSurface = animated(target.onSurface, "playerOnSurfaceColor"),
-        surfaceVariant = animated(target.surfaceVariant, "playerSurfaceVariantColor"),
-        onSurfaceVariant = animated(target.onSurfaceVariant, "playerOnSurfaceVariantColor")
-    )
+    LaunchedEffect(target) {
+        if (toRoles == target) return@LaunchedEffect
+        fromRoles = fromRoles.lerpTo(toRoles, progress.value)
+        toRoles = target
+        progress.snapTo(0f)
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = MiniMusicMotion.trackChangeEffects()
+        )
+    }
+
+    return fromRoles.lerpTo(toRoles, progress.value)
 }
 
 @Composable

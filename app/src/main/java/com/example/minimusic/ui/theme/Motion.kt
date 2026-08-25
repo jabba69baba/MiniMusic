@@ -18,6 +18,7 @@ object MiniMusicMotion {
     const val fastEffectDurationMillis = 180
     const val defaultEffectDurationMillis = 220
     const val selectionDurationMillis = 250
+    const val trackChangeDurationMillis = 480
 
     fun <T> fastEffects(): FiniteAnimationSpec<T> =
         tween(
@@ -34,6 +35,18 @@ object MiniMusicMotion {
     fun <T> selectionEffects(): FiniteAnimationSpec<T> =
         tween(
             durationMillis = selectionDurationMillis,
+            easing = FastOutSlowInEasing
+        )
+
+    fun <T> trackChangeEffects(): FiniteAnimationSpec<T> =
+        tween(
+            durationMillis = trackChangeDurationMillis,
+            easing = FastOutSlowInEasing
+        )
+
+    fun <T> trackChangeExitEffects(): FiniteAnimationSpec<T> =
+        tween(
+            durationMillis = trackChangeDurationMillis / 2,
             easing = FastOutSlowInEasing
         )
 
