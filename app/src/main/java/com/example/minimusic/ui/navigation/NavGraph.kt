@@ -264,6 +264,7 @@ fun MiniMusicNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
+    }
 
         AnimatedVisibility(
             visible = currentRoute == Routes.LIBRARY,
