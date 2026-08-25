@@ -87,6 +87,7 @@ import com.example.minimusic.data.model.Song
 import com.example.minimusic.playback.QueueEntry
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -491,10 +492,10 @@ private fun ColumnScope.QueueDrawerList(
                 overScrollMode = View.OVER_SCROLL_NEVER
                 clipToPadding = true
                 itemAnimator = DefaultItemAnimator().apply {
-                    removeDuration = 220L
-                    moveDuration = 220L
-                    addDuration = 180L
-                    changeDuration = 180L
+                    removeDuration = 120L
+                    moveDuration = 180L
+                    addDuration = 140L
+                    changeDuration = 140L
                     supportsChangeAnimations = false
                 }
             }
@@ -845,14 +846,28 @@ private class PracticalQueueAdapter(
             super.onSelectedChanged(viewHolder, actionState)
             if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
                 viewHolder.setIsRecyclable(false)
+                animateDragLift(viewHolder.itemView, lifted = true)
                 beginDrag(viewHolder)
                 attachedRecyclerView?.let { startAutoScroll(it, viewHolder) }
             } else if (actionState == ItemTouchHelper.ACTION_STATE_IDLE) {
+                activeViewHolder?.itemView?.let { animateDragLift(it, lifted = false) }
                 stopAutoScroll()
             }
         }
 
+        private fun animateDragLift(view: View, lifted: Boolean) {
+            view.animate().cancel()
+            view.animate()
+                .scaleX(if (lifted) 1.015f else 1f)
+                .scaleY(if (lifted) 1.015f else 1f)
+                .setDuration(MiniMusicMotion.selectionDurationMillis.toLong())
+                .setInterpolator(FastOutSlowInEasingInterpolator)
+                .start()
+            view.elevation = if (lifted) context.dp(4).toFloat() else 0f
+        }
+
         override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+            animateDragLift(viewHolder.itemView, lifted = false)
             stopAutoScroll()
             super.clearView(recyclerView, viewHolder)
             if (!releaseSubmitted) {
@@ -1074,5 +1089,7 @@ private class QueueHandleView(context: Context) : View(context) {
         }
     }
 }
+
+private val FastOutSlowInEasingInterpolator = android.view.animation.DecelerateInterpolator()
 
 private fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
