@@ -1,5 +1,11 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -46,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 
 /** Corner shape for the mini player bar — rounded on top to match the app's
@@ -114,33 +121,54 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MiniPlayerArt(artUri = song?.albumArtUri)
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = song?.title ?: "What's the vibe?",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                                            color = artColors.onSurface,
-
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier.basicMarquee(
-                        iterations = Int.MAX_VALUE,
-                        initialDelayMillis = 1_000,
-                        repeatDelayMillis = 1_400,
-                        velocity = 24.dp
-                    )
-                )
-                Text(
-                    text = song?.artist ?: "Tap a song to listen",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = artColors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            AnimatedContent(
+                targetState = song,
+                transitionSpec = {
+                    (slideInHorizontally(
+                        initialOffsetX = { it / 8 },
+                        animationSpec = MiniMusicMotion.trackChangeEffects()
+                    ) + fadeIn(animationSpec = MiniMusicMotion.trackChangeEffects())) togetherWith
+                        (slideOutHorizontally(
+                            targetOffsetX = { -it / 8 },
+                            animationSpec = MiniMusicMotion.trackChangeEffects()
+                        ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()))
+                },
+                modifier = Modifier.weight(1f),
+                contentKey = { it?.id ?: -1L },
+                label = "miniPlayerTrackContent"
+            ) { displayedSong ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MiniPlayerArt(artUri = displayedSong?.albumArtUri)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = displayedSong?.title ?: "What's the vibe?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Normal,
+                            color = artColors.onSurface,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                initialDelayMillis = 1_000,
+                                repeatDelayMillis = 1_400,
+                                velocity = 24.dp
+                            )
+                        )
+                        Text(
+                            text = displayedSong?.artist ?: "Tap a song to listen",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = artColors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
 
             // Play/pause control with a circular progress ring. The ring uses
