@@ -118,6 +118,7 @@ import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
@@ -977,7 +978,11 @@ private fun TransportButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressOverlayAlpha by animateFloatAsState(
         targetValue = if (isPressed) 0.20f else 0f,
-        animationSpec = tween(durationMillis = if (isPressed) 70 else 180),
+        animationSpec = if (isPressed) {
+            MiniMusicMotion.fastEffects()
+        } else {
+            MiniMusicMotion.defaultEffects()
+        },
         label = "transportPressIllumination"
     )
 
@@ -1018,7 +1023,11 @@ private fun PlayPauseButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressOverlayAlpha by animateFloatAsState(
         targetValue = if (isPressed) 0.20f else 0f,
-        animationSpec = tween(durationMillis = if (isPressed) 70 else 180),
+        animationSpec = if (isPressed) {
+            MiniMusicMotion.fastEffects()
+        } else {
+            MiniMusicMotion.defaultEffects()
+        },
         label = "playPausePressIllumination"
     )
 
@@ -1042,10 +1051,16 @@ private fun PlayPauseButton(
             AnimatedContent(
                 targetState = isPlaying,
                 transitionSpec = {
-                    (androidx.compose.animation.fadeIn(animationSpec = tween(170)) +
-                        androidx.compose.animation.scaleIn(initialScale = 0.72f, animationSpec = tween(220))) togetherWith
-                        (androidx.compose.animation.fadeOut(animationSpec = tween(120)) +
-                            androidx.compose.animation.scaleOut(targetScale = 0.72f, animationSpec = tween(150)))
+                    (androidx.compose.animation.fadeIn(animationSpec = MiniMusicMotion.fastEffects()) +
+                        androidx.compose.animation.scaleIn(
+                            initialScale = 0.72f,
+                            animationSpec = MiniMusicMotion.selectionEffects()
+                        )) togetherWith
+                        (androidx.compose.animation.fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
+                            androidx.compose.animation.scaleOut(
+                                targetScale = 0.72f,
+                                animationSpec = MiniMusicMotion.fastEffects()
+                            ))
                 },
                 label = "playPauseMorph"
             ) { playing ->
@@ -1095,17 +1110,17 @@ private fun CapsuleSegment(
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (active) artColors.primaryContainer else Color.Transparent,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabBackground"
     )
     val contentColor by animateColorAsState(
         targetValue = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabContent"
     )
     val inset by animateDpAsState(
         targetValue = if (active) 2.dp else 0.dp,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabInset"
     )
     // Keep every inner tab pill-shaped. The animated inset and background
