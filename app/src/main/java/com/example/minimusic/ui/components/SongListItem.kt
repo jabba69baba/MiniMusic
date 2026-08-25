@@ -52,7 +52,8 @@ fun SongListItem(
     onPlayNext: (Song) -> Unit = {},
     onAddToQueue: (Song) -> Unit = {},
     onShufflePlayFrom: (Song) -> Unit = {},
-    onDelete: (Song) -> Unit = {}
+    onDelete: (Song) -> Unit = {},
+    onOpenDetails: (Song) -> Unit = {}
 ) {
     val containerColor = if (isPlaying) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
@@ -162,7 +163,8 @@ fun SongListItem(
                         onPlayNext = onPlayNext,
                         onAddToQueue = onAddToQueue,
                         onShufflePlayFrom = onShufflePlayFrom,
-                        onDelete = onDelete
+                        onDelete = onDelete,
+                        onOpenDetails = onOpenDetails
                     )
                 }
             }

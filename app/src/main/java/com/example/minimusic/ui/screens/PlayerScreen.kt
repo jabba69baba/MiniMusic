@@ -206,7 +206,15 @@ fun PlayerScreen(
     onStartSleepTimer: (Long, Boolean) -> Unit = { _, _ -> },
     onCancelSleepTimer: () -> Unit = {}
 ) {
-    val song = playbackState.currentSong ?: return
+    val song = playbackState.currentSong
+    if (song == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        )
+        return
+    }
     var queueOpen by remember { mutableStateOf(false) }
     BackHandler(enabled = queueOpen) {
         queueOpen = false
@@ -431,14 +439,17 @@ private fun SleepTimerDialog(
                     thumb = {
                         Box(
                             modifier = Modifier
-                                .size(14.dp)
-                                .background(artColors.primary, CircleShape)
+                                .width(8.dp)
+                                .height(28.dp)
+                                .background(artColors.primary, RoundedCornerShape(50))
                         )
                     },
                     colors = androidx.compose.material3.SliderDefaults.colors(
                         thumbColor = artColors.primary,
                         activeTrackColor = artColors.primary,
-                        inactiveTrackColor = artColors.surfaceVariant
+                        inactiveTrackColor = artColors.surfaceVariant,
+                        activeTickColor = artColors.onPrimary,
+                        inactiveTickColor = artColors.onSurfaceVariant
                     )
                 )
                 SleepTimerSwitchRow(

@@ -30,7 +30,8 @@ fun FilteredSongsScreen(
     songs: List<Song>,
     currentSongId: Long?,
     onBack: () -> Unit,
-    onPlaySong: (Song) -> Unit
+    onPlaySong: (Song) -> Unit,
+    onOpenDetails: (Song) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -56,7 +57,8 @@ fun FilteredSongsScreen(
                 SongListItem(
                     song = song,
                     isPlaying = song.id == currentSongId,
-                    onClick = { onPlaySong(song) }
+                    onClick = { onPlaySong(song) },
+                    onOpenDetails = onOpenDetails
                 )
             }
         }

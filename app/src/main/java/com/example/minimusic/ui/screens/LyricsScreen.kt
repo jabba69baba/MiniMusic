@@ -109,7 +109,9 @@ fun LyricsScreen(
     val scrollScope = rememberCoroutineScope()
     val density = LocalDensity.current
     var scrollJob by remember { mutableStateOf<Job?>(null) }
-    val hasTimedLines = remember(lines) { lines.any { it.startMs != null } }
+    // A single timestamp is not enough to classify a lyric block as synced. Some
+    // files carry one stray timestamp in an otherwise plain USLT text frame.
+    val hasTimedLines = remember(lines) { lines.count { it.startMs != null } >= 2 }
     val activeIndex by remember(lines, playbackState.positionMs) {
         derivedStateOf {
             if (!hasTimedLines) {
@@ -243,42 +245,60 @@ fun LyricsScreen(
                                 items = lines,
                                 key = { index, line -> "${line.startMs ?: -1L}-$index" }
                             ) { index, line ->
-                                val isActive = index == activeIndex
-                                val color by animateColorAsState(
-                                    targetValue = if (!hasTimedLines || isActive) activeColor else inactiveColor,
-                                    animationSpec = tween(
-                                        durationMillis = SCROLL_ANIMATION_DURATION_MS,
-                                        easing = GramophoneMotionEasing
-                                    ),
-                                    label = "lyricsLineColor"
-                                )
-                                val emphasis by animateFloatAsState(
-                                    targetValue = if (hasTimedLines && isActive) 1.015f else 1f,
-                                    animationSpec = tween(
-                                        durationMillis = SCROLL_ANIMATION_DURATION_MS,
-                                        easing = GramophoneMotionEasing
-                                    ),
-                                    label = "lyricsLineEmphasis"
-                                )
-                                Text(
-                                    text = line.text,
-                                    color = color,
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = if (!hasTimedLines || isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                        letterSpacing = (-0.1).sp,
-                                        lineHeight = 38.sp
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 14.dp)
-                                        .clickable(enabled = hasTimedLines && line.startMs != null) {
-                                            line.startMs?.let(onSeekTo)
-                                        }
-                                        .graphicsLayer {
-                                            scaleX = emphasis
-                                            scaleY = emphasis
-                                        }
-                                )
+                                if (!hasTimedLines) {
+                                    // Unsynchronized lyrics are a transcript, not a
+                                    // timeline: every line stays active-colored and
+                                    // manual scrolling remains completely free.
+                                    Text(
+                                        text = line.text,
+                                        color = activeColor,
+                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            letterSpacing = (-0.1).sp,
+                                            lineHeight = 38.sp
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 14.dp)
+                                    )
+                                } else {
+                                    val isActive = index == activeIndex
+                                    val color by animateColorAsState(
+                                        targetValue = if (isActive) activeColor else inactiveColor,
+                                        animationSpec = tween(
+                                            durationMillis = SCROLL_ANIMATION_DURATION_MS,
+                                            easing = GramophoneMotionEasing
+                                        ),
+                                        label = "lyricsLineColor"
+                                    )
+                                    val emphasis by animateFloatAsState(
+                                        targetValue = if (isActive) 1.015f else 1f,
+                                        animationSpec = tween(
+                                            durationMillis = SCROLL_ANIMATION_DURATION_MS,
+                                            easing = GramophoneMotionEasing
+                                        ),
+                                        label = "lyricsLineEmphasis"
+                                    )
+                                    Text(
+                                        text = line.text,
+                                        color = color,
+                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                            letterSpacing = (-0.1).sp,
+                                            lineHeight = 38.sp
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 14.dp)
+                                            .clickable(enabled = line.startMs != null) {
+                                                line.startMs?.let(onSeekTo)
+                                            }
+                                            .graphicsLayer {
+                                                scaleX = emphasis
+                                                scaleY = emphasis
+                                            }
+                                    )
+                                }
                             }
 
                             item(key = "lyrics-reading-band-bottom") {

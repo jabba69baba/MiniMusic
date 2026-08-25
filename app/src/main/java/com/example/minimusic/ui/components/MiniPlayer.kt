@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -94,6 +95,7 @@ fun MiniPlayer(
     val miniPlayerColor = artColors.surfaceVariant
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val verticalDragDistance = remember { mutableFloatStateOf(0f) }
+    var dragConsumed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val minSwipeDistancePx = with(density) { 48.dp.toPx() }
     val progressRingColor = readableProgressColor(
@@ -110,19 +112,31 @@ fun MiniPlayer(
             .background(miniPlayerColor)
             .pointerInput(song?.id, minSwipeDistancePx) {
                 detectDragGestures(
-                    onDragStart = { verticalDragDistance.floatValue = 0f },
+                    onDragStart = {
+                        verticalDragDistance.floatValue = 0f
+                        dragConsumed = false
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         verticalDragDistance.floatValue += dragAmount.y
+                        if (kotlin.math.abs(verticalDragDistance.floatValue) > 4f) {
+                            dragConsumed = true
+                        }
                     },
                     onDragEnd = {
-                        if (verticalDragDistance.floatValue < -minSwipeDistancePx) onSwipeToPlayer()
+                        if (verticalDragDistance.floatValue < -minSwipeDistancePx) {
+                            dragConsumed = true
+                            onSwipeToPlayer()
+                        }
                         verticalDragDistance.floatValue = 0f
                     },
                     onDragCancel = { verticalDragDistance.floatValue = 0f }
                 )
             }
-            .clickable(enabled = song != null, onClick = onClick)
+            .clickable(enabled = song != null, onClick = {
+                if (!dragConsumed) onClick()
+                dragConsumed = false
+            })
     ) {
         Row(
             modifier = Modifier

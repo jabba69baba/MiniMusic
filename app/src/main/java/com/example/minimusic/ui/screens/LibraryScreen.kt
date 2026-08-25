@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MusicNote
@@ -119,6 +120,7 @@ fun LibraryScreen(
     onAddToQueue: (Song) -> Unit,
     onShufflePlayFrom: (Song, List<Song>) -> Unit,
     onDeleteSong: (Song) -> Unit,
+    onOpenDetails: (Song) -> Unit = {},
     onRetryDelete: (Song) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
@@ -219,6 +221,13 @@ fun LibraryScreen(
                     .padding(horizontal = 16.dp),
                 placeholder = { Text("Search....") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
+                            Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 singleLine = true,
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = TextFieldDefaults.colors(
@@ -384,7 +393,7 @@ fun LibraryScreen(
                                 expanded = sortMenuExpanded,
                                 selected = uiState.sortOrder,
                                 onDismiss = { sortMenuExpanded = false },
-                                onSelect = { onSortOrderChange(it); sortMenuExpanded = false }
+                                onSelect = { onSortOrderChange(it) }
                             )
                         }
                     }
@@ -407,7 +416,8 @@ fun LibraryScreen(
                                     onPlayNext = onPlayNext,
                                     onAddToQueue = onAddToQueue,
                                     onShufflePlayFrom = { song -> onShufflePlayFrom(song, filteredSongs) },
-                                    onDelete = onDeleteSong
+                                    onDelete = onDeleteSong,
+                                    onOpenDetails = onOpenDetails
                                 )
                                 LibraryTab.ALBUMS -> AlbumsTab(
                                     albums = uiState.albums,
@@ -488,7 +498,8 @@ private fun SongsTab(
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onShufflePlayFrom: (Song) -> Unit,
-    onDelete: (Song) -> Unit
+    onDelete: (Song) -> Unit,
+    onOpenDetails: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
     val letterForIndex = rememberLetterIndex(songs) { it.title }
@@ -520,7 +531,8 @@ private fun SongsTab(
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
                     onShufflePlayFrom = onShufflePlayFrom,
-                    onDelete = onDelete
+                    onDelete = onDelete,
+                    onOpenDetails = onOpenDetails
                 )
             }
         }
@@ -748,8 +760,14 @@ private fun SortMenu(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SortDirectionPill(
                     ascending = ascending,
-                    onAscending = { ascending = true },
-                    onDescending = { ascending = false }
+                    onAscending = {
+                        ascending = true
+                        onSelect(sortOrderOf(selectedField, true))
+                    },
+                    onDescending = {
+                        ascending = false
+                        onSelect(sortOrderOf(selectedField, false))
+                    }
                 )
                 fields.forEach { (field, label) ->
                     val selectedFieldRow = selectedField == field
@@ -757,7 +775,10 @@ private fun SortMenu(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { selectedField = field },
+                            .clickable {
+                                selectedField = field
+                                onSelect(sortOrderOf(field, ascending))
+                            },
                         shape = RoundedCornerShape(16.dp),
                         color = if (selectedFieldRow) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -781,21 +802,18 @@ private fun SortMenu(
                             )
                             RadioButton(
                                 selected = selectedFieldRow,
-                                onClick = { selectedField = field }
+                                onClick = {
+                                    selectedField = field
+                                    onSelect(sortOrderOf(field, ascending))
+                                }
                             )
                         }
                     }
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = { onSelect(sortOrderOf(selectedField, ascending)) }) {
-                Text("OK")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
+        confirmButton = {},
+        dismissButton = {}
     )
 }
 

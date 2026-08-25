@@ -47,6 +47,7 @@ fun SongGridItem(
     onAddToQueue: (Song) -> Unit = {},
     onShufflePlayFrom: (Song) -> Unit = {},
     onDelete: (Song) -> Unit = {},
+    onOpenDetails: (Song) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val contentColor = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -131,7 +132,8 @@ fun SongGridItem(
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
                     onShufflePlayFrom = onShufflePlayFrom,
-                    onDelete = onDelete
+                    onDelete = onDelete,
+                    onOpenDetails = onOpenDetails
                 )
             }
         }

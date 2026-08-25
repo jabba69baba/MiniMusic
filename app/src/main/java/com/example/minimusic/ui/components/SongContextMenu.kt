@@ -26,11 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.minimusic.data.AudioFormatInfo
 import com.example.minimusic.data.model.Song
-import com.example.minimusic.data.readAudioFormatInfo
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * The dropdown shown from a song row's three-dot button. All playback actions
@@ -46,13 +42,11 @@ fun SongContextMenu(
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onShufflePlayFrom: (Song) -> Unit,
-    onDelete: (Song) -> Unit
+    onDelete: (Song) -> Unit,
+    onOpenDetails: (Song) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var showInfoDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
 
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
@@ -76,11 +70,10 @@ fun SongContextMenu(
             onClick = { onShufflePlayFrom(song); onDismiss() }
         )
         DropdownMenuItem(
-            text = { Text("Song info") },
+            text = { Text("Details") },
             leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
             onClick = {
-                showInfoDialog = true
-                scope.launch { formatInfo = readAudioFormatInfo(context, song.contentUri) }
+                onOpenDetails(song)
                 onDismiss()
             }
         )
@@ -107,9 +100,6 @@ fun SongContextMenu(
         )
     }
 
-    if (showInfoDialog) {
-        SongInfoDialog(song = song, formatInfo = formatInfo, onDismiss = { showInfoDialog = false })
-    }
 
     if (showDeleteConfirm) {
         AlertDialog(
@@ -129,48 +119,4 @@ fun SongContextMenu(
             }
         )
     }
-}
-
-@Composable
-private fun SongInfoDialog(song: Song, formatInfo: AudioFormatInfo?, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(song.title) },
-        text = {
-            val rows = buildList {
-                add("Artist" to song.artist)
-                add("Album" to song.album)
-                add("Duration" to formatDurationLong(song.durationMs))
-                if (song.trackNumber > 0) add("Track" to song.trackNumber.toString())
-                formatInfo?.sampleRateHz?.let { add("Sample rate" to "${"%.1f".format(it / 1000f)} kHz") }
-                formatInfo?.bitrateKbps?.let { add("Bitrate" to "$it kbps") }
-                formatInfo?.mimeLabel?.let { add("Format" to it) }
-            }
-            androidx.compose.foundation.layout.Column {
-                rows.forEach { (label, value) ->
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                        Text(text = value, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        }
-    )
-}
-
-private fun formatDurationLong(durationMs: Long): String {
-    val totalSeconds = durationMs / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
 }

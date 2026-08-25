@@ -1,7 +1,15 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -11,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.minimusic.ui.screens.DetailsScreen
 import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.screens.LyricsScreen
@@ -24,11 +33,13 @@ private object Routes {
     const val LIBRARY = "library"
     const val PLAYER = "player"
     const val LYRICS = "lyrics"
+    const val DETAILS = "details/{songId}"
     const val SETTINGS = "settings"
     const val ALBUM = "album/{albumId}"
     const val ARTIST = "artist/{artistName}"
     fun album(albumId: Long) = "album/$albumId"
     fun artist(artistName: String) = "artist/${java.net.URLEncoder.encode(artistName, "UTF-8")}"
+    fun details(songId: Long) = "details/$songId"
 }
 
 @Composable
@@ -44,7 +55,13 @@ fun MiniMusicNavGraph(
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
 
-    NavHost(navController = navController, startDestination = Routes.LIBRARY) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.LIBRARY,
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
 
         composable(Routes.LIBRARY) {
             LibraryScreen(
@@ -62,13 +79,18 @@ fun MiniMusicNavGraph(
                     playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
                 },
                 onDeleteSong = libraryViewModel::deleteSong,
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
                 onRetryDelete = libraryViewModel::deleteSong,
                 onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
                 onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
                 onSkipPrevious = playerViewModel::skipToPrevious,
-                onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+                onOpenPlayer = {
+                    navController.navigate(Routes.PLAYER) {
+                        launchSingleTop = true
+                    }
+                },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onRetryLoad = libraryViewModel::loadLibrary
             )
@@ -99,7 +121,8 @@ fun MiniMusicNavGraph(
                 songs = songs,
                 currentSongId = playbackState.currentSong?.id,
                 onBack = { navController.popBackStack() },
-                onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) }
+                onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
             )
         }
 
@@ -115,8 +138,18 @@ fun MiniMusicNavGraph(
                 songs = songs,
                 currentSongId = playbackState.currentSong?.id,
                 onBack = { navController.popBackStack() },
-                onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) }
+                onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
             )
+        }
+
+        composable(
+            route = Routes.DETAILS,
+            arguments = listOf(navArgument("songId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val songId = backStackEntry.arguments?.getLong("songId") ?: return@composable
+            val song = libraryViewModel.songById(songId) ?: return@composable
+            DetailsScreen(song = song, onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -124,26 +157,26 @@ fun MiniMusicNavGraph(
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(280)
-                )
+                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))
             },
             exitTransition = {
                 slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(240)
-                )
+                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
             },
             popEnterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(240)
-                )
+                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))
             },
             popExitTransition = {
                 slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(240)
-                )
+                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
             }
         ) {
             val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()

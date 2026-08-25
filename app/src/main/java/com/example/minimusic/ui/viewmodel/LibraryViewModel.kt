@@ -150,6 +150,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun songById(songId: Long): Song? =
+        _uiState.value.allSongs.firstOrNull { it.id == songId }
+
     fun songsForAlbum(albumId: Long): List<Song> =
         _uiState.value.allSongs.filter { it.albumId == albumId }
 
