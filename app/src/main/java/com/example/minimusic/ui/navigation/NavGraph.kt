@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -8,8 +9,14 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,6 +24,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.minimusic.ui.screens.DetailsScreen
@@ -24,6 +32,7 @@ import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
+import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
@@ -55,6 +64,8 @@ fun MiniMusicNavGraph(
     val queueSnapshot by playerViewModel.queueSnapshot.collectAsState()
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
 
     fun openPlayer() {
         if (navController.currentDestination?.route != Routes.PLAYER) {
@@ -64,8 +75,9 @@ fun MiniMusicNavGraph(
         }
     }
 
-    NavHost(
-        navController = navController,
+    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
         startDestination = Routes.LIBRARY,
         modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
@@ -251,6 +263,36 @@ fun MiniMusicNavGraph(
                 onSeekTo = playerViewModel::seekTo,
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        AnimatedVisibility(
+            visible = currentRoute == Routes.LIBRARY,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = MiniMusicMotion.trackChangeEffects()
+            ) + fadeIn(animationSpec = MiniMusicMotion.trackChangeEffects()),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = MiniMusicMotion.trackChangeExitEffects()
+            ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()),
+            modifier = androidx.compose.ui.Modifier.align(Alignment.BottomCenter)
+        ) {
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+            ) {
+                MiniPlayer(
+                    song = playbackState.currentSong,
+                    isPlaying = playbackState.isPlaying,
+                    positionMs = playbackState.positionMs,
+                    durationMs = playbackState.durationMs,
+                    onTogglePlayPause = playerViewModel::togglePlayPause,
+                    onSkipNext = playerViewModel::skipToNext,
+                    onClick = ::openPlayer,
+                    onSwipeToPlayer = ::openPlayer
+                )
+            }
         }
     }
 }

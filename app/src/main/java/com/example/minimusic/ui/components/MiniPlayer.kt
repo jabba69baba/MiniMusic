@@ -64,6 +64,9 @@ private val MiniPlayerShape = RoundedCornerShape(
     bottomEnd = 0.dp
 )
 
+/** Reserved content height used by the library while the shared host overlays the bar. */
+val MiniPlayerReservedHeight = 64.dp
+
 /**
  * Permanent mini player bar — always present at the bottom regardless of
  * whether a song is currently loaded. When [song] is null (nothing has

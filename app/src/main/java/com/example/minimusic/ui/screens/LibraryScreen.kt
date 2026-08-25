@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -73,8 +74,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,7 +85,7 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.components.AlbumGridItem
 import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
-import com.example.minimusic.ui.components.MiniPlayer
+import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -132,7 +131,6 @@ fun LibraryScreen(
     onRetryLoad: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
-    val density = LocalDensity.current
     val view = LocalView.current
     val miniPlayerColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
     DisposableEffect(view, miniPlayerColors.surfaceVariant) {
@@ -145,7 +143,8 @@ fun LibraryScreen(
         }
         onDispose { }
     }
-    var footerHeight by remember { mutableStateOf(0.dp) }
+    val footerHeight =
+        MiniPlayerReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val filteredSongs = uiState.filteredSongs
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
@@ -436,32 +435,7 @@ fun LibraryScreen(
             }
         }
 
-        // Permanent mini player, pinned to the bottom edge: always present
-        // regardless of playback state (shows a placeholder when nothing has
-        // ever been played), so its height never changes and the song list's
-        // bottom padding above it stays stable. Replaces the old separate
-        // Songs/Artists/Albums nav bar entirely — that switching now happens
-        // via the dropdown pill at the top of the drawer.
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .onGloballyPositioned { coordinates ->
-                    footerHeight = with(density) { coordinates.size.height.toDp() }
-                }
-        ) {
-            MiniPlayer(
-                song = playbackState.currentSong,
-                isPlaying = playbackState.isPlaying,
-                positionMs = playbackState.positionMs,
-                durationMs = playbackState.durationMs,
-                onTogglePlayPause = onTogglePlayPause,
-                onSkipNext = onSkipNext,
-                onClick = onOpenPlayer,
-                onSwipeToPlayer = onOpenPlayer
-            )
-        }
+
     }
 }
 
