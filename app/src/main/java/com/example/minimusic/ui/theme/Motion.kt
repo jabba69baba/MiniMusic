@@ -1,6 +1,6 @@
 package com.example.minimusic.ui.theme
 
-import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -19,31 +19,31 @@ object MiniMusicMotion {
     const val defaultEffectDurationMillis = 220
     const val selectionDurationMillis = 250
 
-    fun fastEffects(): AnimationSpec<Float> =
+    fun <T> fastEffects(): FiniteAnimationSpec<T> =
         tween(
             durationMillis = fastEffectDurationMillis,
             easing = FastOutSlowInEasing
         )
 
-    fun defaultEffects(): AnimationSpec<Float> =
+    fun <T> defaultEffects(): FiniteAnimationSpec<T> =
         tween(
             durationMillis = defaultEffectDurationMillis,
             easing = FastOutSlowInEasing
         )
 
-    fun selectionEffects(): AnimationSpec<Float> =
+    fun <T> selectionEffects(): FiniteAnimationSpec<T> =
         tween(
             durationMillis = selectionDurationMillis,
             easing = FastOutSlowInEasing
         )
 
-    fun fastSpatial(): AnimationSpec<Float> =
+    fun <T> fastSpatial(): FiniteAnimationSpec<T> =
         spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
         )
 
-    fun defaultSpatial(): AnimationSpec<Float> =
+    fun <T> defaultSpatial(): FiniteAnimationSpec<T> =
         spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow
