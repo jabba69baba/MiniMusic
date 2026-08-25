@@ -139,32 +139,7 @@ fun MiniMusicNavGraph(
     ) {
 
         composable(Routes.LIBRARY) {
-            LibraryScreen(
-                uiState = libraryState,
-                playbackState = playbackState,
-                events = libraryViewModel.events,
-                onSearchQueryChange = libraryViewModel::onSearchQueryChange,
-                onSortOrderChange = libraryViewModel::onSortOrderChange,
-                onPlaySong = { song, queue ->
-                    playerViewModel.playQueue(queue, queue.indexOf(song))
-                },
-                onPlayNext = playerViewModel::playNext,
-                onAddToQueue = playerViewModel::addToQueue,
-                onShufflePlayFrom = { song, songs ->
-                    playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
-                },
-                onDeleteSong = libraryViewModel::deleteSong,
-                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
-                onRetryDelete = libraryViewModel::deleteSong,
-                onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
-                onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
-                onTogglePlayPause = playerViewModel::togglePlayPause,
-                onSkipNext = playerViewModel::skipToNext,
-                onSkipPrevious = playerViewModel::skipToPrevious,
-                onOpenPlayer = ::openPlayer,
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onRetryLoad = libraryViewModel::loadLibrary
-            )
+            Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
         }
 
         composable(Routes.SETTINGS) {
@@ -224,13 +199,7 @@ fun MiniMusicNavGraph(
         }
 
         composable(Routes.PLAYER) {
-            HomeTransitionBackdrop(
-                songs = libraryState.filteredSongs,
-                currentSongId = playbackState.currentSong?.id,
-                bottomPadding = MiniPlayerReservedHeight + with(density) {
-                    navigationBarHeightPx.toDp()
-                }
-            )
+            Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
         }
 
         composable(Routes.LYRICS) {
@@ -242,6 +211,38 @@ fun MiniMusicNavGraph(
             )
         }
     }
+
+        // Keep the real library composed while the player route is active. This
+        // preserves the exact list, scroll position, and loaded row state under
+        // the sheet, so collapse is the reverse of the opening transition.
+        if (currentRoute == Routes.LIBRARY || currentRoute == Routes.PLAYER) {
+            LibraryScreen(
+                uiState = libraryState,
+                playbackState = playbackState,
+                events = libraryViewModel.events,
+                onSearchQueryChange = libraryViewModel::onSearchQueryChange,
+                onSortOrderChange = libraryViewModel::onSortOrderChange,
+                onPlaySong = { song, queue ->
+                    playerViewModel.playQueue(queue, queue.indexOf(song))
+                },
+                onPlayNext = playerViewModel::playNext,
+                onAddToQueue = playerViewModel::addToQueue,
+                onShufflePlayFrom = { song, songs ->
+                    playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
+                },
+                onDeleteSong = libraryViewModel::deleteSong,
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
+                onRetryDelete = libraryViewModel::deleteSong,
+                onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
+                onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
+                onTogglePlayPause = playerViewModel::togglePlayPause,
+                onSkipNext = playerViewModel::skipToNext,
+                onSkipPrevious = playerViewModel::skipToPrevious,
+                onOpenPlayer = ::openPlayer,
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onRetryLoad = libraryViewModel::loadLibrary
+            )
+        }
 
         if (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f) {
             Box(
