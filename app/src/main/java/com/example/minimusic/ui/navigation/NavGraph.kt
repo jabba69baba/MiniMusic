@@ -25,6 +25,7 @@ import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.screens.SettingsScreen
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
@@ -54,6 +55,14 @@ fun MiniMusicNavGraph(
     val queueSnapshot by playerViewModel.queueSnapshot.collectAsState()
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
+
+    fun openPlayer() {
+        if (navController.currentDestination?.route != Routes.PLAYER) {
+            navController.navigate(Routes.PLAYER) {
+                launchSingleTop = true
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -86,11 +95,7 @@ fun MiniMusicNavGraph(
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
                 onSkipPrevious = playerViewModel::skipToPrevious,
-                onOpenPlayer = {
-                    navController.navigate(Routes.PLAYER) {
-                        launchSingleTop = true
-                    }
-                },
+                onOpenPlayer = ::openPlayer,
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onRetryLoad = libraryViewModel::loadLibrary
             )
@@ -157,26 +162,54 @@ fun MiniMusicNavGraph(
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))
+                    animationSpec = tween(
+                        MiniMusicMotion.sheetDurationMillis,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + fadeIn(animationSpec = tween(
+                        MiniMusicMotion.sheetDurationMillis,
+                        easing = FastOutSlowInEasing
+                    ))
             },
             exitTransition = {
                 slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
+                    animationSpec = tween(
+                        MiniMusicMotion.sheetDurationMillis,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(
+                        MiniMusicMotion.fastEffectDurationMillis,
+                        easing = FastOutSlowInEasing
+                    )
+                )
             },
             popEnterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(320, easing = FastOutSlowInEasing))
+                    animationSpec = tween(
+                        MiniMusicMotion.sheetDurationMillis,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + fadeIn(animationSpec = tween(
+                        MiniMusicMotion.sheetDurationMillis,
+                        easing = FastOutSlowInEasing
+                    ))
             },
             popExitTransition = {
                 slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
+                    animationSpec = tween(
+                        MiniMusicMotion.sheetDurationMillis,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(
+                        MiniMusicMotion.fastEffectDurationMillis,
+                        easing = FastOutSlowInEasing
+                    )
+                )
             }
         ) {
             val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
@@ -186,7 +219,11 @@ fun MiniMusicNavGraph(
                 showAudioQualityBadge = appSettings.showAudioQualityBadge,
                 sleepTimerState = sleepTimerState,
                 onBack = { navController.popBackStack() },
-                onSwipeToMiniplayer = { navController.popBackStack() },
+                onSwipeToMiniplayer = {
+                    if (navController.currentDestination?.route == Routes.PLAYER) {
+                        navController.popBackStack()
+                    }
+                },
                 onTogglePlayPause = playerViewModel::togglePlayPause,
                 onSkipNext = playerViewModel::skipToNext,
                 onSkipPrevious = playerViewModel::skipToPrevious,
