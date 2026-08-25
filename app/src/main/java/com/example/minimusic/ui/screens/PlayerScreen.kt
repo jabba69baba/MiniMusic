@@ -204,7 +204,8 @@ fun PlayerScreen(
     onRemoveQueueEntry: (Long) -> Unit = {},
     onClearQueue: () -> Unit = {},
     onStartSleepTimer: (Long, Boolean) -> Unit = { _, _ -> },
-    onCancelSleepTimer: () -> Unit = {}
+    onCancelSleepTimer: () -> Unit = {},
+    onQueueOpenChange: (Boolean) -> Unit = {}
 ) {
     val song = playbackState.currentSong
     if (song == null) {
@@ -216,8 +217,12 @@ fun PlayerScreen(
         return
     }
     var queueOpen by remember { mutableStateOf(false) }
+    fun setQueueOpen(open: Boolean) {
+        queueOpen = open
+        onQueueOpenChange(open)
+    }
     BackHandler(enabled = queueOpen) {
-        queueOpen = false
+        setQueueOpen(false)
     }
     val targetArtColors = rememberArtColorRoles(song.albumArtUri)
     val artColors = animateArtColorRoles(targetArtColors)
@@ -321,7 +326,7 @@ fun PlayerScreen(
                 snapshot = queueSnapshot,
                 artColors = artColors,
                 isOpen = queueOpen,
-                onOpenChange = { queueOpen = it },
+                onOpenChange = ::setQueueOpen,
                 onEntryClick = onQueueEntryClick,
                 onReorderEntry = onReorderQueue,
                 onRemoveEntry = onRemoveQueueEntry,

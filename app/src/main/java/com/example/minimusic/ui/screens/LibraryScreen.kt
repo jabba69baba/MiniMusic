@@ -927,7 +927,7 @@ private fun SortDirectionOption(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = FontWeight.Bold,
                 color = if (selected) {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else {

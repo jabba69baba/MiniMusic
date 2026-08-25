@@ -81,6 +81,7 @@ fun MiniMusicNavGraph(
         val scope = rememberCoroutineScope()
         val density = LocalDensity.current
         val sheetState = rememberPlayerSheetMotionState(scope)
+        var queueDrawerOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         val fullHeightPx = with(density) { maxHeight.toPx() }
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
@@ -251,7 +252,7 @@ fun MiniMusicNavGraph(
                     }
                     .zIndex(2f)
                     .then(
-                        if (sheetState.progress > 0.001f) {
+                        if (sheetState.progress > 0.001f && !queueDrawerOpen) {
                             sheetDragModifier
                         } else {
                             androidx.compose.ui.Modifier
@@ -281,7 +282,8 @@ fun MiniMusicNavGraph(
                         navController.popBackStack(Routes.LIBRARY, inclusive = false)
                     },
                     onStartSleepTimer = playerViewModel::startSleepTimer,
-                    onCancelSleepTimer = playerViewModel::cancelSleepTimer
+                    onCancelSleepTimer = playerViewModel::cancelSleepTimer,
+                    onQueueOpenChange = { queueDrawerOpen = it }
                 )
             }
         }
@@ -299,7 +301,7 @@ fun MiniMusicNavGraph(
                         alpha = (1f - sheetState.progress).coerceIn(0f, 1f)
                     }
                     .zIndex(1f)
-                    .then(sheetDragModifier)
+                    .then(if (!queueDrawerOpen) sheetDragModifier else androidx.compose.ui.Modifier)
             ) {
                 MiniPlayer(
                     song = playbackState.currentSong,
