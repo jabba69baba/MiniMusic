@@ -269,11 +269,19 @@ fun PlayerScreen(
                 )
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                Surface(
+                    onClick = onBack,
+                    shape = CircleShape,
+                    color = artColors.surfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .size(48.dp)
+                ) {
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Collapse",
-                        tint = artColors.onBackground
+                        tint = artColors.onSurface,
+                        modifier = Modifier.padding(12.dp)
                     )
                 }
                 Text(
@@ -367,8 +375,18 @@ private fun SleepTimerButton(
                 }
             }
         } else {
-            IconButton(onClick = { dialogOpen = true }) {
-                Icon(Icons.Filled.Timer, contentDescription = "Sleep timer", tint = artColors.onBackground)
+            Surface(
+                onClick = { dialogOpen = true },
+                shape = CircleShape,
+                color = artColors.surfaceVariant,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Timer,
+                    contentDescription = "Sleep timer",
+                    tint = artColors.onSurface,
+                    modifier = Modifier.padding(12.dp)
+                )
             }
         }
 
@@ -902,6 +920,7 @@ private fun NowPlayingPanel(
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
                         onClick = onCycleRepeat,
+                        isFirst = true,
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
@@ -918,6 +937,7 @@ private fun NowPlayingPanel(
                         active = false,
                         contentDescription = "Lyrics",
                         onClick = onOpenLyrics,
+                        isLast = true,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -1083,17 +1103,44 @@ private fun CapsuleSegment(
     active: Boolean,
     contentDescription: String,
     onClick: () -> Unit,
+    isFirst: Boolean = false,
+    isLast: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (active) artColors.primaryContainer else Color.Transparent,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "functionTabBackground"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "functionTabContent"
+    )
+    val inset by animateDpAsState(
+        targetValue = if (active) 2.dp else 0.dp,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "functionTabInset"
+    )
+    val innerRadius = 8.dp
+    val outerRadius = 22.dp
+    val tabShape = if (active) {
+        ActiveSegmentShape
+    } else {
+        RoundedCornerShape(
+            topStart = if (isFirst) outerRadius else innerRadius,
+            bottomStart = if (isFirst) outerRadius else innerRadius,
+            topEnd = if (isLast) outerRadius else innerRadius,
+            bottomEnd = if (isLast) outerRadius else innerRadius
+        )
+    }
+
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .padding(horizontal = 2.dp)
-            .clip(ActiveSegmentShape)
-            .background(
-                if (active) artColors.primaryContainer
-                else Color.Transparent
-            )
+            .padding(horizontal = inset)
+            .clip(tabShape)
+            .background(backgroundColor)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -1104,7 +1151,7 @@ private fun CapsuleSegment(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant
+            tint = contentColor
         )
     }
 }

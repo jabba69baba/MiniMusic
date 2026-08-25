@@ -109,9 +109,14 @@ fun LyricsScreen(
     val scrollScope = rememberCoroutineScope()
     val density = LocalDensity.current
     var scrollJob by remember { mutableStateOf<Job?>(null) }
-    // A single timestamp is not enough to classify a lyric block as synced. Some
-    // files carry one stray timestamp in an otherwise plain USLT text frame.
-    val hasTimedLines = remember(lines) { lines.count { it.startMs != null } >= 2 }
+    // Timestamp tags alone do not prove synchronization. Downloaded lyric
+    // providers commonly stamp every line with [00:00.00], which would otherwise
+    // make the final line look active for the whole song. Require at least two
+    // distinct timestamps with actual progression.
+    val hasTimedLines = remember(lines) {
+        val timestamps = lines.mapNotNull { it.startMs }.distinct()
+        timestamps.size >= 2 && timestamps.zipWithNext().any { (a, b) -> b > a }
+    }
     val activeIndex by remember(lines, playbackState.positionMs) {
         derivedStateOf {
             if (!hasTimedLines) {

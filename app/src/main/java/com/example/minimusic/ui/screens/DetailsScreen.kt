@@ -146,7 +146,6 @@ fun DetailsScreen(
             }
         }
 
-        DetailsRule(color = artColors.outlineColor())
         Spacer(Modifier.height(16.dp))
 
         val loaded = details
@@ -165,13 +164,8 @@ fun DetailsScreen(
             DetailCard(Icons.Filled.Album, "Album", song.album, artColors)
             DetailCard(Icons.Filled.Person, "Artist", song.artist, artColors)
             DetailCard(Icons.Filled.Badge, "Album artist", loaded.albumArtist ?: song.artist, artColors)
-            DetailCard(Icons.Filled.Info, "Disc number", loaded.discNumber ?: "Unknown", artColors)
-            DetailCard(Icons.Filled.Info, "Track number", song.trackNumber.takeIf { it > 0 }?.toString() ?: "Unknown", artColors)
             DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", artColors)
-
             Spacer(Modifier.height(8.dp))
-            DetailsRule(color = artColors.outlineColor())
-            Spacer(Modifier.height(16.dp))
 
             val format = loaded.formatInfo
             val audioInfo = buildList {
@@ -180,8 +174,6 @@ fun DetailsScreen(
                 format?.mimeLabel?.let { add(it) }
             }.joinToString(" • ").ifBlank { "Unknown" }
             DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo, artColors)
-            DetailCard(Icons.Filled.GraphicEq, "Bitrate", format?.bitrateKbps?.let { "$it kbps" } ?: "Unknown", artColors)
-            DetailCard(Icons.Filled.AudioFile, "MIME type", loaded.mimeType ?: "Unknown", artColors)
             DetailCard(Icons.Filled.Storage, "Path", loaded.path ?: song.contentUri.toString(), artColors)
         }
     }
