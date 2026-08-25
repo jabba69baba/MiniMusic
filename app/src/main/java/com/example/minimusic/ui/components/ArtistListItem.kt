@@ -1,6 +1,5 @@
 package com.example.minimusic.ui.components
 
-import androidx.compose.foundation.animateItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +34,6 @@ fun ArtistListItem(artist: Artist, onClick: () -> Unit, modifier: Modifier = Mod
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
         modifier = modifier
-            .animateItem()
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 5.dp)
             .clickable(onClick = onClick)

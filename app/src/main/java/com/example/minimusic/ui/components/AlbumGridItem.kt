@@ -1,6 +1,5 @@
 package com.example.minimusic.ui.components
 
-import androidx.compose.foundation.animateItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -39,7 +38,6 @@ fun AlbumGridItem(album: Album, onClick: () -> Unit, modifier: Modifier = Modifi
     }
     Column(
         modifier = modifier
-            .animateItem()
             .clickable(onClick = onClick)
             .padding(8.dp)
     ) {
