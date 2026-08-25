@@ -165,7 +165,6 @@ fun DetailsScreen(
             DetailCard(Icons.Filled.Person, "Artist", song.artist, artColors)
             DetailCard(Icons.Filled.Badge, "Album artist", loaded.albumArtist ?: song.artist, artColors)
             DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", artColors)
-            Spacer(Modifier.height(8.dp))
 
             val format = loaded.formatInfo
             val audioInfo = buildList {
@@ -189,7 +188,7 @@ private fun DetailCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
+            .padding(vertical = 4.dp),
         shape = RoundedCornerShape(18.dp),
         color = artColors.surfaceVariant
     ) {

@@ -269,19 +269,11 @@ fun PlayerScreen(
                 )
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    onClick = onBack,
-                    shape = CircleShape,
-                    color = artColors.surfaceVariant,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .size(48.dp)
-                ) {
+                IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Collapse",
-                        tint = artColors.onSurface,
-                        modifier = Modifier.padding(12.dp)
+                        tint = artColors.onBackground
                     )
                 }
                 Text(
@@ -375,17 +367,11 @@ private fun SleepTimerButton(
                 }
             }
         } else {
-            Surface(
-                onClick = { dialogOpen = true },
-                shape = CircleShape,
-                color = artColors.surfaceVariant,
-                modifier = Modifier.size(48.dp)
-            ) {
+            IconButton(onClick = { dialogOpen = true }) {
                 Icon(
                     Icons.Filled.Timer,
                     contentDescription = "Sleep timer",
-                    tint = artColors.onSurface,
-                    modifier = Modifier.padding(12.dp)
+                    tint = artColors.onBackground
                 )
             }
         }
@@ -1122,18 +1108,9 @@ private fun CapsuleSegment(
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "functionTabInset"
     )
-    val innerRadius = 8.dp
-    val outerRadius = 22.dp
-    val tabShape = if (active) {
-        ActiveSegmentShape
-    } else {
-        RoundedCornerShape(
-            topStart = if (isFirst) outerRadius else innerRadius,
-            bottomStart = if (isFirst) outerRadius else innerRadius,
-            topEnd = if (isLast) outerRadius else innerRadius,
-            bottomEnd = if (isLast) outerRadius else innerRadius
-        )
-    }
+    // Keep every inner tab pill-shaped. The animated inset and background
+    // provide the active transition without exposing rectangular tab corners.
+    val tabShape = RoundedCornerShape(50)
 
     Box(
         modifier = modifier
