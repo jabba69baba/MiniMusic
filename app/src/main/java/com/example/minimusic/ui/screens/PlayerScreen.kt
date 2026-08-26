@@ -188,6 +188,7 @@ fun PlayerScreen(
     playbackState: PlaybackUiState,
     queueSnapshot: QueueSnapshot,
     showAudioQualityBadge: Boolean = true,
+    centeredTitle: Boolean = false,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
     onSwipeToMiniplayer: () -> Unit = onBack,
@@ -268,9 +269,12 @@ fun PlayerScreen(
                 // layout flow, so padding on the last child here has no effect on
                 // the gap before it; this Column has to stop short itself instead.
                 .padding(
-                    bottom = if (queueSlotVisible) {
+                    bottom = if (!isLandscape && queueSlotVisible) {
                         QueueDrawerCollapsedHeight + CapsuleToQueueGap + navigationBarInset
                     } else {
+                        // Landscape has no queue surface. Keep the player free to
+                        // distribute its recovered height instead of reserving a
+                        // collapsed queue slot that is not being composed.
                         navigationBarInset + 12.dp
                     }
                 )
@@ -333,10 +337,9 @@ fun PlayerScreen(
             }
         }
 
-        // Draggable queue drawer overlay — Auxio-style: album art and header
-        // above stay put, the drawer slides up over the lower portion of the
-        // screen rather than a separate full-screen modal.
-        if (queueSlotVisible) {
+        // The queue remains a portrait-only surface. Landscape intentionally
+        // gives the recovered space back to the PixelPlayer-style player row.
+        if (queueSlotVisible && !isLandscape) {
             QueueDrawer(
                 snapshot = queueSnapshot,
                 artColors = artColors,
@@ -345,8 +348,7 @@ fun PlayerScreen(
                 onEntryClick = onQueueEntryClick,
                 onReorderEntry = onReorderQueue,
                 onRemoveEntry = onRemoveQueueEntry,
-                onClearQueue = onClearQueue,
-                landscape = isLandscape
+                onClearQueue = onClearQueue
             )
         }
     }
@@ -739,10 +741,13 @@ private fun NowPlayingPanel(
                         text = displayedSong.title,
                         style = MaterialTheme.typography.headlineSmall,
                         color = artColors.onBackground,
+                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Clip,
-                        modifier = Modifier.basicMarquee(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(
                             iterations = Int.MAX_VALUE,
                             initialDelayMillis = 1_000,
                             repeatDelayMillis = 1_400,

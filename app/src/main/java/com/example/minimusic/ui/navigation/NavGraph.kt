@@ -153,14 +153,24 @@ fun MiniMusicNavGraph(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 settings = appSettings,
+                libraryState = libraryState,
                 appVersion = settingsViewModel.appVersion,
                 onBack = { navController.popBackStack() },
                 onDynamicColorChange = settingsViewModel::setDynamicColorEnabled,
                 onThemeModeChange = settingsViewModel::setThemeMode,
+                onAmoledBlackModeChange = settingsViewModel::setAmoledBlackMode,
+                onHighRefreshRateChange = settingsViewModel::setHighRefreshRate,
                 onResumeOnLaunchChange = settingsViewModel::setResumeOnLaunch,
                 onShowAudioQualityBadgeChange = settingsViewModel::setShowAudioQualityBadge,
+                onCenteredTitleChange = settingsViewModel::setCenteredTitle,
+                onAlbumArtQualityChange = settingsViewModel::setAlbumArtQuality,
+                onStopOnDismissChange = settingsViewModel::setStopOnDismiss,
+                onHapticFeedbackChange = settingsViewModel::setHapticFeedback,
+                onCrossfadeEnabledChange = settingsViewModel::setCrossfadeEnabled,
+                onCrossfadeSecondsChange = settingsViewModel::setCrossfadeSeconds,
+                onMonoAudioChange = settingsViewModel::setMonoAudio,
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
-                onRescanLibrary = libraryViewModel::rescanLibrary
+                onRescanLibrary = libraryViewModel.rescanLibrary
             )
         }
 
@@ -277,6 +287,7 @@ fun MiniMusicNavGraph(
                     playbackState = playbackState,
                     queueSnapshot = queueSnapshot,
                     showAudioQualityBadge = appSettings.showAudioQualityBadge,
+                    centeredTitle = appSettings.centeredTitle,
                     sleepTimerState = sleepTimerState,
                     onBack = { navController.popBackStack() },
                     onSwipeToMiniplayer = {},

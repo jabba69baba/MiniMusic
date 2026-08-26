@@ -67,7 +67,19 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
             }
 
-            MiniMusicTheme(darkTheme = darkTheme, dynamicColor = appSettings.dynamicColorEnabled) {
+            SideEffect {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    window.attributes = window.attributes.apply {
+                        preferredRefreshRate = appSettings.highRefreshRate.preferredHz
+                    }
+                }
+            }
+
+            MiniMusicTheme(
+                darkTheme = darkTheme,
+                dynamicColor = appSettings.dynamicColorEnabled,
+                amoledBlack = appSettings.amoledBlackMode
+            ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var hasPermission by remember {
                         mutableStateOf(

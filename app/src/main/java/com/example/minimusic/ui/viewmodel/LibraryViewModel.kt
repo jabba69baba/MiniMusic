@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.minimusic.MainApplication
 import com.example.minimusic.data.DeleteResult
+import coil.imageLoader
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
 import com.example.minimusic.data.model.Song
@@ -122,8 +123,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    /** Re-reads MediaStore from scratch — used by the "Rescan library" action in Settings. */
-    fun rescanLibrary() = loadLibrary()
+    /** Clears local artwork memory and re-reads MediaStore for the Settings action. */
+    fun rescanLibrary() {
+        getApplication<Application>().imageLoader.memoryCache?.clear()
+        loadLibrary()
+    }
 
     fun onSearchQueryChange(query: String) {
         val state = _uiState.value

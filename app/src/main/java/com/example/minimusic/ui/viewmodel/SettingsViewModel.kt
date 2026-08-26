@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.minimusic.BuildConfig
 import com.example.minimusic.MainApplication
+import com.example.minimusic.data.AlbumArtQuality
 import com.example.minimusic.data.AppSettings
+import com.example.minimusic.data.HighRefreshRate
 import com.example.minimusic.data.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         repository.setThemeMode(mode)
     }
 
+    fun setAmoledBlackMode(enabled: Boolean) = viewModelScope.launch {
+        repository.setAmoledBlackMode(enabled)
+    }
+
+    fun setHighRefreshRate(rate: HighRefreshRate) = viewModelScope.launch {
+        repository.setHighRefreshRate(rate)
+    }
+
     fun setResumeOnLaunch(enabled: Boolean) = viewModelScope.launch {
         repository.setResumeOnLaunch(enabled)
     }
@@ -42,5 +52,33 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setShowAudioQualityBadge(enabled: Boolean) = viewModelScope.launch {
         repository.setShowAudioQualityBadge(enabled)
+    }
+
+    fun setCenteredTitle(enabled: Boolean) = viewModelScope.launch {
+        repository.setCenteredTitle(enabled)
+    }
+
+    fun setAlbumArtQuality(quality: AlbumArtQuality) = viewModelScope.launch {
+        repository.setAlbumArtQuality(quality)
+    }
+
+    fun setStopOnDismiss(enabled: Boolean) = viewModelScope.launch {
+        repository.setStopOnDismiss(enabled)
+    }
+
+    fun setHapticFeedback(enabled: Boolean) = viewModelScope.launch {
+        repository.setHapticFeedback(enabled)
+    }
+
+    fun setCrossfadeEnabled(enabled: Boolean) = viewModelScope.launch {
+        repository.setCrossfadeEnabled(enabled)
+    }
+
+    fun setCrossfadeSeconds(seconds: Int) = viewModelScope.launch {
+        repository.setCrossfadeSeconds(seconds)
+    }
+
+    fun setMonoAudio(enabled: Boolean) = viewModelScope.launch {
+        repository.setMonoAudio(enabled)
     }
 }

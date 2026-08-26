@@ -241,32 +241,20 @@ fun BoxWithConstraintsScope.QueueDrawer(
     onEntryClick: (Long) -> Unit,
     onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
-    onClearQueue: () -> Unit,
-    landscape: Boolean = false
+    onClearQueue: () -> Unit
 ) {
-    if (landscape) {
-        LandscapeQueueSidePanel(
-            snapshot = snapshot,
-            artColors = artColors,
-            isOpen = isOpen,
-            onOpenChange = onOpenChange,
-            onEntryClick = onEntryClick,
-            onReorderEntry = onReorderEntry,
-            onRemoveEntry = onRemoveEntry,
-            onClearQueue = onClearQueue
-        )
-    } else {
-        QueueDrawerBottomSheet(
-            snapshot = snapshot,
-            artColors = artColors,
-            isOpen = isOpen,
-            onOpenChange = onOpenChange,
-            onEntryClick = onEntryClick,
-            onReorderEntry = onReorderEntry,
-            onRemoveEntry = onRemoveEntry,
-            onClearQueue = onClearQueue
-        )
-    }
+    // QueueDrawer is intentionally portrait-only. Landscape PlayerScreen does
+    // not compose this host, so the approved player row receives the full width.
+    QueueDrawerBottomSheet(
+        snapshot = snapshot,
+        artColors = artColors,
+        isOpen = isOpen,
+        onOpenChange = onOpenChange,
+        onEntryClick = onEntryClick,
+        onReorderEntry = onReorderEntry,
+        onRemoveEntry = onRemoveEntry,
+        onClearQueue = onClearQueue
+    )
 }
 
 @Composable

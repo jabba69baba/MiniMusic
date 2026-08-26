@@ -193,6 +193,7 @@ fun DetailsScreen(
                         format?.mimeLabel?.let { add(it) }
                     }.joinToString(" • ").ifBlank { "Unknown" }
                     DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo, artColors)
+                    DetailCard(Icons.Filled.Storage, "Size", formatFileSize(resolved.sizeBytes), artColors)
                     DetailCard(Icons.Filled.Storage, "Path", resolved.path ?: song.contentUri.toString(), artColors)
                 }
             }
@@ -243,6 +244,24 @@ private fun DetailsRule(color: Color) {
 private fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000L
     return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
+}
+
+private fun formatFileSize(sizeBytes: Long?): String {
+    val bytes = sizeBytes ?: return "Unknown"
+    if (bytes < 0L) return "Unknown"
+    if (bytes < 1024L) return "$bytes B"
+    val units = arrayOf("KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var unitIndex = -1
+    while (value >= 1024.0 && unitIndex < units.lastIndex) {
+        value /= 1024.0
+        unitIndex++
+    }
+    return if (value >= 100.0 || unitIndex == 0) {
+        "%.0f %s".format(Locale.US, value, units[unitIndex])
+    } else {
+        "%.1f %s".format(Locale.US, value, units[unitIndex])
+    }
 }
 
 private fun com.example.minimusic.ui.theme.ArtColorRoles.outlineColor(): Color =

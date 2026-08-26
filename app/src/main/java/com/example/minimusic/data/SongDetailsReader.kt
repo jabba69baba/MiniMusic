@@ -15,8 +15,15 @@ data class SongDetails(
     val year: String?,
     val mimeType: String?,
     val formatInfo: AudioFormatInfo?,
-    val path: String?
+    val path: String?,
+    val sizeBytes: Long?
 )
+
+private fun readContentSize(context: Context, uri: android.net.Uri): Long? = runCatching {
+    context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
+        descriptor.length.takeIf { it >= 0L }
+    }
+}.getOrNull()
 
 suspend fun readSongDetails(context: Context, song: Song): SongDetails = withContext(Dispatchers.IO) {
     val retriever = MediaMetadataRetriever()
@@ -32,16 +39,23 @@ suspend fun readSongDetails(context: Context, song: Song): SongDetails = withCon
             ?.takeIf { it.isNotBlank() }
         val mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
             ?.takeIf { it.isNotBlank() }
-        val path = context.contentResolver.query(
+        val pathAndSize = context.contentResolver.query(
             song.contentUri,
-            arrayOf(MediaStore.MediaColumns.DATA),
+            arrayOf(MediaStore.MediaColumns.DATA, MediaStore.MediaColumns.SIZE),
             null,
             null,
             null
         )?.use { cursor ->
-            val index = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
-            if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
-        }
+            val pathIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+            val sizeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
+            if (cursor.moveToFirst()) {
+                val path = if (pathIndex >= 0) cursor.getString(pathIndex) else null
+                val size = if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else null
+                path to size
+            } else {
+                null to null
+            }
+        } ?: (null to null)
         SongDetails(
             albumArtist = albumArtist,
             discNumber = discNumber,
@@ -49,7 +63,9 @@ suspend fun readSongDetails(context: Context, song: Song): SongDetails = withCon
             year = year,
             mimeType = mimeType,
             formatInfo = readAudioFormatInfo(context, song.contentUri),
-            path = path?.takeIf { it.isNotBlank() }
+            path = pathAndSize.first?.takeIf { it.isNotBlank() },
+            sizeBytes = pathAndSize.second?.takeIf { it >= 0L }
+                ?: readContentSize(context, song.contentUri)
         )
     } catch (_: Exception) {
         SongDetails(
@@ -59,7 +75,8 @@ suspend fun readSongDetails(context: Context, song: Song): SongDetails = withCon
             year = null,
             mimeType = null,
             formatInfo = readAudioFormatInfo(context, song.contentUri),
-            path = null
+            path = null,
+            sizeBytes = readContentSize(context, song.contentUri)
         )
     } finally {
         retriever.release()
