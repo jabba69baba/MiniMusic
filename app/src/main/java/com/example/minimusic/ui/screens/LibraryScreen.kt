@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -62,7 +61,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -487,10 +485,7 @@ private fun SongsTab(
                     onAddToQueue = onAddToQueue,
                     onShufflePlayFrom = onShufflePlayFrom,
                     onDelete = onDelete,
-                    onOpenDetails = onOpenDetails,
-                    modifier = Modifier.animateItemPlacement(
-                        animationSpec = tween(durationMillis = 180)
-                    )
+                    onOpenDetails = onOpenDetails
                 )
             }
         }
