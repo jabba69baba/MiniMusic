@@ -43,6 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
@@ -146,8 +147,9 @@ fun LibraryScreen(
         }
         onDispose { }
     }
-    val footerHeight =
-        MiniPlayerReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // The outer library column already consumes system-bar insets. Reserve
+    // only the persistent miniplayer here so navigation space is not counted twice.
+    val footerHeight = MiniPlayerReservedHeight
     val filteredSongs = uiState.filteredSongs
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
@@ -268,30 +270,47 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // One full selector pill shows the active library view;
-                        // the arrow was only a second tap target for the same
-                        // dialog and no longer serves a purpose.
+                        // Split selector: the active view remains centered in the
+                        // wide segment and the smaller chevron opens the same dialog.
                         Box {
-                            PillButton(
-                                onClick = { tabMenuExpanded = true },
-                                horizontalPadding = 14.dp,
-                                shape = PillShape,
-                                modifier = Modifier.width(SelectorPillWidth)
+                            Row(
+                                modifier = Modifier.width(SelectorPillWidth),
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                Icon(
-                                    selectedTab.icon,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Text(
-                                    selectedTab.label,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                PillButton(
+                                    onClick = { tabMenuExpanded = true },
+                                    horizontalPadding = 10.dp,
+                                    shape = PillGroupShapes.First,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        selectedTab.icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        selectedTab.label,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                PillButton(
+                                    onClick = { tabMenuExpanded = true },
+                                    horizontalPadding = 6.dp,
+                                    shape = PillGroupShapes.Last,
+                                    modifier = Modifier.width(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = "Choose library view",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                             LibraryTabDialog(
                                 expanded = tabMenuExpanded,

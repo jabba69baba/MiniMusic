@@ -1,9 +1,10 @@
 package com.example.minimusic.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,13 +37,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.minimusic.playback.PlaybackUiState
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LyricsState
 import kotlinx.coroutines.Job
@@ -102,15 +106,10 @@ fun LyricsScreen(
 ) {
     var isExiting by remember { mutableStateOf(false) }
     val exitScope = rememberCoroutineScope()
-    val screenAlpha by animateFloatAsState(
-        targetValue = if (isExiting) 0f else 1f,
-        animationSpec = tween(durationMillis = 220),
-        label = "lyricsScreenExit"
-    )
     BackHandler(enabled = !isExiting) {
         isExiting = true
         exitScope.launch {
-            delay(220)
+            delay(MiniMusicMotion.sheetDurationMillis.toLong())
             onBack()
         }
     }
@@ -151,11 +150,39 @@ fun LyricsScreen(
     val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
     val activeColor = artColors.primary
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer { alpha = screenAlpha }
+    AnimatedVisibility(
+        visible = !isExiting,
+        enter = androidx.compose.animation.slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = tween(
+                durationMillis = MiniMusicMotion.sheetDurationMillis,
+                easing = FastOutSlowInEasing
+            )
+        ) + androidx.compose.animation.fadeIn(
+            animationSpec = tween(
+                durationMillis = MiniMusicMotion.sheetDurationMillis,
+                easing = FastOutSlowInEasing
+            )
+        ),
+        exit = androidx.compose.animation.slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = tween(
+                durationMillis = MiniMusicMotion.sheetDurationMillis,
+                easing = FastOutSlowInEasing
+            )
+        ) + androidx.compose.animation.fadeOut(
+            animationSpec = tween(
+                durationMillis = MiniMusicMotion.sheetDurationMillis,
+                easing = FastOutSlowInEasing
+            )
+        ),
+        modifier = Modifier.fillMaxSize()
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+        ) {
         when (lyricsState) {
         LyricsState.Idle, LyricsState.Loading -> Box(
             modifier = Modifier
@@ -330,6 +357,7 @@ fun LyricsScreen(
                 }
             }
         }
-    }
+        }
+        }
     }
 }
