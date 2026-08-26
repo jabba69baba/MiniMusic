@@ -126,7 +126,7 @@ fun MiniMusicNavGraph(
         LaunchedEffect(currentRoute) {
             sheetState.settle(
                 velocityPxPerSecond = 0f,
-                targetProgressOverride = if (currentRoute == Routes.PLAYER) 1f else 0f,
+                targetProgressOverride = if (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS) 1f else 0f,
                 onExpanded = {},
                 onCollapsed = {}
             )
@@ -246,7 +246,9 @@ fun MiniMusicNavGraph(
             )
         }
 
-        if (hasActiveSong && (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)) {
+        if (hasActiveSong && currentRoute != Routes.LYRICS &&
+            (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)
+        ) {
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxSize()
@@ -294,7 +296,7 @@ fun MiniMusicNavGraph(
             }
         }
 
-        if (hasActiveSong && currentRoute != Routes.LYRICS &&
+        if (currentRoute != Routes.LYRICS &&
             (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
         ) {
             Box(
@@ -309,7 +311,7 @@ fun MiniMusicNavGraph(
                         alpha = 1f
                     }
                     .zIndex(1f)
-                    .then(if (!queueDrawerOpen) sheetDragModifier else androidx.compose.ui.Modifier)
+                    .then(if (hasActiveSong && !queueDrawerOpen) sheetDragModifier else androidx.compose.ui.Modifier)
             ) {
                 MiniPlayer(
                     song = playbackState.currentSong,

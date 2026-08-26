@@ -42,7 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
@@ -269,58 +268,30 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left selector: current view (Songs/Artists/Albums)
-                        // and the chevron next to it — two segments of one
-                        // continuous pill silhouette (rounded on the outer
-                        // ends, square where they meet), separated by a
-                        // hairline gap rather than genuinely separate pills.
+                        // One full selector pill shows the active library view;
+                        // the arrow was only a second tap target for the same
+                        // dialog and no longer serves a purpose.
                         Box {
-                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                PillButton(
-                                    onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 10.dp,
-                                    shape = PillGroupShapes.First,
-                                    // Fixed width sized to the longest label
-                                    // ("Artists") so the pill never resizes when
-                                    // switching tabs — without this, "Songs" and
-                                    // "Albums" (shorter/different width) made the
-                                    // whole pill shrink and grow between taps.
-                                    // Padding trimmed from the shared 16.dp down
-                                    // to 10.dp here specifically so the fixed
-                                    // width can stay compact (matching the
-                                    // right-side group's total width) while
-                                    // still leaving enough room for the text
-                                    // to render without truncating.
-                                    modifier = Modifier.width(SelectorLabelWidth)
-                                ) {
-                                    Icon(
-                                        selectedTab.icon,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                    Text(
-                                        selectedTab.label,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                PillButton(
-                                    onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Last,
-                                    modifier = Modifier.width(SelectorChevronWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.ExpandMore,
-                                        contentDescription = "Switch view",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                            PillButton(
+                                onClick = { tabMenuExpanded = true },
+                                horizontalPadding = 14.dp,
+                                shape = PillShape,
+                                modifier = Modifier.width(SelectorPillWidth)
+                            ) {
+                                Icon(
+                                    selectedTab.icon,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    selectedTab.label,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                             LibraryTabDialog(
                                 expanded = tabMenuExpanded,
@@ -621,21 +592,9 @@ private fun ArtistsTab(
  *  pill sit at visibly different heights before. */
 private val PillButtonHeight = 44.dp
 
-/** Fixed width for the Songs/Artists/Albums label segment (icon + text),
- *  sized to comfortably fit "Artists" — the longest of the three labels —
- *  so the pill's overall width never changes when switching tabs. */
-private val SelectorLabelWidth = 96.dp
-
-/** Fixed width for the chevron segment next to the label, and for each of
- *  the three Shuffle/Locate/Sort segments — chosen so the left group
- *  (label + chevron) and the right group (3 icon segments) add up to the
- *  same total width, including the 2.dp gaps between segments in each
- *  group. Right group (unchanged icon-only sizing): 3 segments of 46.dp +
- *  2 gaps of 2.dp = 142.dp. Left group needs label + chevron + 1 gap to
- *  also total 142.dp, so with chevron kept at 46.dp: 142 - 2 - 46 = 94.dp
- *  for the label segment — see [SelectorLabelWidth] above, rounded to
- *  96.dp for comfortable text fit (144.dp total, 2.dp over — negligible). */
-private val SelectorChevronWidth = 46.dp
+/** Fixed width for the complete Songs/Artists/Albums selector pill so
+ *  switching labels never changes the control’s footprint. */
+private val SelectorPillWidth = 144.dp
 private val ControlSegmentWidth = 46.dp
 
 /**
