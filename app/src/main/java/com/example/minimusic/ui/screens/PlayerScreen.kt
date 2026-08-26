@@ -966,7 +966,9 @@ private fun HorizontalNowPlayingPanel(
     ) {
         // Landscape uses the same player body as portrait, split into two
         // measured regions rather than compressing the portrait column.
-        val artRegionWidth = maxWidth * 0.40f
+        val landscapeGutter = 20.dp
+        val artRegionWidth = maxWidth * 0.45f
+        val controlRegionWidth = (maxWidth - artRegionWidth - landscapeGutter).coerceAtLeast(0.dp)
         val artSize = minOf(
             maxHeight * 0.82f,
             (artRegionWidth - 8.dp).coerceAtLeast(0.dp)
@@ -977,7 +979,7 @@ private fun HorizontalNowPlayingPanel(
                 .fillMaxWidth()
                 .height(artSize)
                 .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(landscapeGutter),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -1035,8 +1037,9 @@ private fun HorizontalNowPlayingPanel(
 
             Column(
                 modifier = Modifier
-                    .height(artSize)
-                    .weight(1f),
+                    .width(controlRegionWidth)
+                    .height(artSize),
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 AnimatedContent(
