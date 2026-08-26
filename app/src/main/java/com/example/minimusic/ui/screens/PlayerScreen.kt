@@ -249,7 +249,7 @@ fun PlayerScreen(
             .background(artColors.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        val horizontalPlayerLayout = maxWidth > maxHeight && maxHeight >= 280.dp
+        val horizontalPlayerLayout = maxWidth > maxHeight && maxHeight >= 320.dp
 
         Column(
             modifier = Modifier
@@ -961,29 +961,38 @@ private fun HorizontalNowPlayingPanel(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 4.dp)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
-        // The artwork height is the horizontal layout’s single visual ruler.
-        // The right column receives that exact height, so controls never drift
-        // above or below the album-art container.
-        val artSize = (maxHeight - 8.dp)
-            .coerceAtLeast(0.dp)
-            .coerceAtMost(maxWidth * 0.46f)
+        // Landscape uses the same player body as portrait, split into two
+        // measured regions rather than compressing the portrait column.
+        val artRegionWidth = maxWidth * 0.40f
+        val artSize = minOf(
+            maxHeight * 0.82f,
+            (artRegionWidth - 8.dp).coerceAtLeast(0.dp)
+        )
 
         Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(artSize)
                 .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .requiredSize(artSize)
-                    .clip(ArtCornerShape)
-                    .background(artColors.primaryContainer),
-                contentAlignment = Alignment.Center
+                    .fillMaxHeight()
+                    .width(artRegionWidth),
+                contentAlignment = Alignment.CenterStart
             ) {
+                Box(
+                    modifier = Modifier
+                        .requiredSize(artSize)
+                        .clip(ArtCornerShape)
+                        .background(artColors.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
                 AnimatedContent(
                     targetState = displayedArtworkSong,
                     transitionSpec = {
@@ -1019,6 +1028,7 @@ private fun HorizontalNowPlayingPanel(
                                 .fillMaxSize()
                                 .clip(ArtCornerShape)
                         )
+                    }
                     }
                 }
             }
