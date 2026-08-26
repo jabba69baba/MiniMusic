@@ -275,27 +275,38 @@ fun PlayerScreen(
                     }
                 )
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Collapse",
-                        tint = artColors.onBackground
+            @Composable
+            fun PlayerHeader(modifier: Modifier) {
+                Box(modifier = modifier.fillMaxWidth()) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "Collapse",
+                            tint = artColors.onBackground
+                        )
+                    }
+                    Text(
+                        text = "Now Playing",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = artColors.onBackground,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    SleepTimerButton(
+                        sleepTimerState = sleepTimerState,
+                        onStart = onStartSleepTimer,
+                        onCancel = onCancelSleepTimer,
+                        artColors = artColors,
+                        modifier = Modifier.align(Alignment.CenterEnd)
                     )
                 }
-                Text(
-                    text = "Now Playing",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = artColors.onBackground,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                SleepTimerButton(
-                    sleepTimerState = sleepTimerState,
-                    onStart = onStartSleepTimer,
-                    onCancel = onCancelSleepTimer,
-                    artColors = artColors,
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                )
+            }
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    PlayerHeader(modifier = Modifier.weight(1f))
+                }
+            } else {
+                PlayerHeader(modifier = Modifier.fillMaxWidth())
             }
 
             Box(
@@ -334,7 +345,8 @@ fun PlayerScreen(
                 onEntryClick = onQueueEntryClick,
                 onReorderEntry = onReorderQueue,
                 onRemoveEntry = onRemoveQueueEntry,
-                onClearQueue = onClearQueue
+                onClearQueue = onClearQueue,
+                landscape = isLandscape
             )
         }
     }

@@ -239,6 +239,226 @@ fun BoxWithConstraintsScope.QueueDrawer(
     onEntryClick: (Long) -> Unit,
     onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
+    onClearQueue: () -> Unit,
+    landscape: Boolean = false
+) {
+    if (landscape) {
+        LandscapeQueueSidePanel(
+            snapshot = snapshot,
+            artColors = artColors,
+            isOpen = isOpen,
+            onOpenChange = onOpenChange,
+            onEntryClick = onEntryClick,
+            onReorderEntry = onReorderEntry,
+            onRemoveEntry = onRemoveEntry,
+            onClearQueue = onClearQueue
+        )
+    } else {
+        QueueDrawerBottomSheet(
+            snapshot = snapshot,
+            artColors = artColors,
+            isOpen = isOpen,
+            onOpenChange = onOpenChange,
+            onEntryClick = onEntryClick,
+            onReorderEntry = onReorderEntry,
+            onRemoveEntry = onRemoveEntry,
+            onClearQueue = onClearQueue
+        )
+    }
+}
+
+@Composable
+private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
+    snapshot: QueueSnapshot,
+    artColors: ArtColorRoles,
+    isOpen: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onEntryClick: (Long) -> Unit,
+    onReorderEntry: (Long, Int) -> Unit,
+    onRemoveEntry: (Long) -> Unit,
+    onClearQueue: () -> Unit
+) {
+    val density = LocalDensity.current
+    val panelWidth = maxOf(360.dp, minOf(480.dp, maxWidth * 0.42f))
+    val closedOffset = panelWidth - 56.dp
+    val offsetX = remember(panelWidth) { Animatable(closedOffset.value) }
+    val scope = rememberCoroutineScope()
+    var locateRequest by remember { mutableStateOf(0) }
+    var queueTopRequest by remember { mutableStateOf(0) }
+    var openRequest by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isOpen, panelWidth) {
+        offsetX.animateTo(
+            if (isOpen) 0f else closedOffset.value,
+            animationSpec = tween(280, easing = FastOutSlowInEasing)
+        )
+        if (isOpen) openRequest++
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(panelWidth)
+                .offset {
+                    IntOffset(
+                        with(density) { offsetX.value.dp.toPx().roundToInt() },
+                        0
+                    )
+                },
+            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp),
+            color = artColors.surfaceVariant,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(102.dp)
+                        .draggable(
+                            orientation = Orientation.Horizontal,
+                            state = rememberDraggableState { delta ->
+                                val next = (offsetX.value + delta / density.density)
+                                    .coerceIn(0f, closedOffset.value)
+                                scope.launch { offsetX.snapTo(next) }
+                            },
+                            startDragImmediately = false,
+                            onDragStopped = { velocity ->
+                                val shouldOpen = if (abs(velocity) > 800f) {
+                                    velocity < 0f
+                                } else {
+                                    offsetX.value < closedOffset.value / 2f
+                                }
+                                scope.launch {
+                                    offsetX.animateTo(
+                                        if (shouldOpen) 0f else closedOffset.value,
+                                        animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                                onOpenChange(shouldOpen)
+                            }
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 10.dp)
+                            .size(width = 36.dp, height = 4.dp)
+                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable { queueTopRequest++ }
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = artColors.onSurface
+                            )
+                            Text(
+                                text = "Queue",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = artColors.onSurface,
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        QueueActionPill(
+                            icon = Icons.Filled.Delete,
+                            label = "Clear",
+                            contentDescription = "Clear queue",
+                            artColors = artColors,
+                            onClick = onClearQueue,
+                            modifier = Modifier.weight(1f)
+                        )
+                        QueueActionPill(
+                            icon = Icons.Filled.MyLocation,
+                            label = "Locate",
+                            contentDescription = "Locate current song",
+                            artColors = artColors,
+                            onClick = { locateRequest++ },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                if (isOpen) {
+                    QueueDrawerList(
+                        snapshot = snapshot,
+                        artColors = artColors,
+                        onEntryClick = onEntryClick,
+                        onReorderEntry = onReorderEntry,
+                        onRemoveEntry = onRemoveEntry,
+                        locateRequest = locateRequest,
+                        queueTopRequest = queueTopRequest,
+                        openRequest = openRequest,
+                        onTopCloseDrag = {},
+                        onTopCloseDragEnd = {}
+                    )
+                }
+            }
+        }
+
+        if (!isOpen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(56.dp)
+                    .align(Alignment.CenterEnd)
+                    .clickable { onOpenChange(true) },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 28.dp, height = 4.dp)
+                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.QueueMusic,
+                        contentDescription = "Open queue",
+                        modifier = Modifier.padding(top = 8.dp).size(20.dp),
+                        tint = artColors.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
+    snapshot: QueueSnapshot,
+    artColors: ArtColorRoles,
+    isOpen: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onEntryClick: (Long) -> Unit,
+    onReorderEntry: (Long, Int) -> Unit,
+    onRemoveEntry: (Long) -> Unit,
     onClearQueue: () -> Unit
 ) {
     val density = LocalDensity.current
