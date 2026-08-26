@@ -478,7 +478,6 @@ private fun SongsTab(
             // target, preventing old velocity from carrying into the new position.
             locateJob?.cancel()
             locateJob = scrollScope.launch {
-                listState.stopScroll()
                 listState.animateScrollToItem(index = index, scrollOffset = 0)
             }
         }
@@ -521,7 +520,6 @@ private fun SongsTab(
                 // target is relevant while the finger is on the scrollbar.
                 fastScrollJob?.cancel()
                 fastScrollJob = scrollScope.launch {
-                    listState.stopScroll()
                     listState.scrollToItem(index = index, scrollOffset = 0)
                 }
             },
@@ -570,7 +568,6 @@ private fun AlbumsTab(
             onScrollToIndex = { index ->
                 fastScrollJob?.cancel()
                 fastScrollJob = scrollScope.launch {
-                    gridState.stopScroll()
                     gridState.scrollToItem(index = index, scrollOffset = 0)
                 }
             },
@@ -614,7 +611,6 @@ private fun ArtistsTab(
             onScrollToIndex = { index ->
                 fastScrollJob?.cancel()
                 fastScrollJob = scrollScope.launch {
-                    listState.stopScroll()
                     listState.scrollToItem(index = index, scrollOffset = 0)
                 }
             },
