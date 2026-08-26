@@ -74,7 +74,8 @@ fun SongListItem(
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                iconSize = 26.dp
+                iconSize = 26.dp,
+                crossfadeMillis = 0
             )
 
             Column(modifier = Modifier.weight(1f)) {

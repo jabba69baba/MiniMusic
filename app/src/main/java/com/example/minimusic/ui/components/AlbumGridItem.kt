@@ -34,7 +34,8 @@ fun AlbumGridItem(album: Album, onClick: () -> Unit, modifier: Modifier = Modifi
                 .fillMaxWidth()
                 .aspectRatio(1f),
             shape = RoundedCornerShape(20.dp),
-            iconSize = 42.dp
+            iconSize = 42.dp,
+            crossfadeMillis = 0
         )
         Text(
             text = album.title,

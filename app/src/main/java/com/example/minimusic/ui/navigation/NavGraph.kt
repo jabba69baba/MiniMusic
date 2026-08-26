@@ -63,6 +63,7 @@ fun MiniMusicNavGraph(
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
     val playbackState by playerViewModel.uiState.collectAsState()
+
     val queueSnapshot by playerViewModel.queueSnapshot.collectAsState()
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
@@ -86,6 +87,7 @@ fun MiniMusicNavGraph(
         val fullHeightPx = with(density) { maxHeight.toPx() }
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
+        val hasActiveSong = playbackState.currentSong != null
         val collapsedOffsetPx = (fullHeightPx - miniPlayerHeightPx).coerceAtLeast(0f)
         val sheetDragState = rememberDraggableState { delta -> sheetState.dragBy(delta) }
         val sheetDragModifier = androidx.compose.ui.Modifier.draggable(
@@ -207,7 +209,7 @@ fun MiniMusicNavGraph(
                 playbackState = playbackState,
                 lyricsState = lyricsState,
                 onSeekTo = playerViewModel::seekTo,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
             )
         }
     }
@@ -244,13 +246,15 @@ fun MiniMusicNavGraph(
             )
         }
 
-        if (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f) {
+        if (hasActiveSong && (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)) {
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxSize()
                     .graphicsLayer {
                         translationY = (1f - sheetState.progress) * fullHeightPx
-                        alpha = sheetState.progress
+                        // The player surface remains opaque while moving; its own
+                        // album-art-derived background is left unchanged.
+                        alpha = 1f
                     }
                     .zIndex(2f)
                     .then(
@@ -290,7 +294,7 @@ fun MiniMusicNavGraph(
             }
         }
 
-        if (currentRoute != Routes.LYRICS &&
+        if (hasActiveSong && currentRoute != Routes.LYRICS &&
             (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
         ) {
             Box(
@@ -300,7 +304,9 @@ fun MiniMusicNavGraph(
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .graphicsLayer {
                         translationY = sheetState.progress * miniPlayerHeightPx
-                        alpha = (1f - sheetState.progress).coerceIn(0f, 1f)
+                        // Keep the miniplayer opaque until it fully hands off to
+                        // the player sheet, avoiding a translucent cross-fade.
+                        alpha = 1f
                     }
                     .zIndex(1f)
                     .then(if (!queueDrawerOpen) sheetDragModifier else androidx.compose.ui.Modifier)

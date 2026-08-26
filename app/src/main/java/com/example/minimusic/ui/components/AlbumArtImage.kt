@@ -33,7 +33,8 @@ fun AlbumArtImage(
     shape: Shape,
     iconSize: Dp = 28.dp,
     contentDescription: String? = null,
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    crossfadeMillis: Int = 180
 ) {
     val context = LocalContext.current
     val request = remember(model) {
@@ -41,10 +42,12 @@ fun AlbumArtImage(
             .data(model)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
-            .crossfade(180)
+            .apply {
+                if (crossfadeMillis > 0) crossfade(crossfadeMillis) else crossfade(false)
+            }
             .build()
     }
-    var imageLoaded by remember(model) { mutableStateOf(false) }
+    var imageFailed by remember(model) { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -59,11 +62,11 @@ fun AlbumArtImage(
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
                 onState = { state ->
-                    imageLoaded = state is AsyncImagePainter.State.Success
+                    if (state is AsyncImagePainter.State.Error) imageFailed = true
                 }
             )
         }
-        if (model == null || !imageLoaded) {
+        if (model == null || imageFailed) {
             MissingAlbumArtIcon(iconSize)
         }
     }
