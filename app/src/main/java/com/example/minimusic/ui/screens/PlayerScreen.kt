@@ -249,6 +249,8 @@ fun PlayerScreen(
             .background(artColors.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
+        val horizontalPlayerLayout = maxWidth > maxHeight && maxHeight >= 280.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -314,7 +316,7 @@ fun PlayerScreen(
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
                     onSwipeToMiniplayer = onSwipeToMiniplayer,
-                    horizontalLayout = maxWidth > maxHeight && maxHeight >= 280.dp
+                    horizontalLayout = horizontalPlayerLayout
                 )
             }
         }
