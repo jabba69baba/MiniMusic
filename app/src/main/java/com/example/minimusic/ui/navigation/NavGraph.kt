@@ -137,7 +137,13 @@ fun MiniMusicNavGraph(
         startDestination = Routes.LIBRARY,
         modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .then(
+                if (currentRoute == Routes.LYRICS) {
+                    androidx.compose.ui.Modifier
+                } else {
+                    androidx.compose.ui.Modifier.background(MaterialTheme.colorScheme.background)
+                }
+            )
     ) {
 
         composable(Routes.LIBRARY) {
@@ -246,8 +252,8 @@ fun MiniMusicNavGraph(
             )
         }
 
-        if (hasActiveSong && currentRoute != Routes.LYRICS &&
-            (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)
+        if (hasActiveSong &&
+            (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS || sheetState.progress > 0.001f)
         ) {
             Box(
                 modifier = androidx.compose.ui.Modifier
@@ -258,9 +264,9 @@ fun MiniMusicNavGraph(
                         // album-art-derived background is left unchanged.
                         alpha = 1f
                     }
-                    .zIndex(2f)
+                    .zIndex(if (currentRoute == Routes.LYRICS) -1f else 2f)
                     .then(
-                        if (sheetState.progress > 0.001f && !queueDrawerOpen) {
+                        if (currentRoute != Routes.LYRICS && sheetState.progress > 0.001f && !queueDrawerOpen) {
                             sheetDragModifier
                         } else {
                             androidx.compose.ui.Modifier

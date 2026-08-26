@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -61,6 +62,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -468,7 +470,9 @@ private fun SongsTab(
             // Bottom padding matches the footer's actual measured height, so
             // the last song is never hidden underneath the now-opaque mini
             // player + nav bar, without reserving more space than needed.
-            contentPadding = PaddingValues(bottom = bottomContentPadding + 8.dp, end = 28.dp)
+            // The 68 dp miniplayer is compensated by 2 dp at each lazy-space
+            // edge, restoring the prior card/scrollbar visual positions.
+            contentPadding = PaddingValues(bottom = bottomContentPadding + 4.dp, end = 28.dp)
         ) {
             items(
                 items = songs,
@@ -483,7 +487,10 @@ private fun SongsTab(
                     onAddToQueue = onAddToQueue,
                     onShufflePlayFrom = onShufflePlayFrom,
                     onDelete = onDelete,
-                    onOpenDetails = onOpenDetails
+                    onOpenDetails = onOpenDetails,
+                    modifier = Modifier.animateItemPlacement(
+                        animationSpec = tween(durationMillis = 180)
+                    )
                 )
             }
         }
@@ -501,7 +508,7 @@ private fun SongsTab(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 16.dp)
+                .padding(top = 8.dp, bottom = bottomContentPadding + 12.dp)
         )
     }
 }
@@ -594,7 +601,7 @@ private val PillButtonHeight = 44.dp
 
 /** Fixed width for the complete Songs/Artists/Albums selector pill so
  *  switching labels never changes the control’s footprint. */
-private val SelectorPillWidth = 144.dp
+private val SelectorPillWidth = 142.dp
 private val ControlSegmentWidth = 46.dp
 
 /**
@@ -623,9 +630,10 @@ private fun PillButton(
     ) {
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .fillMaxHeight()
                 .padding(horizontal = horizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             content = content
         )

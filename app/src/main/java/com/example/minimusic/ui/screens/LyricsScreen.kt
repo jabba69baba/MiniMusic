@@ -46,6 +46,7 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LyricsState
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -99,7 +100,20 @@ fun LyricsScreen(
     onSeekTo: (Long) -> Unit,
     onBack: () -> Unit
 ) {
-    BackHandler(onBack = onBack)
+    var isExiting by remember { mutableStateOf(false) }
+    val exitScope = rememberCoroutineScope()
+    val screenAlpha by animateFloatAsState(
+        targetValue = if (isExiting) 0f else 1f,
+        animationSpec = tween(durationMillis = 220),
+        label = "lyricsScreenExit"
+    )
+    BackHandler(enabled = !isExiting) {
+        isExiting = true
+        exitScope.launch {
+            delay(220)
+            onBack()
+        }
+    }
 
     val lines = remember(lyricsState) {
         if (lyricsState is LyricsState.Found) parseDisplayLyrics(lyricsState.text) else emptyList()
@@ -137,7 +151,12 @@ fun LyricsScreen(
     val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
     val activeColor = artColors.primary
 
-    when (lyricsState) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = screenAlpha }
+    ) {
+        when (lyricsState) {
         LyricsState.Idle, LyricsState.Loading -> Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -311,5 +330,6 @@ fun LyricsScreen(
                 }
             }
         }
+    }
     }
 }
