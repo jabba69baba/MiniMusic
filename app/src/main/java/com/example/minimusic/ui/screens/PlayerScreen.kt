@@ -249,6 +249,8 @@ fun PlayerScreen(
             .background(artColors.background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
+        val isLandscape = maxWidth > maxHeight && maxHeight >= 320.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -313,7 +315,9 @@ fun PlayerScreen(
                     onSkipNext = onSkipNext,
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
-                    onSwipeToMiniplayer = onSwipeToMiniplayer
+                    onSwipeToMiniplayer = onSwipeToMiniplayer,
+                    isLandscape = isLandscape,
+                    modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier
                 )
             }
         }
@@ -583,7 +587,9 @@ private fun NowPlayingPanel(
     onSkipNext: () -> Unit,
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
-    onSwipeToMiniplayer: () -> Unit
+    onSwipeToMiniplayer: () -> Unit,
+    isLandscape: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
@@ -643,21 +649,9 @@ private fun NowPlayingPanel(
             .forEach { preloadAlbumArt(context, it) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (balanceAlbumArtSpacing) Modifier.fillMaxHeight() else Modifier)
-    ) {
-        if (balanceAlbumArtSpacing) {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-
+    val artworkBlock: @Composable (Modifier) -> Unit = { modifier ->
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp)
-                .padding(top = 4.dp)
-                .aspectRatio(1f)
+            modifier = modifier
                 .clip(ArtCornerShape)
                 .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
@@ -678,7 +672,6 @@ private fun NowPlayingPanel(
                         ) + fadeOut(
                             animationSpec = MiniMusicMotion.trackChangeExitEffects()
                         ))
-
                 },
                 contentKey = { it.id },
                 label = "albumArtCarouselTransition"
@@ -695,214 +688,273 @@ private fun NowPlayingPanel(
                         model = displayedSong.albumArtUri,
                         contentDescription = null,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
+                            .fillMaxSize()
                             .clip(ArtCornerShape)
                     )
                 }
             }
         }
+    }
 
-        if (balanceAlbumArtSpacing) {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-
-        AnimatedContent(
-            targetState = song,
-            transitionSpec = {
-                val direction = transitionDirection
-                (slideInHorizontally(
-                    initialOffsetX = { width -> direction * (width / 8) },
-                    animationSpec = MiniMusicMotion.trackChangeEffects()
-                ) + fadeIn(
-                    animationSpec = MiniMusicMotion.trackChangeEffects()
-                )) togetherWith
-                    (slideOutHorizontally(
-                        targetOffsetX = { width -> -direction * (width / 8) },
+    val belowArtworkBlock: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier = modifier) {
+            AnimatedContent(
+                targetState = song,
+                transitionSpec = {
+                    val direction = transitionDirection
+                    (slideInHorizontally(
+                        initialOffsetX = { width -> direction * (width / 8) },
                         animationSpec = MiniMusicMotion.trackChangeEffects()
-                    ) + fadeOut(
-                        animationSpec = MiniMusicMotion.trackChangeExitEffects()
-                    ))
-            },
-            contentKey = { it.id },
-            label = "songMetadataTransition"
-        ) { displayedSong ->
+                    ) + fadeIn(
+                        animationSpec = MiniMusicMotion.trackChangeEffects()
+                    )) togetherWith
+                        (slideOutHorizontally(
+                            targetOffsetX = { width -> -direction * (width / 8) },
+                            animationSpec = MiniMusicMotion.trackChangeEffects()
+                        ) + fadeOut(
+                            animationSpec = MiniMusicMotion.trackChangeExitEffects()
+                        ))
+                },
+                contentKey = { it.id },
+                label = "songMetadataTransition"
+            ) { displayedSong ->
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 2.dp)
+                        .padding(top = ContentSectionGap)
+                ) {
+                    Text(
+                        text = displayedSong.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = artColors.onBackground,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier.basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            initialDelayMillis = 1_000,
+                            repeatDelayMillis = 1_400,
+                            velocity = 24.dp
+                        )
+                    )
+
+                    Text(
+                        text = displayedSong.artist,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = artColors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
             Column(
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
                     .padding(top = ContentSectionGap)
             ) {
-                Text(
-                    text = displayedSong.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = artColors.onBackground,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier.basicMarquee(
-                        iterations = Int.MAX_VALUE,
-                        initialDelayMillis = 1_000,
-                        repeatDelayMillis = 1_400,
-                        velocity = 24.dp
+                FlatMusicSlider(
+                    value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
+                    valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
+                    onValueChange = { onSeekTo(it.toLong()) },
+                    activeColor = artColors.primary,
+                    inactiveColor = artColors.onSurface.copy(alpha = 0.34f),
+                    transitionKey = song.id
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 24.dp)
+                        .padding(top = SeekbarToTimeGap),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        formatDuration(playbackState.positionMs),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = artColors.onSurfaceVariant
                     )
-                )
 
-                Text(
-                    text = displayedSong.artist,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = artColors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                    Box(
+                        modifier = Modifier
+                            .width(150.dp)
+                            .height(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val badgeText = formatInfo?.toBadgeText()
+                        if (showAudioQualityBadge && badgeReady && badgeText != null) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = artColors.surfaceVariant,
+                                modifier = Modifier.graphicsLayer { alpha = badgeAlpha.value }
+                            ) {
+                                Text(
+                                    text = badgeText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = artColors.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        formatDuration(playbackState.durationMs),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = artColors.onSurfaceVariant
+                    )
+                }
             }
-        }
 
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 2.dp)
-                .padding(top = ContentSectionGap)
-        ) {
-            FlatMusicSlider(
-                value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
-                valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
-                onValueChange = { onSeekTo(it.toLong()) },
-                activeColor = artColors.primary,
-                inactiveColor = artColors.onSurface.copy(alpha = 0.34f),
-                transitionKey = song.id
-            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 24.dp)
-                    .padding(top = SeekbarToTimeGap),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .height(TransportButtonSize)
+                    .padding(top = ControlSectionGap),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    formatDuration(playbackState.positionMs),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = artColors.onSurfaceVariant
+                TransportButton(
+                    icon = Icons.Filled.SkipPrevious,
+                    contentDescription = "Previous",
+                    shape = CircleShape,
+                    containerColor = artColors.secondaryContainer,
+                    contentColor = artColors.onSecondaryContainer,
+                    onClick = {
+                        transitionDirection = -1
+                        onSkipPrevious()
+                    },
+                    modifier = Modifier.requiredSize(TransportCircleSize)
                 )
-
-                Box(
+                PlayPauseButton(
+                    isPlaying = playbackState.isPlaying,
+                    containerColor = artColors.primary,
+                    contentColor = artColors.onPrimary,
+                    onClick = onTogglePlayPause,
                     modifier = Modifier
-                        .width(150.dp)
-                        .height(32.dp),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .requiredHeight(TransportButtonSize)
+                )
+                TransportButton(
+                    icon = Icons.Filled.SkipNext,
+                    contentDescription = "Next",
+                    shape = CircleShape,
+                    containerColor = artColors.secondaryContainer,
+                    contentColor = artColors.onSecondaryContainer,
+                    onClick = {
+                        transitionDirection = 1
+                        onSkipNext()
+                    },
+                    modifier = Modifier.requiredSize(TransportCircleSize)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .padding(top = FunctionSectionGap)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = artColors.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(CapsuleSegmentHeight)
                 ) {
-                    val badgeText = formatInfo?.toBadgeText()
-                    if (showAudioQualityBadge && badgeReady && badgeText != null) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = artColors.surfaceVariant,
-                            modifier = Modifier.graphicsLayer { alpha = badgeAlpha.value }
-                        ) {
-                            Text(
-                                text = badgeText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = artColors.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
+                    Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
+                        CapsuleSegment(
+                            artColors = artColors,
+                            icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                            active = playbackState.repeatMode != RepeatMode.OFF,
+                            contentDescription = "Repeat",
+                            onClick = onCycleRepeat,
+                            isFirst = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        CapsuleSegment(
+                            artColors = artColors,
+                            icon = Icons.Filled.Shuffle,
+                            active = playbackState.isShuffled,
+                            contentDescription = "Shuffle",
+                            onClick = onToggleShuffle,
+                            modifier = Modifier.weight(1f)
+                        )
+                        CapsuleSegment(
+                            artColors = artColors,
+                            icon = Icons.Filled.Subtitles,
+                            active = false,
+                            contentDescription = "Lyrics",
+                            onClick = onOpenLyrics,
+                            isLast = true,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
-
-                Text(
-                    formatDuration(playbackState.durationMs),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = artColors.onSurfaceVariant
-                )
             }
         }
+    }
 
-        Row(
-            modifier = Modifier
+    if (isLandscape) {
+        PixelPlayerLandscapeContent(
+            modifier = modifier,
+            albumCoverSection = { artworkModifier -> artworkBlock(artworkModifier) },
+            controlsSection = { belowArtworkBlock(Modifier.fillMaxWidth()) }
+        )
+    } else {
+        Column(
+            modifier = modifier
                 .fillMaxWidth()
-                .height(TransportButtonSize)
-                .padding(top = ControlSectionGap),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .then(if (balanceAlbumArtSpacing) Modifier.fillMaxHeight() else Modifier)
         ) {
-            TransportButton(
-                icon = Icons.Filled.SkipPrevious,
-                contentDescription = "Previous",
-                shape = CircleShape,
-                containerColor = artColors.secondaryContainer,
-                contentColor = artColors.onSecondaryContainer,
-                onClick = {
-                    transitionDirection = -1
-                    onSkipPrevious()
-                },
-                modifier = Modifier.requiredSize(TransportCircleSize)
-            )
-            PlayPauseButton(
-                isPlaying = playbackState.isPlaying,
-                containerColor = artColors.primary,
-                contentColor = artColors.onPrimary,
-                onClick = onTogglePlayPause,
-                modifier = Modifier
-                    .weight(1f)
-                    .requiredHeight(TransportButtonSize)
-            )
-            TransportButton(
-                icon = Icons.Filled.SkipNext,
-                contentDescription = "Next",
-                shape = CircleShape,
-                containerColor = artColors.secondaryContainer,
-                contentColor = artColors.onSecondaryContainer,
-                onClick = {
-                    transitionDirection = 1
-                    onSkipNext()
-                },
-                modifier = Modifier.requiredSize(TransportCircleSize)
-            )
-        }
+            if (balanceAlbumArtSpacing) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
 
-        // Outer capsule: one continuous background. Each segment is flush with
-        // it while inactive; when active, that segment gets its own filled
-        // rounded-pill highlight that visually pops out from the shared
-        // background — independently, so more than one can be active at once.
+            artworkBlock(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .padding(top = 4.dp)
+                    .aspectRatio(1f)
+            )
+
+            if (balanceAlbumArtSpacing) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            belowArtworkBlock(Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun PixelPlayerLandscapeContent(
+    modifier: Modifier = Modifier,
+    albumCoverSection: @Composable (Modifier) -> Unit,
+    controlsSection: @Composable () -> Unit
+) {
+    // Adapted from PixelPlayerOSS FullPlayerLandscapeContent (GPLv3).
+    // MiniMusic-specific state, artwork, controls, and callbacks remain local.
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        albumCoverSection(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        )
+        Spacer(Modifier.width(9.dp))
         Column(
             modifier = Modifier
-                .padding(horizontal = 8.dp)
-                .padding(top = FunctionSectionGap)
+                .weight(1f)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = artColors.surfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(CapsuleSegmentHeight)
-            ) {
-                Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
-                    CapsuleSegment(
-                        artColors = artColors,
-                        icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                        active = playbackState.repeatMode != RepeatMode.OFF,
-                        contentDescription = "Repeat",
-                        onClick = onCycleRepeat,
-                        isFirst = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    CapsuleSegment(
-                        artColors = artColors,
-                        icon = Icons.Filled.Shuffle,
-                        active = playbackState.isShuffled,
-                        contentDescription = "Shuffle",
-                        onClick = onToggleShuffle,
-                        modifier = Modifier.weight(1f)
-                    )
-                    CapsuleSegment(
-                        artColors = artColors,
-                        icon = Icons.Filled.Subtitles,
-                        active = false,
-                        contentDescription = "Lyrics",
-                        onClick = onOpenLyrics,
-                        isLast = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
+            controlsSection()
         }
     }
 }
