@@ -19,7 +19,23 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // CI test releases are signed with the generated debug key so the
+            // release-variant APK remains installable without committing a
+            // private signing key. This does not alter playback or UI code.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    // Keep the test artifact focused on the user-requested ARM64-v8a target.
+    // The app has no native source of its own, but this still produces an
+    // ABI-specific release APK for consistent device testing.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
 

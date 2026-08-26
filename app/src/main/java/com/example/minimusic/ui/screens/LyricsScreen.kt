@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -153,28 +152,21 @@ fun LyricsScreen(
 
     AnimatedVisibility(
         visible = !isExiting,
+        // One owner and one trajectory for both directions. The player remains
+        // composed underneath in NavGraph, so closing reveals it continuously
+        // instead of exposing a transient blank/home frame.
         enter = androidx.compose.animation.slideInVertically(
             initialOffsetY = { it },
             animationSpec = tween(
                 durationMillis = MiniMusicMotion.sheetDurationMillis,
-                easing = FastOutSlowInEasing
-            )
-        ) + androidx.compose.animation.fadeIn(
-            animationSpec = tween(
-                durationMillis = MiniMusicMotion.sheetDurationMillis,
-                easing = FastOutSlowInEasing
+                easing = GramophoneMotionEasing
             )
         ),
         exit = androidx.compose.animation.slideOutVertically(
             targetOffsetY = { it },
             animationSpec = tween(
                 durationMillis = MiniMusicMotion.sheetDurationMillis,
-                easing = FastOutSlowInEasing
-            )
-        ) + androidx.compose.animation.fadeOut(
-            animationSpec = tween(
-                durationMillis = MiniMusicMotion.sheetDurationMillis,
-                easing = FastOutSlowInEasing
+                easing = GramophoneMotionEasing
             )
         ),
         modifier = Modifier.fillMaxSize()

@@ -1,17 +1,17 @@
-name: Build UI polish test APK
+name: Build MiniMusic ARM64 release APK
 
 on:
   push:
     branches:
-      - test/ui-polish
+      - visual-fixes
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-debug-apk:
-    name: Build debug APK
+  build-arm64-release:
+    name: Build ARM64-v8a release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -28,13 +28,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Build ARM64-v8a release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload ARM64-v8a release APK
         uses: actions/upload-artifact@v4
         with:
-          name: MiniMusic-test-ui-polish-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: MiniMusic-arm64-v8a-release
+          path: app/build/outputs/apk/release/*arm64-v8a*.apk
           if-no-files-found: error
           retention-days: 14

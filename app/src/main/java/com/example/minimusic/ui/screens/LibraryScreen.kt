@@ -69,6 +69,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,6 +98,8 @@ import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import com.example.minimusic.ui.viewmodel.SongSortOrder
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     SONGS("Songs", Icons.Filled.MusicNote),
@@ -281,14 +284,8 @@ fun LibraryScreen(
                                     onClick = { tabMenuExpanded = true },
                                     horizontalPadding = 10.dp,
                                     shape = PillGroupShapes.First,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.width(94.dp)
                                 ) {
-                                    Icon(
-                                        selectedTab.icon,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
                                     Text(
                                         selectedTab.label,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -302,7 +299,7 @@ fun LibraryScreen(
                                     onClick = { tabMenuExpanded = true },
                                     horizontalPadding = 6.dp,
                                     shape = PillGroupShapes.Last,
-                                    modifier = Modifier.width(36.dp)
+                                    modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.KeyboardArrowDown,
@@ -468,16 +465,22 @@ private fun SongsTab(
     onOpenDetails: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val scrollScope = rememberCoroutineScope()
+    var locateJob by remember { mutableStateOf<Job?>(null) }
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(songs) { it.title }
 
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
         val index = songs.indexOfFirst { it.id == currentSongId }
         if (index >= 0) {
-            // Locate is an explicit position reset, not a smooth navigation gesture. A
-            // zero-offset request makes the selected row share the exact same leading
-            // edge as item zero and eliminates the previous-row sliver.
-            listState.requestScrollToItem(index = index, scrollOffset = 0)
+            // Locate cancels any active fling/fast-scroll before moving to the
+            // target, preventing old velocity from carrying into the new position.
+            locateJob?.cancel()
+            locateJob = scrollScope.launch {
+                listState.stopScroll()
+                listState.animateScrollToItem(index = index, scrollOffset = 0)
+            }
         }
     }
 
@@ -514,7 +517,13 @@ private fun SongsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                listState.requestScrollToItem(index = index, scrollOffset = 0)
+                // Do not queue one jump per pointer event. Only the newest
+                // target is relevant while the finger is on the scrollbar.
+                fastScrollJob?.cancel()
+                fastScrollJob = scrollScope.launch {
+                    listState.stopScroll()
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                }
             },
             // The top remains aligned with the first song container. The bottom
             // Keep the same 3dp visual inset at both ends: the top is 8dp
@@ -534,6 +543,8 @@ private fun AlbumsTab(
     onAlbumClick: (Album) -> Unit
 ) {
     val gridState = rememberLazyGridState()
+    val scrollScope = rememberCoroutineScope()
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(albums) { it.title }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -557,7 +568,11 @@ private fun AlbumsTab(
             currentIndex = gridState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                gridState.requestScrollToItem(index = index, scrollOffset = 0)
+                fastScrollJob?.cancel()
+                fastScrollJob = scrollScope.launch {
+                    gridState.stopScroll()
+                    gridState.scrollToItem(index = index, scrollOffset = 0)
+                }
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -574,6 +589,8 @@ private fun ArtistsTab(
     onArtistClick: (Artist) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val scrollScope = rememberCoroutineScope()
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(artists) { it.name }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -595,7 +612,11 @@ private fun ArtistsTab(
             currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
             onScrollToIndex = { index ->
-                listState.requestScrollToItem(index = index, scrollOffset = 0)
+                fastScrollJob?.cancel()
+                fastScrollJob = scrollScope.launch {
+                    listState.stopScroll()
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                }
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -907,8 +928,8 @@ private fun SortDirectionOption(
         ) {
             Text(
                 text = label,
+                // Match the Title/Artist/Album/Date added/Duration rows exactly.
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
                 color = if (selected) {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else {

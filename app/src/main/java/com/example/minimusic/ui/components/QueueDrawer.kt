@@ -1000,10 +1000,25 @@ private class PracticalQueueAdapter(
             onStartDrag: () -> Unit
         ) {
             val resolved = colors ?: return
-            val rowColor = if (isCurrent) resolved.primaryContainer else resolved.surface
-            val rowArgb = rowColor.toArgb()
+            // Keep every state fully opaque. The current row uses a restrained
+            // blend toward the queue surface so album-art colors remain present
+            // without becoming overly saturated; history uses a quieter tonal
+            // blend so played rows recede without alpha/transparency.
+            val rowArgb = if (isCurrent) {
+                ColorUtils.blendARGB(
+                    resolved.primaryContainer.toArgb(),
+                    resolved.surface.toArgb(),
+                    0.22f
+                )
+            } else {
+                resolved.surface.toArgb()
+            }
             val opaqueHistoryColor = if (isHistory) {
-                ColorUtils.blendARGB(rowArgb, resolved.surfaceVariant.toArgb(), 0.32f)
+                ColorUtils.blendARGB(
+                    resolved.surface.toArgb(),
+                    resolved.surfaceVariant.toArgb(),
+                    0.46f
+                )
             } else {
                 rowArgb
             }
@@ -1018,22 +1033,28 @@ private class PracticalQueueAdapter(
                 root.context.dp(8),
                 root.context.dp(4)
             )
-            // The current row remains fully opaque and is identified only by its
-            // highlighted card. History is conveyed by blended opaque colors.
-            // The card itself always remains fully opaque. History is conveyed
-            // by blended opaque colors rather than a translucent whole-row layer.
+            // The current row is identified by its restrained opaque highlight;
+            // history is conveyed only by subdued opaque colors, never alpha.
             root.alpha = 1f
             title.text = entry.song.title
             artist.text = entry.song.artist
             title.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_medium))
             artist.setTypeface(ResourcesCompat.getFont(root.context, R.font.google_sans_flex_regular))
             val titleArgb = if (isHistory) {
-                ColorUtils.blendARGB(resolved.onSurface.toArgb(), opaqueHistoryColor, 0.18f)
+                ColorUtils.blendARGB(resolved.onSurface.toArgb(), opaqueHistoryColor, 0.28f)
+            } else if (isCurrent) {
+                resolved.onPrimaryContainer.toArgb()
             } else {
                 resolved.onSurface.toArgb()
             }
             val artistArgb = if (isHistory) {
-                ColorUtils.blendARGB(resolved.onSurfaceVariant.toArgb(), opaqueHistoryColor, 0.24f)
+                ColorUtils.blendARGB(resolved.onSurfaceVariant.toArgb(), opaqueHistoryColor, 0.36f)
+            } else if (isCurrent) {
+                ColorUtils.blendARGB(
+                    resolved.onPrimaryContainer.toArgb(),
+                    resolved.onSurfaceVariant.toArgb(),
+                    0.18f
+                )
             } else {
                 resolved.onSurfaceVariant.toArgb()
             }
