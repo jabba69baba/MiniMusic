@@ -170,7 +170,7 @@ fun MiniMusicNavGraph(
                 onCrossfadeSecondsChange = settingsViewModel::setCrossfadeSeconds,
                 onMonoAudioChange = settingsViewModel::setMonoAudio,
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
-                onRescanLibrary = libraryViewModel.rescanLibrary
+                onRescanLibrary = { libraryViewModel.rescanLibrary() }
             )
         }
 
