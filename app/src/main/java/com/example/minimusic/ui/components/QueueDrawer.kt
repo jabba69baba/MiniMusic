@@ -300,7 +300,7 @@ fun LandscapeQueueContent(
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(top = 10.dp)
+                        .padding(top = 4.dp)
                         .size(width = 36.dp, height = 4.dp)
                         .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                 )
@@ -424,7 +424,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(top = 10.dp)
+                            .padding(top = 4.dp)
                             .size(width = 36.dp, height = 4.dp)
                             .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                     )
