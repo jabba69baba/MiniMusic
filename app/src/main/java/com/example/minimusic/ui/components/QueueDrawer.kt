@@ -288,7 +288,6 @@ fun LandscapeQueueContent(
         Surface(
             modifier = modifier
                 .fillMaxWidth()
-                .height(64.dp)
                 .clickable { onOpenChange(true) },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             color = artColors.surfaceVariant,

@@ -324,6 +324,7 @@ fun PlayerScreen(
                     showAudioQualityBadge = showAudioQualityBadge,
                     centeredTitle = centeredTitle,
                     queueOpen = queueOpen,
+                    landscapeQueueVisible = queueSlotVisible,
                     balanceAlbumArtSpacing = navigationBarInset > 0.dp,
                     onSeekTo = onSeekTo,
                     onToggleShuffle = onToggleShuffle,
@@ -608,6 +609,7 @@ private fun NowPlayingPanel(
     showAudioQualityBadge: Boolean,
     centeredTitle: Boolean,
     queueOpen: Boolean,
+    landscapeQueueVisible: Boolean,
     balanceAlbumArtSpacing: Boolean,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
@@ -682,7 +684,7 @@ private fun NowPlayingPanel(
     val landscapeTransportButtonSize = if (isLandscape) 64.dp else TransportButtonSize
     val landscapeTransportCircleSize = if (isLandscape) 64.dp else TransportCircleSize
     val landscapeCapsuleHeight = if (isLandscape) 44.dp else CapsuleSegmentHeight
-    val landscapeControlSectionGap = if (isLandscape) 14.dp else ControlSectionGap
+    val landscapeControlSectionGap = if (isLandscape) 18.dp else ControlSectionGap
     val landscapeFunctionSectionGap = if (isLandscape) 18.dp else FunctionSectionGap
 
     val artworkBlock: @Composable (Modifier) -> Unit = { modifier ->
@@ -759,7 +761,7 @@ private fun NowPlayingPanel(
                 Column(
                     modifier = Modifier
                         .padding(horizontal = 2.dp)
-                        .padding(top = ContentSectionGap)
+                        .padding(top = if (isLandscape) 0.dp else ContentSectionGap)
                 ) {
                     Text(
                         text = displayedSong.title,
@@ -943,18 +945,18 @@ private fun NowPlayingPanel(
                 Box(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         belowArtworkBlock(Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(18.dp))
-                        if (!queueOpen) {
+                        Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
+                        if (landscapeQueueVisible && !queueOpen) {
                             landscapeQueueContent(
                                 false,
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 8.dp)
-                                    .height(64.dp)
+                                    .height(72.dp)
                             )
                         }
                     }
-                    if (queueOpen) {
+                    if (landscapeQueueVisible && queueOpen) {
                         landscapeQueueContent(
                             true,
                             Modifier
