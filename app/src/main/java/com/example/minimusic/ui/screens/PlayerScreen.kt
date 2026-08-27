@@ -329,9 +329,6 @@ fun PlayerScreen(
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
                     onSwipeToMiniplayer = onSwipeToMiniplayer,
-                    sleepTimerState = sleepTimerState,
-                    onStartSleepTimer = onStartSleepTimer,
-                    onCancelSleepTimer = onCancelSleepTimer,
                     isLandscape = isLandscape,
                     modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier
                 )
@@ -604,9 +601,6 @@ private fun NowPlayingPanel(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onSwipeToMiniplayer: () -> Unit,
-    sleepTimerState: SleepTimerState? = null,
-    onStartSleepTimer: (Long, Boolean) -> Unit = { _, _ -> },
-    onCancelSleepTimer: () -> Unit = {},
     isLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -676,6 +670,7 @@ private fun NowPlayingPanel(
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
+                modifier = Modifier.fillMaxSize(),
                 targetState = displayedArtworkSong,
                 transitionSpec = {
                     val direction = transitionDirection
@@ -708,7 +703,8 @@ private fun NowPlayingPanel(
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(ArtCornerShape)
+                            .clip(ArtCornerShape),
+                        contentScale = ContentScale.Crop
                     )
                 }
             }
@@ -920,25 +916,7 @@ private fun NowPlayingPanel(
         PixelPlayerLandscapeContent(
             modifier = modifier,
             albumCoverSection = { artworkModifier -> artworkBlock(artworkModifier) },
-            controlsSection = {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        SleepTimerButton(
-                            sleepTimerState = sleepTimerState,
-                            onStart = onStartSleepTimer,
-                            onCancel = onCancelSleepTimer,
-                            artColors = artColors
-                        )
-                    }
-                    belowArtworkBlock(Modifier.fillMaxWidth())
-                }
-            }
+            controlsSection = { belowArtworkBlock(Modifier.fillMaxWidth()) }
         )
     } else {
         Column(
@@ -983,8 +961,8 @@ private fun PixelPlayerLandscapeContent(
     ) {
         albumCoverSection(
             Modifier
-                .weight(1f)
                 .fillMaxHeight()
+                .aspectRatio(1f)
         )
         Spacer(Modifier.width(9.dp))
         Column(
