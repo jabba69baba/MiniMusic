@@ -904,7 +904,10 @@ private fun NowPlayingPanel(
                         .fillMaxWidth()
                         .height(landscapeCapsuleHeight)
                 ) {
-                    Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
+                    Row(
+                        modifier = Modifier.padding(4.dp).fillMaxHeight(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         CapsuleSegment(
                             artColors = artColors,
                             icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
@@ -945,7 +948,7 @@ private fun NowPlayingPanel(
                 Box(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         belowArtworkBlock(Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
                         if (landscapeQueueVisible && !queueOpen) {
                             landscapeQueueContent(
                                 false,
@@ -1225,6 +1228,11 @@ private fun CapsuleSegment(
     )
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val pressOverlayAlpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.20f else 0f,
+        animationSpec = if (isPressed) MiniMusicMotion.fastEffects() else MiniMusicMotion.defaultEffects(),
+        label = "functionTabPressIllumination"
+    )
     val density = LocalDensity.current
     val tabScale by animateFloatAsState(
         targetValue = when {
@@ -1271,6 +1279,11 @@ private fun CapsuleSegment(
             ),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color.White.copy(alpha = pressOverlayAlpha))
+        )
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
