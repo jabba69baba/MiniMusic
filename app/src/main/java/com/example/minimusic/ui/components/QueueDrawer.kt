@@ -272,6 +272,77 @@ fun BoxWithConstraintsScope.QueueDrawer(
 }
 
 @Composable
+fun LandscapeQueueContent(
+    modifier: Modifier = Modifier,
+    snapshot: QueueSnapshot,
+    artColors: ArtColorRoles,
+    isOpen: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onEntryClick: (Long) -> Unit,
+    onReorderEntry: (Long, Int) -> Unit,
+    onRemoveEntry: (Long) -> Unit,
+    onClearQueue: () -> Unit
+) {
+    if (!isOpen) {
+        Surface(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clickable { onOpenChange(true) },
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            color = artColors.surfaceVariant,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.QueueMusic,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = artColors.onSurface
+                    )
+                    Text(
+                        text = "Queue",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = artColors.onSurface,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+        }
+    } else {
+        BoxWithConstraints(modifier = modifier) {
+            LandscapeQueueBottomSheet(
+                snapshot = snapshot,
+                artColors = artColors,
+                isOpen = true,
+                onOpenChange = onOpenChange,
+                onEntryClick = onEntryClick,
+                onReorderEntry = onReorderEntry,
+                onRemoveEntry = onRemoveEntry,
+                onClearQueue = onClearQueue
+            )
+        }
+    }
+}
+
+@Composable
 private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
@@ -325,6 +396,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(102.dp)
+                        .clickable(enabled = !isOpen) { onOpenChange(true) }
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
@@ -366,7 +438,9 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .clickable { queueTopRequest++ }
+                                .clickable {
+                                    if (isOpen) queueTopRequest++ else onOpenChange(true)
+                                }
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -428,30 +502,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
             }
         }
 
-        if (!isOpen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .align(Alignment.BottomCenter)
-                    .clickable { onOpenChange(true) },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 28.dp, height = 4.dp)
-                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = "Open queue",
-                        modifier = Modifier.padding(top = 8.dp).size(20.dp),
-                        tint = artColors.onSurface
-                    )
-                }
-            }
-        }
     }
 }
 

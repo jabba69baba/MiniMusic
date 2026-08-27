@@ -115,6 +115,7 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.FlatMusicSlider
+import com.example.minimusic.ui.components.LandscapeQueueContent
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
@@ -322,6 +323,7 @@ fun PlayerScreen(
                     artColors = artColors,
                     showAudioQualityBadge = showAudioQualityBadge,
                     centeredTitle = centeredTitle,
+                    queueOpen = queueOpen,
                     balanceAlbumArtSpacing = navigationBarInset > 0.dp,
                     onSeekTo = onSeekTo,
                     onToggleShuffle = onToggleShuffle,
@@ -331,50 +333,36 @@ fun PlayerScreen(
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
                     onSwipeToMiniplayer = onSwipeToMiniplayer,
+                    landscapeQueueContent = { open, queueModifier ->
+                        LandscapeQueueContent(
+                            modifier = queueModifier,
+                            snapshot = queueSnapshot,
+                            artColors = artColors,
+                            isOpen = open,
+                            onOpenChange = ::setQueueOpen,
+                            onEntryClick = onQueueEntryClick,
+                            onReorderEntry = onReorderQueue,
+                            onRemoveEntry = onRemoveQueueEntry,
+                            onClearQueue = onClearQueue
+                        )
+                    },
                     isLandscape = isLandscape,
                     modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier
                 )
             }
         }
 
-        if (queueSlotVisible) {
-            if (isLandscape) {
-                // Bound the landscape queue to the controls half. A nested
-                // BoxWithConstraints is intentional: the queue side panel uses
-                // this pane width, never the full display width.
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(0.5f)
-                        .align(Alignment.CenterEnd)
-                        .zIndex(3f)
-                ) {
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        QueueDrawer(
-                            snapshot = queueSnapshot,
-                            artColors = artColors,
-                            isOpen = queueOpen,
-                            onOpenChange = ::setQueueOpen,
-                            onEntryClick = onQueueEntryClick,
-                            onReorderEntry = onReorderQueue,
-                            onRemoveEntry = onRemoveQueueEntry,
-                            onClearQueue = onClearQueue,
-                            isLandscape = true
-                        )
-                    }
-                }
-            } else {
-                QueueDrawer(
-                    snapshot = queueSnapshot,
-                    artColors = artColors,
-                    isOpen = queueOpen,
-                    onOpenChange = ::setQueueOpen,
-                    onEntryClick = onQueueEntryClick,
-                    onReorderEntry = onReorderQueue,
-                    onRemoveEntry = onRemoveQueueEntry,
-                    onClearQueue = onClearQueue
-                )
-            }
+        if (queueSlotVisible && !isLandscape) {
+            QueueDrawer(
+                snapshot = queueSnapshot,
+                artColors = artColors,
+                isOpen = queueOpen,
+                onOpenChange = ::setQueueOpen,
+                onEntryClick = onQueueEntryClick,
+                onReorderEntry = onReorderQueue,
+                onRemoveEntry = onRemoveQueueEntry,
+                onClearQueue = onClearQueue
+            )
         }
     }
 }
@@ -619,6 +607,7 @@ private fun NowPlayingPanel(
     artColors: ArtColorRoles,
     showAudioQualityBadge: Boolean,
     centeredTitle: Boolean,
+    queueOpen: Boolean,
     balanceAlbumArtSpacing: Boolean,
     onSeekTo: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
@@ -628,6 +617,7 @@ private fun NowPlayingPanel(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onSwipeToMiniplayer: () -> Unit,
+    landscapeQueueContent: @Composable (Boolean, Modifier) -> Unit = { _, _ -> },
     isLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -949,7 +939,31 @@ private fun NowPlayingPanel(
         PixelPlayerLandscapeContent(
             modifier = modifier,
             albumCoverSection = { artworkModifier -> artworkBlock(artworkModifier) },
-            controlsSection = { belowArtworkBlock(Modifier.fillMaxWidth()) }
+            controlsSection = {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        belowArtworkBlock(Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(18.dp))
+                        if (!queueOpen) {
+                            landscapeQueueContent(
+                                false,
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp)
+                                    .height(64.dp)
+                            )
+                        }
+                    }
+                    if (queueOpen) {
+                        landscapeQueueContent(
+                            true,
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp)
+                        )
+                    }
+                }
+            }
         )
     } else {
         Column(
