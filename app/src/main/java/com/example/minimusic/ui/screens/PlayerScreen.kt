@@ -736,7 +736,7 @@ private fun NowPlayingPanel(
         }
     }
 
-    val belowArtworkBlock: @Composable (Modifier) -> Unit = { modifier ->
+    val metadataAndSeekBlock: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier = modifier) {
             AnimatedContent(
                 targetState = song,
@@ -850,95 +850,113 @@ private fun NowPlayingPanel(
                     )
                 }
             }
+        }
+    }
 
-            Row(
+    val transportBlock: @Composable (Modifier) -> Unit = { modifier ->
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(landscapeTransportButtonSize)
+                .then(
+                    if (isLandscape) Modifier
+                    else Modifier.padding(top = landscapeControlSectionGap)
+                ),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TransportButton(
+                icon = Icons.Filled.SkipPrevious,
+                contentDescription = "Previous",
+                shape = CircleShape,
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
+                onClick = {
+                    transitionDirection = -1
+                    onSkipPrevious()
+                },
+                modifier = Modifier.requiredSize(landscapeTransportCircleSize)
+            )
+            PlayPauseButton(
+                isPlaying = playbackState.isPlaying,
+                containerColor = artColors.primary,
+                contentColor = artColors.onPrimary,
+                onClick = onTogglePlayPause,
+                modifier = Modifier
+                    .weight(1f)
+                    .requiredHeight(landscapeTransportButtonSize)
+            )
+            TransportButton(
+                icon = Icons.Filled.SkipNext,
+                contentDescription = "Next",
+                shape = CircleShape,
+                containerColor = artColors.secondaryContainer,
+                contentColor = artColors.onSecondaryContainer,
+                onClick = {
+                    transitionDirection = 1
+                    onSkipNext()
+                },
+                modifier = Modifier.requiredSize(landscapeTransportCircleSize)
+            )
+        }
+    }
+
+    val functionBlock: @Composable (Modifier) -> Unit = { modifier ->
+        Column(
+            modifier = modifier
+                .padding(horizontal = 8.dp)
+                .then(
+                    if (isLandscape) Modifier
+                    else Modifier.padding(top = landscapeFunctionSectionGap)
+                )
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = artColors.surfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
-                        .height(landscapeTransportButtonSize)
-                        .padding(top = landscapeControlSectionGap),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(landscapeCapsuleHeight)
             ) {
-                TransportButton(
-                    icon = Icons.Filled.SkipPrevious,
-                    contentDescription = "Previous",
-                    shape = CircleShape,
-                    containerColor = artColors.secondaryContainer,
-                    contentColor = artColors.onSecondaryContainer,
-                    onClick = {
-                        transitionDirection = -1
-                        onSkipPrevious()
-                    },
-                    modifier = Modifier.requiredSize(landscapeTransportCircleSize)
-                )
-                PlayPauseButton(
-                    isPlaying = playbackState.isPlaying,
-                    containerColor = artColors.primary,
-                    contentColor = artColors.onPrimary,
-                    onClick = onTogglePlayPause,
-                    modifier = Modifier
-                        .weight(1f)
-                        .requiredHeight(landscapeTransportButtonSize)
-                )
-                TransportButton(
-                    icon = Icons.Filled.SkipNext,
-                    contentDescription = "Next",
-                    shape = CircleShape,
-                    containerColor = artColors.secondaryContainer,
-                    contentColor = artColors.onSecondaryContainer,
-                    onClick = {
-                        transitionDirection = 1
-                        onSkipNext()
-                    },
-                    modifier = Modifier.requiredSize(landscapeTransportCircleSize)
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .padding(top = landscapeFunctionSectionGap)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = artColors.surfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(landscapeCapsuleHeight)
+                Row(
+                    modifier = Modifier.padding(4.dp).fillMaxHeight(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(4.dp).fillMaxHeight(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        CapsuleSegment(
-                            artColors = artColors,
-                            icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                            active = playbackState.repeatMode != RepeatMode.OFF,
-                            contentDescription = "Repeat",
-                            onClick = onCycleRepeat,
-                            isFirst = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        CapsuleSegment(
-                            artColors = artColors,
-                            icon = Icons.Filled.Shuffle,
-                            active = playbackState.isShuffled,
-                            contentDescription = "Shuffle",
-                            onClick = onToggleShuffle,
-                            modifier = Modifier.weight(1f)
-                        )
-                        CapsuleSegment(
-                            artColors = artColors,
-                            icon = Icons.Filled.Subtitles,
-                            active = false,
-                            contentDescription = "Lyrics",
-                            onClick = onOpenLyrics,
-                            isLast = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    CapsuleSegment(
+                        artColors = artColors,
+                        icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        active = playbackState.repeatMode != RepeatMode.OFF,
+                        contentDescription = "Repeat",
+                        onClick = onCycleRepeat,
+                        isFirst = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CapsuleSegment(
+                        artColors = artColors,
+                        icon = Icons.Filled.Shuffle,
+                        active = playbackState.isShuffled,
+                        contentDescription = "Shuffle",
+                        onClick = onToggleShuffle,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CapsuleSegment(
+                        artColors = artColors,
+                        icon = Icons.Filled.Subtitles,
+                        active = false,
+                        contentDescription = "Lyrics",
+                        onClick = onOpenLyrics,
+                        isLast = true,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
+        }
+    }
+
+    val belowArtworkBlock: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier = modifier) {
+            metadataAndSeekBlock(Modifier.fillMaxWidth())
+            transportBlock(Modifier.fillMaxWidth())
+            functionBlock(Modifier.fillMaxWidth())
         }
     }
 
@@ -949,7 +967,10 @@ private fun NowPlayingPanel(
             controlsSection = {
                 Box(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        belowArtworkBlock(Modifier.fillMaxWidth())
+                        metadataAndSeekBlock(Modifier.fillMaxWidth())
+                        transportBlock(Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(landscapeControlSectionGap))
+                        functionBlock(Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
                         if (landscapeQueueVisible && !queueOpen) {
                             landscapeQueueContent(
