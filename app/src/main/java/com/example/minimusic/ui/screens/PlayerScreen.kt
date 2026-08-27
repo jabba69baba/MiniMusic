@@ -261,8 +261,8 @@ fun PlayerScreen(
                 // exactly CapsuleToQueueGap. Without a queue, retain the existing
                 // 12dp outer bottom padding.
                 .padding(
-                    top = 4.dp,
-                    bottom = if (queueSlotVisible) 0.dp else 12.dp
+                    top = if (isLandscape) 0.dp else 4.dp,
+                    bottom = if (!isLandscape && !queueSlotVisible) 12.dp else 0.dp
                 )
                 // Reserve real space for the drawer's collapsed bar sitting on top
                 // as a separate overlay below — it isn't part of this Column's
@@ -271,10 +271,12 @@ fun PlayerScreen(
                 .padding(
                     bottom = if (!isLandscape && queueSlotVisible) {
                         QueueDrawerCollapsedHeight + CapsuleToQueueGap + navigationBarInset
+                    } else if (isLandscape) {
+                        // Landscape has no queue surface or header. Keep only a
+                        // small navigation clearance and return the rest to the
+                        // two-column player.
+                        navigationBarInset + 4.dp
                     } else {
-                        // Landscape has no queue surface. Keep the player free to
-                        // distribute its recovered height instead of reserving a
-                        // collapsed queue slot that is not being composed.
                         navigationBarInset + 12.dp
                     }
                 )
@@ -304,12 +306,7 @@ fun PlayerScreen(
                     )
                 }
             }
-            if (isLandscape) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    PlayerHeader(modifier = Modifier.weight(1f))
-                }
-            } else {
+            if (!isLandscape) {
                 PlayerHeader(modifier = Modifier.fillMaxWidth())
             }
 
@@ -332,6 +329,9 @@ fun PlayerScreen(
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
                     onSwipeToMiniplayer = onSwipeToMiniplayer,
+                    sleepTimerState = sleepTimerState,
+                    onStartSleepTimer = onStartSleepTimer,
+                    onCancelSleepTimer = onCancelSleepTimer,
                     isLandscape = isLandscape,
                     modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier
                 )
@@ -604,6 +604,9 @@ private fun NowPlayingPanel(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onSwipeToMiniplayer: () -> Unit,
+    sleepTimerState: SleepTimerState? = null,
+    onStartSleepTimer: (Long, Boolean) -> Unit = { _, _ -> },
+    onCancelSleepTimer: () -> Unit = {},
     isLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -917,7 +920,25 @@ private fun NowPlayingPanel(
         PixelPlayerLandscapeContent(
             modifier = modifier,
             albumCoverSection = { artworkModifier -> artworkBlock(artworkModifier) },
-            controlsSection = { belowArtworkBlock(Modifier.fillMaxWidth()) }
+            controlsSection = {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        SleepTimerButton(
+                            sleepTimerState = sleepTimerState,
+                            onStart = onStartSleepTimer,
+                            onCancel = onCancelSleepTimer,
+                            artColors = artColors
+                        )
+                    }
+                    belowArtworkBlock(Modifier.fillMaxWidth())
+                }
+            }
         )
     } else {
         Column(
