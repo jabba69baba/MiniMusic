@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -514,7 +515,7 @@ private fun SongsTab(
         if (stopScrollRequest == 0) return@LaunchedEffect
         locateJob?.cancel()
         fastScrollJob?.cancel()
-        listState.stopScroll()
+        listState.scroll(MutatePriority.PreventUserInput) {}
     }
 
     LaunchedEffect(jumpToCurrentRequest) {
@@ -526,7 +527,7 @@ private fun SongsTab(
             locateJob?.cancel()
             fastScrollJob?.cancel()
             locateJob = scrollScope.launch {
-                listState.stopScroll()
+                listState.scroll(MutatePriority.PreventUserInput) {}
                 listState.animateScrollToItem(index = index, scrollOffset = 0)
             }
         }
