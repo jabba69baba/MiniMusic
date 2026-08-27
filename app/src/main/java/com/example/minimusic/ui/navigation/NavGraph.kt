@@ -1,5 +1,8 @@
 package com.example.minimusic.ui.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -135,18 +138,64 @@ fun MiniMusicNavGraph(
             )
         }
 
+        // Keep Home composed as a stable base layer for every destination.
+        // Overlay destinations can then enter/exit over the already-rendered
+        // library instead of exposing a stale frame while the back stack changes.
+        LibraryScreen(
+            uiState = libraryState,
+            playbackState = playbackState,
+            events = libraryViewModel.events,
+            onSearchQueryChange = libraryViewModel::onSearchQueryChange,
+            onSortOrderChange = libraryViewModel::onSortOrderChange,
+            onPlaySong = { song, queue ->
+                playerViewModel.playQueue(queue, queue.indexOf(song))
+            },
+            onPlayNext = playerViewModel::playNext,
+            onAddToQueue = playerViewModel::addToQueue,
+            onShufflePlayFrom = { song, songs ->
+                playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
+            },
+            onDeleteSong = libraryViewModel::deleteSong,
+            onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
+            onRetryDelete = libraryViewModel::deleteSong,
+            onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
+            onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
+            onTogglePlayPause = playerViewModel::togglePlayPause,
+            onSkipNext = playerViewModel::skipToNext,
+            onSkipPrevious = playerViewModel::skipToPrevious,
+            onOpenPlayer = ::openPlayer,
+            onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+            onRetryLoad = libraryViewModel::loadLibrary
+        )
+
         NavHost(
             navController = navController,
         startDestination = Routes.LIBRARY,
         modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
             .then(
-                if (currentRoute == Routes.LYRICS) {
-                    androidx.compose.ui.Modifier
-                } else {
+                if (currentRoute == Routes.SETTINGS ||
+                    currentRoute == Routes.DETAILS ||
+                    currentRoute == Routes.ALBUM ||
+                    currentRoute == Routes.ARTIST
+                ) {
                     androidx.compose.ui.Modifier.background(MaterialTheme.colorScheme.background)
+                } else {
+                    androidx.compose.ui.Modifier
                 }
             )
+            .zIndex(3f)
+            .then(
+                if (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS) {
+                    androidx.compose.ui.Modifier.zIndex(-1f)
+                } else {
+                    androidx.compose.ui.Modifier
+                }
+            ),
+        enterTransition = { fadeIn(tween(180)) },
+        exitTransition = { fadeOut(tween(180)) },
+        popEnterTransition = { fadeIn(tween(180)) },
+        popExitTransition = { fadeOut(tween(180)) }
     ) {
 
         composable(Routes.LIBRARY) {
@@ -248,37 +297,6 @@ fun MiniMusicNavGraph(
         }
     }
 
-        // Keep the real library composed while the player route is active. This
-        // preserves the exact list, scroll position, and loaded row state under
-        // the sheet, so collapse is the reverse of the opening transition.
-        if (currentRoute == Routes.LIBRARY || currentRoute == Routes.PLAYER) {
-            LibraryScreen(
-                uiState = libraryState,
-                playbackState = playbackState,
-                events = libraryViewModel.events,
-                onSearchQueryChange = libraryViewModel::onSearchQueryChange,
-                onSortOrderChange = libraryViewModel::onSortOrderChange,
-                onPlaySong = { song, queue ->
-                    playerViewModel.playQueue(queue, queue.indexOf(song))
-                },
-                onPlayNext = playerViewModel::playNext,
-                onAddToQueue = playerViewModel::addToQueue,
-                onShufflePlayFrom = { song, songs ->
-                    playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
-                },
-                onDeleteSong = libraryViewModel::deleteSong,
-                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
-                onRetryDelete = libraryViewModel::deleteSong,
-                onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
-                onArtistClick = { artist -> navController.navigate(Routes.artist(artist.name)) },
-                onTogglePlayPause = playerViewModel::togglePlayPause,
-                onSkipNext = playerViewModel::skipToNext,
-                onSkipPrevious = playerViewModel::skipToPrevious,
-                onOpenPlayer = ::openPlayer,
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onRetryLoad = libraryViewModel::loadLibrary
-            )
-        }
 
         if (hasActiveSong &&
             (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS || sheetState.progress > 0.001f)
