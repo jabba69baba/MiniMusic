@@ -241,10 +241,24 @@ fun BoxWithConstraintsScope.QueueDrawer(
     onEntryClick: (Long) -> Unit,
     onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
-    onClearQueue: () -> Unit
+    onClearQueue: () -> Unit,
+    isLandscape: Boolean = false
 ) {
-    // QueueDrawer is intentionally portrait-only. Landscape PlayerScreen does
-    // not compose this host, so the approved player row receives the full width.
+    if (isLandscape) {
+        LandscapeQueueSidePanel(
+            snapshot = snapshot,
+            artColors = artColors,
+            isOpen = isOpen,
+            onOpenChange = onOpenChange,
+            onEntryClick = onEntryClick,
+            onReorderEntry = onReorderEntry,
+            onRemoveEntry = onRemoveEntry,
+            onClearQueue = onClearQueue
+        )
+        return
+    }
+
+    // Portrait retains the existing bottom-sheet queue implementation.
     QueueDrawerBottomSheet(
         snapshot = snapshot,
         artColors = artColors,
@@ -269,8 +283,10 @@ private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
     onClearQueue: () -> Unit
 ) {
     val density = LocalDensity.current
-    val panelWidth = maxOf(360.dp, minOf(480.dp, maxWidth * 0.42f))
-    val closedOffset = panelWidth - 56.dp
+    // PlayerScreen bounds this composable to the controls-side pane. The panel
+    // therefore fills that pane instead of calculating a second full-screen width.
+    val panelWidth = maxWidth
+    val closedOffset = (panelWidth - 56.dp).coerceAtLeast(0.dp)
     val offsetX = remember(panelWidth) { Animatable(closedOffset.value) }
     val scope = rememberCoroutineScope()
     var locateRequest by remember { mutableStateOf(0) }

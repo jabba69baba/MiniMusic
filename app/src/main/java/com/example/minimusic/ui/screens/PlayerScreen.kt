@@ -336,19 +336,44 @@ fun PlayerScreen(
             }
         }
 
-        // The queue remains a portrait-only surface. Landscape intentionally
-        // gives the recovered space back to the PixelPlayer-style player row.
-        if (queueSlotVisible && !isLandscape) {
-            QueueDrawer(
-                snapshot = queueSnapshot,
-                artColors = artColors,
-                isOpen = queueOpen,
-                onOpenChange = ::setQueueOpen,
-                onEntryClick = onQueueEntryClick,
-                onReorderEntry = onReorderQueue,
-                onRemoveEntry = onRemoveQueueEntry,
-                onClearQueue = onClearQueue
-            )
+        if (queueSlotVisible) {
+            if (isLandscape) {
+                // Bound the landscape queue to the controls half. A nested
+                // BoxWithConstraints is intentional: the queue side panel uses
+                // this pane width, never the full display width.
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(0.5f)
+                        .align(Alignment.CenterEnd)
+                        .zIndex(3f)
+                ) {
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        QueueDrawer(
+                            snapshot = queueSnapshot,
+                            artColors = artColors,
+                            isOpen = queueOpen,
+                            onOpenChange = ::setQueueOpen,
+                            onEntryClick = onQueueEntryClick,
+                            onReorderEntry = onReorderQueue,
+                            onRemoveEntry = onRemoveQueueEntry,
+                            onClearQueue = onClearQueue,
+                            isLandscape = true
+                        )
+                    }
+                }
+            } else {
+                QueueDrawer(
+                    snapshot = queueSnapshot,
+                    artColors = artColors,
+                    isOpen = queueOpen,
+                    onOpenChange = ::setQueueOpen,
+                    onEntryClick = onQueueEntryClick,
+                    onReorderEntry = onReorderQueue,
+                    onRemoveEntry = onRemoveQueueEntry,
+                    onClearQueue = onClearQueue
+                )
+            }
         }
     }
 }
@@ -663,6 +688,12 @@ private fun NowPlayingPanel(
             .forEach { preloadAlbumArt(context, it) }
     }
 
+    val landscapeTransportButtonSize = if (isLandscape) 64.dp else TransportButtonSize
+    val landscapeTransportCircleSize = if (isLandscape) 64.dp else TransportCircleSize
+    val landscapeCapsuleHeight = if (isLandscape) 44.dp else CapsuleSegmentHeight
+    val landscapeControlSectionGap = if (isLandscape) 14.dp else ControlSectionGap
+    val landscapeFunctionSectionGap = if (isLandscape) 18.dp else FunctionSectionGap
+
     val artworkBlock: @Composable (Modifier) -> Unit = { modifier ->
         Box(
             modifier = modifier
@@ -828,8 +859,8 @@ private fun NowPlayingPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(TransportButtonSize)
-                    .padding(top = ControlSectionGap),
+                        .height(landscapeTransportButtonSize)
+                        .padding(top = landscapeControlSectionGap),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -843,7 +874,7 @@ private fun NowPlayingPanel(
                         transitionDirection = -1
                         onSkipPrevious()
                     },
-                    modifier = Modifier.requiredSize(TransportCircleSize)
+                    modifier = Modifier.requiredSize(landscapeTransportCircleSize)
                 )
                 PlayPauseButton(
                     isPlaying = playbackState.isPlaying,
@@ -852,7 +883,7 @@ private fun NowPlayingPanel(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
                         .weight(1f)
-                        .requiredHeight(TransportButtonSize)
+                        .requiredHeight(landscapeTransportButtonSize)
                 )
                 TransportButton(
                     icon = Icons.Filled.SkipNext,
@@ -864,21 +895,21 @@ private fun NowPlayingPanel(
                         transitionDirection = 1
                         onSkipNext()
                     },
-                    modifier = Modifier.requiredSize(TransportCircleSize)
+                    modifier = Modifier.requiredSize(landscapeTransportCircleSize)
                 )
             }
 
             Column(
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
-                    .padding(top = FunctionSectionGap)
+                    .padding(top = landscapeFunctionSectionGap)
             ) {
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = artColors.surfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(CapsuleSegmentHeight)
+                        .height(landscapeCapsuleHeight)
                 ) {
                     Row(modifier = Modifier.padding(4.dp).fillMaxHeight()) {
                         CapsuleSegment(
@@ -965,13 +996,13 @@ private fun PixelPlayerLandscapeContent(
                 .fillMaxHeight()
                 .aspectRatio(1f)
         )
-        Spacer(Modifier.width(9.dp))
+        Spacer(Modifier.width(20.dp))
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly
+            verticalArrangement = Arrangement.Top
         ) {
             controlsSection()
         }

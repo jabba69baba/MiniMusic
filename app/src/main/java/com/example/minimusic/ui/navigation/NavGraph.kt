@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,6 +88,7 @@ fun MiniMusicNavGraph(
         val fullHeightPx = with(density) { maxHeight.toPx() }
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
+        val isLandscape = maxWidth > maxHeight && maxHeight >= 320.dp
         val hasActiveSong = playbackState.currentSong != null
         val collapsedOffsetPx = (fullHeightPx - miniPlayerHeightPx).coerceAtLeast(0f)
         val sheetDragState = rememberDraggableState { delta -> sheetState.dragBy(delta) }
@@ -221,12 +223,29 @@ fun MiniMusicNavGraph(
         }
 
         composable(Routes.LYRICS) {
-            LyricsScreen(
-                playbackState = playbackState,
-                lyricsState = lyricsState,
-                onSeekTo = playerViewModel::seekTo,
-                onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
-            )
+            if (isLandscape) {
+                Box(
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(0.5f)
+                        .align(Alignment.CenterEnd)
+                        .zIndex(4f)
+                ) {
+                    LyricsScreen(
+                        playbackState = playbackState,
+                        lyricsState = lyricsState,
+                        onSeekTo = playerViewModel::seekTo,
+                        onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
+                    )
+                }
+            } else {
+                LyricsScreen(
+                    playbackState = playbackState,
+                    lyricsState = lyricsState,
+                    onSeekTo = playerViewModel::seekTo,
+                    onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
+                )
+            }
         }
     }
 
