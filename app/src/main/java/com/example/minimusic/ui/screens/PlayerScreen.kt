@@ -785,8 +785,10 @@ private fun NowPlayingPanel(
                         text = displayedSong.artist,
                         style = MaterialTheme.typography.bodyLarge,
                         color = artColors.onSurfaceVariant,
+                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

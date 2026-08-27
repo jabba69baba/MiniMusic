@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
@@ -30,17 +31,22 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.minimusic.data.AlbumArtQuality
+import android.content.Context
+import android.provider.OpenableColumns
+import androidx.compose.ui.platform.LocalContext
 import com.example.minimusic.data.AppSettings
-import com.example.minimusic.data.HighRefreshRate
 import com.example.minimusic.data.ThemeMode
+import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.viewmodel.LibraryUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -51,10 +57,8 @@ fun SettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onAmoledBlackModeChange: (Boolean) -> Unit,
-    onHighRefreshRateChange: (HighRefreshRate) -> Unit,
     onShowAudioQualityBadgeChange: (Boolean) -> Unit,
     onCenteredTitleChange: (Boolean) -> Unit,
-    onAlbumArtQualityChange: (AlbumArtQuality) -> Unit,
     onResumeOnLaunchChange: (Boolean) -> Unit,
     onStopOnDismissChange: (Boolean) -> Unit,
     onHapticFeedbackChange: (Boolean) -> Unit,
@@ -65,6 +69,12 @@ fun SettingsScreen(
     onRescanLibrary: () -> Unit
 ) {
     val totalDurationMs = libraryState.allSongs.sumOf { it.durationMs }
+    val context = LocalContext.current
+    val totalSizeBytes by produceState<Long?>(initialValue = null, libraryState.allSongs) {
+        value = withContext(Dispatchers.IO) {
+            libraryState.allSongs.sumOf { songSizeBytes(context, it) }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -85,7 +95,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 84.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             item {
@@ -109,14 +119,6 @@ fun SettingsScreen(
                         checked = settings.amoledBlackMode,
                         onCheckedChange = onAmoledBlackModeChange
                     )
-                    SettingsDivider()
-                    SettingsChoiceRow(
-                        title = "High refresh rate",
-                        subtitle = "Android uses the closest supported display mode",
-                        options = HighRefreshRate.values().map { it to it.label },
-                        selected = settings.highRefreshRate,
-                        onSelect = onHighRefreshRateChange
-                    )
                 }
             }
 
@@ -132,17 +134,9 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Centered title",
-                        subtitle = "Center the current song title in the player",
+                        subtitle = "Center the current song title and artist in the player",
                         checked = settings.centeredTitle,
                         onCheckedChange = onCenteredTitleChange
-                    )
-                    SettingsDivider()
-                    SettingsChoiceRow(
-                        title = "Album art quality",
-                        subtitle = "Stored preference; image sizing pipeline remains unchanged for now",
-                        options = AlbumArtQuality.values().map { it to it.label },
-                        selected = settings.albumArtQuality,
-                        onSelect = onAlbumArtQualityChange
                     )
                 }
             }
@@ -205,19 +199,29 @@ fun SettingsScreen(
             item {
                 SettingsSectionHeader("Library", Icons.Filled.LibraryMusic)
                 SettingsGroup {
-                    SettingsChoiceRow(
+                    SettingsSliderRow(
                         title = "Song minimum length",
-                        subtitle = "Hide shorter clips from the music library",
-                        options = listOf(0, 15, 30, 45, 60).map { it to if (it == 0) "0s" else "${it}s" },
-                        selected = settings.minDurationSeconds,
-                        onSelect = onMinDurationChange
+                        subtitle = if (settings.minDurationSeconds == 0) "No minimum" else "${settings.minDurationSeconds} seconds",
+                        value = settings.minDurationSeconds.toFloat(),
+                        valueRange = 0f..60f,
+                        steps = 3,
+                        enabled = true,
+                        onValueChange = { onMinDurationChange((it / 15f).toInt() * 15) }
                     )
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Rescan library") },
                         supportingContent = { Text("Clear the current library view and reload local MediaStore files") },
                         leadingContent = { Icon(Icons.Filled.Refresh, contentDescription = null) },
-                        trailingContent = { TextButton(onClick = onRescanLibrary) { Text("Scan") } }
+                        trailingContent = {
+                            if (libraryState.isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+                            } else {
+                                IconButton(onClick = onRescanLibrary) {
+                                    Icon(Icons.Filled.Refresh, contentDescription = "Rescan library")
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -231,11 +235,12 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsValueRow("Artists loaded", libraryState.artists.size.toString())
                     SettingsDivider()
-                    SettingsValueRow("Genres loaded", "— (metadata not indexed)")
-                    SettingsDivider()
                     SettingsValueRow("Total duration", formatTotalDuration(totalDurationMs))
                     SettingsDivider()
-                    SettingsValueRow("Total size", "— (file size not indexed)")
+                    SettingsValueRow(
+                        "Total size",
+                        totalSizeBytes?.let(::formatTotalSize) ?: "Calculating…"
+                    )
                 }
             }
 
@@ -369,6 +374,46 @@ private fun SettingsValueRow(label: String, value: String) {
         headlineContent = { Text(label) },
         trailingContent = { Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     )
+}
+
+private fun songSizeBytes(context: Context, song: Song): Long {
+    val mediaStoreSize = runCatching {
+        context.contentResolver.query(
+            song.contentUri,
+            arrayOf(OpenableColumns.SIZE),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                cursor.getLong(0).takeIf { it >= 0L }
+            } else {
+                null
+            }
+        }
+    }.getOrNull()
+
+    return mediaStoreSize ?: runCatching {
+        context.contentResolver.openAssetFileDescriptor(song.contentUri, "r")?.use { descriptor ->
+            descriptor.length.takeIf { it >= 0L }
+        }
+    }.getOrNull() ?: 0L
+}
+
+private fun formatTotalSize(bytes: Long): String {
+    if (bytes < 1024L) return "${bytes.coerceAtLeast(0L)} B"
+    val units = arrayOf("KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var unitIndex = -1
+    while (value >= 1024.0 && unitIndex < units.lastIndex) {
+        value /= 1024.0
+        unitIndex++
+    }
+    return if (value >= 100.0 || unitIndex == 0) {
+        String.format(java.util.Locale.US, "%.0f %s", value, units[unitIndex])
+    } else {
+        String.format(java.util.Locale.US, "%.1f %s", value, units[unitIndex])
+    }
 }
 
 private fun formatTotalDuration(durationMs: Long): String {
