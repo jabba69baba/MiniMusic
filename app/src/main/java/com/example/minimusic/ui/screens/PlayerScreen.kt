@@ -945,7 +945,7 @@ private fun NowPlayingPanel(
                 Box(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         belowArtworkBlock(Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
+                        Spacer(modifier = Modifier.height(14.dp))
                         if (landscapeQueueVisible && !queueOpen) {
                             landscapeQueueContent(
                                 false,
