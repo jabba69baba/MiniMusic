@@ -245,7 +245,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
     isLandscape: Boolean = false
 ) {
     if (isLandscape) {
-        LandscapeQueueSidePanel(
+        LandscapeQueueBottomSheet(
             snapshot = snapshot,
             artColors = artColors,
             isOpen = isOpen,
@@ -272,7 +272,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
 }
 
 @Composable
-private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
+private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
     isOpen: Boolean,
@@ -283,18 +283,18 @@ private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
     onClearQueue: () -> Unit
 ) {
     val density = LocalDensity.current
-    // PlayerScreen bounds this composable to the controls-side pane. The panel
-    // therefore fills that pane instead of calculating a second full-screen width.
-    val panelWidth = maxWidth
-    val closedOffset = (panelWidth - 56.dp).coerceAtLeast(0.dp)
-    val offsetX = remember(panelWidth) { Animatable(closedOffset.value) }
+    // PlayerScreen bounds this composable to the controls-side pane. The sheet
+    // therefore fills that pane and slides vertically from its bottom edge.
+    val panelHeight = maxHeight
+    val closedOffset = (panelHeight - 64.dp).coerceAtLeast(0.dp)
+    val offsetY = remember(panelHeight) { Animatable(closedOffset.value) }
     val scope = rememberCoroutineScope()
     var locateRequest by remember { mutableStateOf(0) }
     var queueTopRequest by remember { mutableStateOf(0) }
     var openRequest by remember { mutableStateOf(0) }
 
-    LaunchedEffect(isOpen, panelWidth) {
-        offsetX.animateTo(
+    LaunchedEffect(isOpen, panelHeight) {
+        offsetY.animateTo(
             if (isOpen) 0f else closedOffset.value,
             animationSpec = tween(280, easing = FastOutSlowInEasing)
         )
@@ -308,15 +308,14 @@ private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxHeight()
-                .width(panelWidth)
+                .fillMaxSize()
                 .offset {
                     IntOffset(
-                        with(density) { offsetX.value.dp.toPx().roundToInt() },
-                        0
+                        0,
+                        with(density) { offsetY.value.dp.toPx().roundToInt() }
                     )
                 },
-            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp),
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             color = artColors.surfaceVariant,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
@@ -327,21 +326,21 @@ private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
                         .fillMaxWidth()
                         .height(102.dp)
                         .draggable(
-                            orientation = Orientation.Horizontal,
+                            orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
-                                val next = (offsetX.value + delta / density.density)
+                                val next = (offsetY.value + delta / density.density)
                                     .coerceIn(0f, closedOffset.value)
-                                scope.launch { offsetX.snapTo(next) }
+                                scope.launch { offsetY.snapTo(next) }
                             },
                             startDragImmediately = false,
                             onDragStopped = { velocity ->
                                 val shouldOpen = if (abs(velocity) > 800f) {
                                     velocity < 0f
                                 } else {
-                                    offsetX.value < closedOffset.value / 2f
+                                    offsetY.value < closedOffset.value / 2f
                                 }
                                 scope.launch {
-                                    offsetX.animateTo(
+                                    offsetY.animateTo(
                                         if (shouldOpen) 0f else closedOffset.value,
                                         animationSpec = tween(240, easing = FastOutSlowInEasing)
                                     )
@@ -432,9 +431,9 @@ private fun BoxWithConstraintsScope.LandscapeQueueSidePanel(
         if (!isOpen) {
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .width(56.dp)
-                    .align(Alignment.CenterEnd)
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .align(Alignment.BottomCenter)
                     .clickable { onOpenChange(true) },
                 contentAlignment = Alignment.Center
             ) {
