@@ -683,9 +683,10 @@ private fun NowPlayingPanel(
 
     val landscapeTransportButtonSize = if (isLandscape) 64.dp else TransportButtonSize
     val landscapeTransportCircleSize = if (isLandscape) 64.dp else TransportCircleSize
-    val landscapeCapsuleHeight = if (isLandscape) 44.dp else CapsuleSegmentHeight
-    val landscapeControlSectionGap = if (isLandscape) 18.dp else ControlSectionGap
-    val landscapeFunctionSectionGap = if (isLandscape) 18.dp else FunctionSectionGap
+    val landscapeCapsuleHeight = if (isLandscape) 46.dp else CapsuleSegmentHeight
+    val landscapeTimestampTransportGap = if (isLandscape) 2.dp else 0.dp
+    val landscapeControlSectionGap = if (isLandscape) 16.dp else ControlSectionGap
+    val landscapeFunctionSectionGap = if (isLandscape) 16.dp else FunctionSectionGap
 
     val artworkBlock: @Composable (Modifier) -> Unit = { modifier ->
         Box(
@@ -968,6 +969,7 @@ private fun NowPlayingPanel(
                 Box(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         metadataAndSeekBlock(Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(landscapeTimestampTransportGap))
                         transportBlock(Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(landscapeControlSectionGap))
                         functionBlock(Modifier.fillMaxWidth())
