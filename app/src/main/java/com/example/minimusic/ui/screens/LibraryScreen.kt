@@ -41,6 +41,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -52,6 +53,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,6 +81,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,6 +101,9 @@ import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import com.example.minimusic.ui.viewmodel.SongSortOrder
+import coil.imageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -250,6 +257,7 @@ fun LibraryScreen(
             )
 
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
+            var stopSongScrollRequest by remember { mutableStateOf(0) }
             var sortMenuExpanded by remember { mutableStateOf(false) }
             var tabMenuExpanded by remember { mutableStateOf(false) }
 
@@ -274,7 +282,8 @@ fun LibraryScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Split selector: the active view remains centered in the
-                        // wide segment and the smaller chevron opens the same dialog.
+                        // wide segment with its category icon; the smaller chevron
+                        // opens the matching-width dropdown.
                         Box {
                             Row(
                                 modifier = Modifier.width(SelectorPillWidth),
@@ -286,13 +295,20 @@ fun LibraryScreen(
                                     shape = PillGroupShapes.First,
                                     modifier = Modifier.width(94.dp)
                                 ) {
+                                    Icon(
+                                        imageVector = selectedTab.icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        selectedTab.label,
+                                        text = selectedTab.label,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Clip
                                     )
                                 }
                                 PillButton(
@@ -309,7 +325,7 @@ fun LibraryScreen(
                                     )
                                 }
                             }
-                            LibraryTabDialog(
+                            LibraryTabMenu(
                                 expanded = tabMenuExpanded,
                                 selected = selectedTab,
                                 onDismiss = { tabMenuExpanded = false },
@@ -330,7 +346,10 @@ fun LibraryScreen(
                         Box {
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
-                                    onClick = { jumpToCurrentRequest++ },
+                                    onClick = {
+                                        stopSongScrollRequest++
+                                        jumpToCurrentRequest++
+                                    },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.First,
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -345,6 +364,7 @@ fun LibraryScreen(
                                 }
                                 PillButton(
                                     onClick = {
+                                        stopSongScrollRequest++
                                         if (filteredSongs.isNotEmpty()) {
                                             val startSong = filteredSongs.random()
                                             onShufflePlayFrom(startSong, filteredSongs)
@@ -399,6 +419,7 @@ fun LibraryScreen(
                                     songs = filteredSongs,
                                     currentSongId = playbackState.currentSong?.id,
                                     jumpToCurrentRequest = jumpToCurrentRequest,
+                                    stopScrollRequest = stopSongScrollRequest,
                                     bottomContentPadding = footerHeight,
                                     onPlaySong = { song -> onPlaySong(song, filteredSongs) },
                                     onPlayNext = onPlayNext,
@@ -456,6 +477,7 @@ private fun SongsTab(
     songs: List<Song>,
     currentSongId: Long?,
     jumpToCurrentRequest: Int,
+    stopScrollRequest: Int,
     bottomContentPadding: androidx.compose.ui.unit.Dp,
     onPlaySong: (Song) -> Unit,
     onPlayNext: (Song) -> Unit,
@@ -466,9 +488,34 @@ private fun SongsTab(
 ) {
     val listState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var locateJob by remember { mutableStateOf<Job?>(null) }
     var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(songs) { it.title }
+
+    LaunchedEffect(songs) {
+        songs.asSequence()
+            .mapNotNull { it.albumArtUri }
+            .distinct()
+            .take(16)
+            .forEach { artworkUri ->
+                context.imageLoader.enqueue(
+                    ImageRequest.Builder(context)
+                        .data(artworkUri)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .size(96)
+                        .build()
+                )
+            }
+    }
+
+    LaunchedEffect(stopScrollRequest) {
+        if (stopScrollRequest == 0) return@LaunchedEffect
+        locateJob?.cancel()
+        fastScrollJob?.cancel()
+        listState.stopScroll()
+    }
 
     LaunchedEffect(jumpToCurrentRequest) {
         if (jumpToCurrentRequest == 0) return@LaunchedEffect
@@ -477,7 +524,9 @@ private fun SongsTab(
             // Locate cancels any active fling/fast-scroll before moving to the
             // target, preventing old velocity from carrying into the new position.
             locateJob?.cancel()
+            fastScrollJob?.cancel()
             locateJob = scrollScope.launch {
+                listState.stopScroll()
                 listState.animateScrollToItem(index = index, scrollOffset = 0)
             }
         }
@@ -707,7 +756,7 @@ private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = w
 }
 
 @Composable
-private fun LibraryTabDialog(
+private fun LibraryTabMenu(
     expanded: Boolean,
     selected: LibraryTab,
     onDismiss: () -> Unit,
@@ -719,65 +768,66 @@ private fun LibraryTabDialog(
         LibraryTab.ARTISTS,
         LibraryTab.ALBUMS
     )
-    AlertDialog(
+    DropdownMenu(
+        expanded = expanded,
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        title = { Text("View by") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                tabs.forEach { tab ->
-                    val selectedRow = selected == tab
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onSelect(tab) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (selectedRow) {
-                            MaterialTheme.colorScheme.primaryContainer
+        modifier = Modifier.width(SelectorPillWidth)
+    ) {
+        tabs.forEach { tab ->
+            val selectedRow = selected == tab
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = tab.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = null,
+                        tint = if (selectedRow) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surface
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = null,
-                                tint = if (selectedRow) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Text(
-                                text = tab.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (selectedRow) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 12.dp)
-                            )
-                            RadioButton(
-                                selected = selectedRow,
-                                onClick = { onSelect(tab) }
-                            )
-                        }
+                    )
+                },
+                trailingIcon = {
+                    if (selectedRow) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
+                },
+                colors = androidx.compose.material3.MenuDefaults.itemColors(
+                    textColor = if (selectedRow) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    leadingIconColor = if (selectedRow) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    trailingIconColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.background(
+                    if (selectedRow) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                ),
+                onClick = {
+                    onSelect(tab)
+                    onDismiss()
                 }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {}
-    )
+            )
+        }
+    }
 }
 
 @Composable

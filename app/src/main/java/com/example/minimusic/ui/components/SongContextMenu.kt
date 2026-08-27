@@ -73,8 +73,8 @@ fun SongContextMenu(
             text = { Text("Details") },
             leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
             onClick = {
-                onOpenDetails(song)
                 onDismiss()
+                onOpenDetails(song)
             }
         )
         DropdownMenuItem(

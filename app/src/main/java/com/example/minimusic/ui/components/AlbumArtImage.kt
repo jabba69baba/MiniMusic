@@ -34,7 +34,8 @@ fun AlbumArtImage(
     iconSize: Dp = 28.dp,
     contentDescription: String? = null,
     contentScale: ContentScale = ContentScale.Crop,
-    crossfadeMillis: Int = 180
+    crossfadeMillis: Int = 180,
+    requestSizePx: Int? = null
 ) {
     val context = LocalContext.current
     val request = remember(model) {
@@ -43,6 +44,7 @@ fun AlbumArtImage(
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .apply {
+                requestSizePx?.let { size(it) }
                 if (crossfadeMillis > 0) crossfade(crossfadeMillis) else crossfade(false)
             }
             .build()

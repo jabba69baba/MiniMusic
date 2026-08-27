@@ -1,7 +1,6 @@
 package com.example.minimusic.ui.viewmodel
 
 import android.app.Application
-import android.os.SystemClock
 import android.content.IntentSender
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,7 +16,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -90,12 +88,27 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     /** Call once the READ_MEDIA_AUDIO / READ_EXTERNAL_STORAGE permission has been granted. */
     fun loadLibrary() {
         viewModelScope.launch {
-            val loadStartedAt = SystemClock.uptimeMillis()
             _uiState.value = _uiState.value.copy(isLoading = true, loadError = null)
             try {
                 val minDuration = settingsRepository.settings.first().minDurationSeconds
                 val songs = repository.loadSongs(minDuration)
                 val currentState = _uiState.value
+
+                // The repository query already returns title-sorted Song objects with
+                // title/artist/album metadata populated. Publish that first frame as
+                // soon as the local query completes so the home list becomes
+                // interactive immediately instead of waiting for derived tabs and a
+                // synthetic loading delay.
+                _uiState.value = currentState.copy(
+                    isLoading = false,
+                    loadError = null,
+                    allSongs = songs,
+                    filteredSongs = songs
+                )
+
+                // Albums, artists, and non-default filtering are secondary work. Keep
+                // them off the UI thread and update only if this load still owns the
+                // current song list, so they cannot stall first-render scrolling.
                 val (albums, artists, filteredSongs) = withContext(Dispatchers.Default) {
                     Triple(
                         repository.deriveAlbums(songs),
@@ -103,16 +116,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         filterAndSortSongs(songs, currentState.searchQuery, currentState.sortOrder)
                     )
                 }
-                val remainingIndicatorTime = 240L - (SystemClock.uptimeMillis() - loadStartedAt)
-                if (remainingIndicatorTime > 0L) delay(remainingIndicatorTime)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    loadError = null,
-                    allSongs = songs,
-                    albums = albums,
-                    artists = artists,
-                    filteredSongs = filteredSongs
-                )
+                if (_uiState.value.allSongs == songs) {
+                    _uiState.value = _uiState.value.copy(
+                        albums = albums,
+                        artists = artists,
+                        filteredSongs = filteredSongs
+                    )
+                }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 _uiState.value = _uiState.value.copy(
