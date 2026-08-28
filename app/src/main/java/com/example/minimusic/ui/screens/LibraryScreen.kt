@@ -98,7 +98,6 @@ import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.PillShape
-import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import com.example.minimusic.ui.viewmodel.SongSortOrder
@@ -147,13 +146,13 @@ fun LibraryScreen(
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     val view = LocalView.current
-    val miniPlayerColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
-    DisposableEffect(view, miniPlayerColors.surfaceVariant) {
+    val appNavigationBarColor = MaterialTheme.colorScheme.surface
+    DisposableEffect(view, appNavigationBarColor) {
         val window = (view.context as? Activity)?.window
         if (window != null) {
             val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
-            window.navigationBarColor = miniPlayerColors.surfaceVariant.toArgb()
-            val useDarkIcons = miniPlayerColors.surfaceVariant.luminance() > 0.52f
+            window.navigationBarColor = appNavigationBarColor.toArgb()
+            val useDarkIcons = appNavigationBarColor.luminance() > 0.52f
             controller.isAppearanceLightNavigationBars = useDarkIcons
         }
         onDispose { }

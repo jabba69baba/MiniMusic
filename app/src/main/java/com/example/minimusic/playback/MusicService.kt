@@ -1,5 +1,6 @@
 package com.example.minimusic.playback
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -21,8 +22,12 @@ import com.google.common.util.concurrent.ListenableFuture
  * content:// URIs, so there is no networking involved at any point.
  */
 class MusicService : MediaSessionService() {
-
     companion object {
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+        const val ACTION_UPDATE_WIDGET = "com.example.minimusic.widget.UPDATE_WIDGET"
+
         const val ACTION_FRESH_SHUFFLE = "com.example.minimusic.action.FRESH_SHUFFLE"
         const val ACTION_APPLY_SHUFFLE_ORDER = "com.example.minimusic.action.APPLY_SHUFFLE_ORDER"
         const val EXTRA_SHUFFLE_ORDER = "shuffle_order"
@@ -83,6 +88,7 @@ class MusicService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -105,11 +111,25 @@ class MusicService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(sessionCallback)
             .build()
+        MiniMusicWidgetProvider.updateFromPlayer(this, player)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_UPDATE_WIDGET -> mediaSession?.player?.let { MiniMusicWidgetProvider.updateFromPlayer(this, it) }
+            MiniMusicWidgetProvider.ACTION_PREVIOUS -> mediaSession?.player?.seekToPreviousMediaItem()
+            MiniMusicWidgetProvider.ACTION_PLAY_PAUSE -> mediaSession?.player?.let { player ->
+                if (player.isPlaying) player.pause() else player.play()
+            }
+            MiniMusicWidgetProvider.ACTION_NEXT -> mediaSession?.player?.seekToNextMediaItem()
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
+        isRunning = false
         mediaSession?.run {
             player.release()
             release()
