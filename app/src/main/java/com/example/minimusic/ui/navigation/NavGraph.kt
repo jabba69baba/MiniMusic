@@ -184,14 +184,7 @@ fun MiniMusicNavGraph(
                     androidx.compose.ui.Modifier
                 }
             )
-            .zIndex(3f)
-            .then(
-                if (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS) {
-                    androidx.compose.ui.Modifier.zIndex(-1f)
-                } else {
-                    androidx.compose.ui.Modifier
-                }
-            ),
+            .zIndex(3f),
         enterTransition = { fadeIn(tween(180)) },
         exitTransition = { fadeOut(tween(180)) },
         popEnterTransition = { fadeIn(tween(180)) },
@@ -310,7 +303,8 @@ fun MiniMusicNavGraph(
                         // album-art-derived background is left unchanged.
                         alpha = 1f
                     }
-                    .zIndex(if (currentRoute == Routes.LYRICS) -1f else 2f)
+                    // Keep the player surface beneath Lyrics, but above the stable Home base.
+                    .zIndex(2f)
                     .then(
                         if (currentRoute != Routes.LYRICS && sheetState.progress > 0.001f && !queueDrawerOpen) {
                             sheetDragModifier

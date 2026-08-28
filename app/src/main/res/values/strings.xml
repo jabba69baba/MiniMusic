@@ -3,4 +3,10 @@
     <string name="permission_rationale">MiniMusic needs access to your music to build your library. Nothing is ever uploaded — everything stays on this device.</string>
     <string name="grant_access">Grant access</string>
     <string name="no_songs_found">No songs found on this device yet.</string>
+    <string name="widget_album_art">Album artwork</string>
+    <string name="widget_previous">Previous song</string>
+    <string name="widget_play_pause">Play or pause</string>
+    <string name="widget_next">Next song</string>
+    <string name="widget_no_song">Tap to choose a song</string>
+    <string name="widget_open_hint">Open MiniMusic</string>
 </resources>

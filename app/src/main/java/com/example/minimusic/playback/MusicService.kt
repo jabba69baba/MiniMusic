@@ -11,6 +11,7 @@ import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
+import com.example.minimusic.widget.MiniMusicWidgetProvider
 import com.google.common.util.concurrent.ListenableFuture
 
 /**
@@ -92,6 +93,13 @@ class MusicService : MediaSessionService() {
             .build()
             .apply {
                 repeatMode = Player.REPEAT_MODE_OFF
+            }
+            .also { exoPlayer ->
+                exoPlayer.addListener(object : Player.Listener {
+                    override fun onEvents(player: Player, events: Player.Events) {
+                        MiniMusicWidgetProvider.requestUpdate(this@MusicService)
+                    }
+                })
             }
 
         mediaSession = MediaSession.Builder(this, player)
