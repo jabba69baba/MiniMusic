@@ -30,6 +30,12 @@ import com.example.minimusic.ui.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_OPEN_PLAYER = "com.example.minimusic.extra.OPEN_PLAYER"
+    }
+
+    private var openPlayerFromWidget by mutableStateOf(false)
+
     private val audioPermission: String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_AUDIO
@@ -52,6 +58,7 @@ class MainActivity : ComponentActivity() {
         }
 
         super.onCreate(savedInstanceState)
+        openPlayerFromWidget = intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)
 
         setContent {
             SideEffect { firstComposeFrameReady = true }
@@ -96,13 +103,22 @@ class MainActivity : ComponentActivity() {
                         MiniMusicNavGraph(
                             libraryViewModel = libraryViewModel,
                             playerViewModel = playerViewModel,
-                            settingsViewModel = settingsViewModel
+                            settingsViewModel = settingsViewModel,
+                            openPlayerFromWidget = openPlayerFromWidget
                         )
                     } else {
                         PermissionScreen(onGrantClick = { permissionLauncher.launch(audioPermission) })
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) {
+            openPlayerFromWidget = true
         }
     }
 }

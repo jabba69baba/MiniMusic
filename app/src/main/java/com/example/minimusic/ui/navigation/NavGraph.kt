@@ -64,6 +64,7 @@ fun MiniMusicNavGraph(
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
     settingsViewModel: SettingsViewModel,
+    openPlayerFromWidget: Boolean = false,
     navController: NavHostController = rememberNavController()
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
@@ -128,6 +129,16 @@ fun MiniMusicNavGraph(
                     collapsedOffsetPx = collapsedOffsetPx
                 )
             )
+        }
+        LaunchedEffect(openPlayerFromWidget, hasActiveSong) {
+            if (openPlayerFromWidget && hasActiveSong) {
+                sheetState.settle(
+                    velocityPxPerSecond = 0f,
+                    targetProgressOverride = 1f,
+                    onExpanded = { openPlayer() },
+                    onCollapsed = {}
+                )
+            }
         }
         LaunchedEffect(currentRoute) {
             sheetState.settle(

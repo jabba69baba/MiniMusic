@@ -8,13 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Shader
-import android.graphics.BitmapShader
 import android.net.Uri
 import android.os.Bundle
-import android.view.View
 import android.widget.RemoteViews
 import androidx.media3.common.Player
 import com.example.minimusic.MainActivity
@@ -31,7 +26,7 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
                 context.startService(Intent(context, MusicService::class.java).setAction(MusicService.ACTION_UPDATE_WIDGET))
             }
         } else {
-            ids.forEach { updateDefault(context, manager, it, manager.getAppWidgetOptions(it)) }
+            ids.forEach { widgetId -> updateDefault(context, manager, widgetId, manager.getAppWidgetOptions(widgetId)) }
         }
     }
 
@@ -60,10 +55,7 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
                         context.startService(Intent(context, MusicService::class.java).setAction(intent.action))
                     }
                 } else {
-                    context.startActivity(
-                        Intent(context, MainActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    )
+                    context.startActivity(openAppIntent(context, openPlayer = false).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }
         }
@@ -74,6 +66,10 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_PLAY_PAUSE = "com.example.minimusic.widget.PLAY_PAUSE"
         const val ACTION_NEXT = "com.example.minimusic.widget.NEXT"
         private const val MAX_ARTWORK_EDGE = 256
+        private val artworkExecutor = Executors.newSingleThreadExecutor()
+        private val artworkCache = object : LinkedHashMap<String, Bitmap>(6, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean = size > 4
+        }
 
         fun requestUpdate(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -85,12 +81,8 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
                     context.startService(Intent(context, MusicService::class.java).setAction(MusicService.ACTION_UPDATE_WIDGET))
                 }
             } else {
-                ids.forEach { updateDefault(context, manager, it, manager.getAppWidgetOptions(it)) }
+                ids.forEach { widgetId -> updateDefault(context, manager, widgetId, manager.getAppWidgetOptions(widgetId)) }
             }
-        }
-        private val artworkExecutor = Executors.newSingleThreadExecutor()
-        private val artworkCache = object : LinkedHashMap<String, Bitmap>(6, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean = size > 4
         }
 
         fun updateFromPlayer(context: Context, player: Player) {
@@ -103,7 +95,7 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
                 val artUri = player.mediaMetadata.artworkUri
                 if (artUri != null) {
                     artworkExecutor.execute {
-                        val artwork = loadCircularArtwork(context, artUri)
+                        val artwork = loadArtwork(context, artUri)
                         if (artwork != null) {
                             views.setImageViewBitmap(R.id.widget_art, artwork)
                             manager.updateAppWidget(widgetId, views)
@@ -115,40 +107,43 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
 
         private fun updateDefault(context: Context, manager: AppWidgetManager, widgetId: Int, options: Bundle) {
             val views = RemoteViews(context.packageName, layoutFor(options))
-            views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
-            views.setTextViewText(R.id.widget_artist, context.getString(R.string.widget_no_song))
-            views.setImageViewResource(R.id.widget_art, R.drawable.widget_note)
+            views.setImageViewResource(R.id.widget_art, R.drawable.widget_idle_logo)
             views.setImageViewResource(R.id.widget_play, R.drawable.ic_widget_play)
-            configureClicks(context, views)
+            configureClicks(context, views, openPlayer = false)
             manager.updateAppWidget(widgetId, views)
         }
 
         private fun newViews(context: Context, options: Bundle, player: Player): RemoteViews {
             val views = RemoteViews(context.packageName, layoutFor(options))
-            val metadata = player.mediaMetadata
-            views.setTextViewText(R.id.widget_title, metadata.title?.toString().orEmpty().ifBlank { context.getString(R.string.app_name) })
-            views.setTextViewText(R.id.widget_artist, metadata.artist?.toString().orEmpty().ifBlank { context.getString(R.string.widget_no_song) })
+            val active = player.currentMediaItem != null
+            views.setImageViewResource(R.id.widget_art, if (active) R.drawable.widget_note else R.drawable.widget_idle_logo)
             views.setImageViewResource(
                 R.id.widget_play,
                 if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
             )
-            configureClicks(context, views)
+            configureClicks(context, views, openPlayer = active)
             return views
         }
 
-        private fun configureClicks(context: Context, views: RemoteViews) {
-            views.setOnClickPendingIntent(R.id.widget_root, openAppPendingIntent(context))
+        private fun configureClicks(context: Context, views: RemoteViews, openPlayer: Boolean) {
+            val openIntent = openAppPendingIntent(context, openPlayer)
+            views.setOnClickPendingIntent(R.id.widget_root, openIntent)
+            views.setOnClickPendingIntent(R.id.widget_art, openIntent)
             views.setOnClickPendingIntent(R.id.widget_play, broadcastPendingIntent(context, ACTION_PLAY_PAUSE, 2))
             views.setOnClickPendingIntent(R.id.widget_previous, broadcastPendingIntent(context, ACTION_PREVIOUS, 3))
             views.setOnClickPendingIntent(R.id.widget_next, broadcastPendingIntent(context, ACTION_NEXT, 4))
         }
 
-        private fun openAppPendingIntent(context: Context): PendingIntent = PendingIntent.getActivity(
+        private fun openAppPendingIntent(context: Context, openPlayer: Boolean): PendingIntent = PendingIntent.getActivity(
             context,
-            1,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            if (openPlayer) 11 else 12,
+            openAppIntent(context, openPlayer),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        private fun openAppIntent(context: Context, openPlayer: Boolean): Intent = Intent(context, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_OPEN_PLAYER, openPlayer)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
         private fun broadcastPendingIntent(context: Context, action: String, requestCode: Int): PendingIntent = PendingIntent.getBroadcast(
             context,
@@ -163,35 +158,27 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
             return if (width >= 180 || height >= 180) R.layout.widget_music_expanded else R.layout.widget_music
         }
 
-        private fun loadCircularArtwork(context: Context, uri: Uri): Bitmap? {
+        private fun loadArtwork(context: Context, uri: Uri): Bitmap? {
             val key = uri.toString()
             synchronized(artworkCache) { artworkCache[key]?.let { return it } }
             return try {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
                 if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-                val largest = maxOf(bounds.outWidth, bounds.outHeight)
-                val sample = Integer.highestOneBit((largest / MAX_ARTWORK_EDGE).coerceAtLeast(1)).coerceAtLeast(1)
-                val decodeOptions = BitmapFactory.Options().apply {
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_ARTWORK_EDGE) sample *= 2
+                val options = BitmapFactory.Options().apply {
                     inSampleSize = sample
                     inPreferredConfig = Bitmap.Config.RGB_565
                 }
                 val source = context.contentResolver.openInputStream(uri)?.use {
-                    BitmapFactory.decodeStream(it, null, decodeOptions)
+                    BitmapFactory.decodeStream(it, null, options)
                 } ?: return null
                 val side = minOf(source.width, source.height)
-                val crop = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
-                val output = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
-                Canvas(output).drawCircle(
-                    side / 2f,
-                    side / 2f,
-                    side / 2f,
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        shader = BitmapShader(crop, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-                    }
-                )
+                val cropped = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
+                val output = if (cropped.width == MAX_ARTWORK_EDGE) cropped else Bitmap.createScaledBitmap(cropped, MAX_ARTWORK_EDGE, MAX_ARTWORK_EDGE, true)
+                if (cropped !== output) cropped.recycle()
                 source.recycle()
-                if (crop !== source) crop.recycle()
                 synchronized(artworkCache) { artworkCache[key] = output }
                 output
             } catch (_: Exception) {
