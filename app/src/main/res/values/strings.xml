@@ -7,6 +7,4 @@
     <string name="widget_previous">Previous song</string>
     <string name="widget_play_pause">Play or pause</string>
     <string name="widget_next">Next song</string>
-    <string name="widget_no_song">Tap to choose a song</string>
-    <string name="widget_open_hint">Open MiniMusic</string>
 </resources>

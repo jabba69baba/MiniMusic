@@ -16,7 +16,9 @@ import com.example.minimusic.MainActivity
 import com.example.minimusic.R
 import com.example.minimusic.playback.MusicService
 import java.util.LinkedHashMap
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /** Offline launcher widget with compact and expanded RemoteViews size classes. */
 class MiniMusicWidgetProvider : AppWidgetProvider() {
@@ -65,8 +67,10 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_PREVIOUS = "com.example.minimusic.widget.PREVIOUS"
         const val ACTION_PLAY_PAUSE = "com.example.minimusic.widget.PLAY_PAUSE"
         const val ACTION_NEXT = "com.example.minimusic.widget.NEXT"
-        private const val MAX_ARTWORK_EDGE = 256
+        private const val MAX_ARTWORK_EDGE = 512
         private val artworkExecutor = Executors.newSingleThreadExecutor()
+        private val updateGeneration = ConcurrentHashMap<Int, Long>()
+        private val generationCounter = AtomicLong(0L)
         private val artworkCache = object : LinkedHashMap<String, Bitmap>(6, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean = size > 4
         }
@@ -88,15 +92,17 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
         fun updateFromPlayer(context: Context, player: Player) {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, MiniMusicWidgetProvider::class.java)
+            val artworkUri = player.mediaMetadata.artworkUri
             manager.getAppWidgetIds(component).forEach { widgetId ->
+                val generation = generationCounter.incrementAndGet()
+                updateGeneration[widgetId] = generation
                 val options = manager.getAppWidgetOptions(widgetId)
                 val views = newViews(context, options, player)
                 manager.updateAppWidget(widgetId, views)
-                val artUri = player.mediaMetadata.artworkUri
-                if (artUri != null) {
+                if (artworkUri != null && player.currentMediaItem != null) {
                     artworkExecutor.execute {
-                        val artwork = loadArtwork(context, artUri)
-                        if (artwork != null) {
+                        val artwork = loadArtwork(context, artworkUri)
+                        if (artwork != null && updateGeneration[widgetId] == generation) {
                             views.setImageViewBitmap(R.id.widget_art, artwork)
                             manager.updateAppWidget(widgetId, views)
                         }
@@ -106,6 +112,7 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
         }
 
         private fun updateDefault(context: Context, manager: AppWidgetManager, widgetId: Int, options: Bundle) {
+            updateGeneration[widgetId] = generationCounter.incrementAndGet()
             val views = RemoteViews(context.packageName, layoutFor(options))
             views.setImageViewResource(R.id.widget_art, R.drawable.widget_idle_logo)
             views.setImageViewResource(R.id.widget_play, R.drawable.ic_widget_play)
@@ -143,6 +150,7 @@ class MiniMusicWidgetProvider : AppWidgetProvider() {
 
         private fun openAppIntent(context: Context, openPlayer: Boolean): Intent = Intent(context, MainActivity::class.java)
             .putExtra(MainActivity.EXTRA_OPEN_PLAYER, openPlayer)
+            .putExtra(MainActivity.EXTRA_WIDGET_OPEN, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
         private fun broadcastPendingIntent(context: Context, action: String, requestCode: Int): PendingIntent = PendingIntent.getBroadcast(

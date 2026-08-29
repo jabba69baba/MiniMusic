@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_PLAYER = "com.example.minimusic.extra.OPEN_PLAYER"
+        const val EXTRA_WIDGET_OPEN = "com.example.minimusic.extra.WIDGET_OPEN"
     }
 
     private var openPlayerFromWidget by mutableStateOf(false)
@@ -59,6 +60,9 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         openPlayerFromWidget = intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)
+        if (intent.getBooleanExtra(EXTRA_WIDGET_OPEN, false)) {
+            overridePendingTransition(R.anim.widget_open_enter, R.anim.widget_open_exit)
+        }
 
         setContent {
             SideEffect { firstComposeFrameReady = true }
@@ -119,6 +123,9 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) {
             openPlayerFromWidget = true
+        }
+        if (intent.getBooleanExtra(EXTRA_WIDGET_OPEN, false)) {
+            overridePendingTransition(R.anim.widget_open_enter, R.anim.widget_open_exit)
         }
     }
 }
