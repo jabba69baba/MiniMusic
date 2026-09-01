@@ -1,14 +1,13 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.MutatorMutex
 import kotlinx.coroutines.CoroutineScope
@@ -74,10 +73,7 @@ class PlayerSheetMotionState internal constructor(
                 if (targetProgress == 0f) onCollapseStarted()
                 offset.animateTo(
                     target,
-                    animationSpec = tween(
-                        durationMillis = 255,
-                        easing = FastOutSlowInEasing
-                    )
+                    animationSpec = MiniMusicMotion.sheetSpatial()
                 )
                 if (targetProgress == 1f) onExpanded() else onCollapsed()
             }

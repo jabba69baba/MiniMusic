@@ -2,7 +2,6 @@ package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,6 +36,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import com.example.minimusic.ui.screens.DetailsScreen
 import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.components.MiniPlayer
@@ -196,10 +196,10 @@ fun MiniMusicNavGraph(
                 }
             )
             .zIndex(3f),
-        enterTransition = { fadeIn(tween(180)) },
-        exitTransition = { fadeOut(tween(180)) },
-        popEnterTransition = { fadeIn(tween(180)) },
-        popExitTransition = { fadeOut(tween(180)) }
+        enterTransition = { fadeIn(MiniMusicMotion.fastEffects()) },
+        exitTransition = { fadeOut(MiniMusicMotion.fastEffects()) },
+        popEnterTransition = { fadeIn(MiniMusicMotion.fastEffects()) },
+        popExitTransition = { fadeOut(MiniMusicMotion.fastEffects()) }
     ) {
 
         composable(Routes.LIBRARY) {

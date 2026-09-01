@@ -54,6 +54,10 @@ object MiniMusicMotion {
     fun <T> fastSpatial(): FiniteAnimationSpec<T> =
         spring(dampingRatio = 0.90f, stiffness = 1400f)
 
+    /** Used by the player/miniplayer sheet so it settles quickly without rubber-band overshoot. */
+    fun <T> sheetSpatial(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = 1f, stiffness = 900f)
+
     fun <T> defaultSpatial(): FiniteAnimationSpec<T> =
         spring(dampingRatio = 0.90f, stiffness = 700f)
 

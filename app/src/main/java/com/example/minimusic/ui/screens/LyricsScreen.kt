@@ -157,17 +157,11 @@ fun LyricsScreen(
         // instead of exposing a transient blank/home frame.
         enter = androidx.compose.animation.slideInVertically(
             initialOffsetY = { it },
-            animationSpec = tween(
-                durationMillis = MiniMusicMotion.sheetDurationMillis,
-                easing = GramophoneMotionEasing
-            )
+            animationSpec = MiniMusicMotion.sheetSpatial()
         ),
         exit = androidx.compose.animation.slideOutVertically(
             targetOffsetY = { it },
-            animationSpec = tween(
-                durationMillis = MiniMusicMotion.sheetDurationMillis,
-                easing = GramophoneMotionEasing
-            )
+            animationSpec = MiniMusicMotion.sheetSpatial()
         ),
         modifier = Modifier.fillMaxSize()
     ) {
