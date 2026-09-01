@@ -64,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
@@ -123,6 +125,7 @@ private val LibraryDrawerShape = RoundedCornerShape(
     topStart = 28.dp, topEnd = 28.dp, bottomStart = 0.dp, bottomEnd = 0.dp
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     uiState: LibraryUiState,
@@ -235,9 +238,12 @@ fun LibraryScreen(
                 }
             }
 
-            TextField(
-                value = uiState.searchQuery,
-                onValueChange = onSearchQueryChange,
+            SearchBar(
+                query = uiState.searchQuery,
+                onQueryChange = onSearchQueryChange,
+                onSearch = {},
+                active = false,
+                onActiveChange = {},
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
@@ -256,12 +262,12 @@ fun LibraryScreen(
                         }
                     }
                 },
-                singleLine = true,
                 shape = MaterialTheme.shapes.extraLarge,
-                colors = TextFieldDefaults.colors(
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent
-                )
+                colors = androidx.compose.material3.SearchBarDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    dividerColor = Color.Transparent
+                ),
+                content = {}
             )
 
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
