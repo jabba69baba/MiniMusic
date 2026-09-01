@@ -65,6 +65,9 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SearchBar
+import androidx.compose.material3.MultiChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -358,58 +361,72 @@ fun LibraryScreen(
                         // selector, so they shouldn't carry the same
                         // saturated accent tone.
                         Box {
-                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                PillButton(
-                                    onClick = {
+                            MultiChoiceSegmentedButtonRow(
+                                modifier = Modifier
+                                    .width(ControlSegmentWidth * 3 + 4.dp)
+                                    .height(PillButtonHeight),
+                                space = (-2).dp
+                            ) {
+                                SegmentedButton(
+                                    checked = false,
+                                    onCheckedChange = {
                                         stopSongScrollRequest++
                                         jumpToCurrentRequest++
                                     },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.First,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.MyLocation,
-                                        contentDescription = "Jump to current song",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                PillButton(
-                                    onClick = {
+                                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                                    colors = SegmentedButtonDefaults.colors(
+                                        inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    icon = {
+                                        Icon(
+                                            Icons.Filled.MyLocation,
+                                            contentDescription = "Jump to current song",
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    },
+                                    label = {}
+                                )
+                                SegmentedButton(
+                                    checked = false,
+                                    onCheckedChange = {
                                         stopSongScrollRequest++
                                         if (filteredSongs.isNotEmpty()) {
                                             val startSong = filteredSongs.random()
                                             onShufflePlayFrom(startSong, filteredSongs)
                                         }
                                     },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Middle,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Shuffle,
-                                        contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                PillButton(
-                                    onClick = { sortMenuExpanded = true },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Last,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Sort,
-                                        contentDescription = "Sort songs",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                                    colors = SegmentedButtonDefaults.colors(
+                                        inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    icon = {
+                                        Icon(
+                                            Icons.Filled.Shuffle,
+                                            contentDescription = "Shuffle",
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    },
+                                    label = {}
+                                )
+                                SegmentedButton(
+                                    checked = false,
+                                    onCheckedChange = { sortMenuExpanded = true },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                                    colors = SegmentedButtonDefaults.colors(
+                                        inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    icon = {
+                                        Icon(
+                                            Icons.Filled.Sort,
+                                            contentDescription = "Sort songs",
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    },
+                                    label = {}
+                                )
                             }
                             SortMenu(
                                 expanded = sortMenuExpanded,

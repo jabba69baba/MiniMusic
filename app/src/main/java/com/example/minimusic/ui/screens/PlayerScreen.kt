@@ -122,7 +122,6 @@ import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.lerpTo
 import com.example.minimusic.ui.theme.rememberArtColorRoles
-import com.example.minimusic.ui.theme.expressiveBlobShape
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -692,7 +691,7 @@ private fun NowPlayingPanel(
     val artworkBlock: @Composable (Modifier) -> Unit = { modifier ->
         Box(
             modifier = modifier
-                .clip(if (isLandscape) ArtCornerShape else expressiveBlobShape())
+                .clip(ArtCornerShape)
                 .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
