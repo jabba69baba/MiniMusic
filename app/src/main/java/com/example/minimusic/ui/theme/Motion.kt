@@ -2,7 +2,6 @@ package com.example.minimusic.ui.theme
 
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 
@@ -50,15 +49,23 @@ object MiniMusicMotion {
             easing = FastOutSlowInEasing
         )
 
+    // Canonical M3E-style motion roles. These are presentation-only and do not
+    // own playback, queue, or navigation state.
     fun <T> fastSpatial(): FiniteAnimationSpec<T> =
-        spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        )
+        spring(dampingRatio = 0.90f, stiffness = 1400f)
 
     fun <T> defaultSpatial(): FiniteAnimationSpec<T> =
-        spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        )
+        spring(dampingRatio = 0.90f, stiffness = 700f)
+
+    fun <T> slowSpatial(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = 0.90f, stiffness = 400f)
+
+    fun <T> fastEffectsSpring(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = 0.90f, stiffness = 1400f)
+
+    fun <T> defaultEffectsSpring(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = 0.90f, stiffness = 700f)
+
+    fun <T> slowEffectsSpring(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = 0.90f, stiffness = 400f)
 }

@@ -18,3 +18,9 @@ val MiniMusicShapes = Shapes(
  *  so it looks correct at any size. Used for the mini player, capsule controls,
  *  floating nav bars, and anywhere else a fully-rounded pill is needed. */
 val PillShape = RoundedCornerShape(percent = 50)
+
+// Expressive shape tiers are additive; existing Material 3 shape roles remain
+// unchanged so current player and queue geometry is preserved.
+val LargeIncreasedShape = RoundedCornerShape(20.dp)
+val ExtraLargeIncreasedShape = RoundedCornerShape(32.dp)
+val ExtraExtraLargeShape = RoundedCornerShape(48.dp)

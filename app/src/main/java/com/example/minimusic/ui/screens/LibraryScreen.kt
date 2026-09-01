@@ -64,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.Composable
@@ -167,6 +169,7 @@ fun LibraryScreen(
     // and on a successful result, retry the same delete (which then succeeds).
     var pendingRetrySong by remember { mutableStateOf<Song?>(null) }
     val currentOnRetryDelete = rememberUpdatedState(onRetryDelete)
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val deletePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -187,8 +190,13 @@ fun LibraryScreen(
                         IntentSenderRequest.Builder(event.intentSender).build()
                     )
                 }
-                is LibraryEvent.SongDeleted, is LibraryEvent.DeleteFailed -> {
+                is LibraryEvent.SongDeleted -> {
                     pendingRetrySong = null
+                    snackbarHostState.showSnackbar("Deleted ${event.song.title}")
+                }
+                is LibraryEvent.DeleteFailed -> {
+                    pendingRetrySong = null
+                    snackbarHostState.showSnackbar(event.message)
                 }
             }
         }
@@ -444,8 +452,12 @@ fun LibraryScreen(
                 }
             }
         }
-
-
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = footerHeight + 12.dp)
+        )
     }
 }
 

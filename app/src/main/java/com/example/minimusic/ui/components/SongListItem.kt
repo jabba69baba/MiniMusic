@@ -1,6 +1,5 @@
 package com.example.minimusic.ui.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,12 +56,12 @@ fun SongListItem(
     val contentColor = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
     var menuExpanded by remember { mutableStateOf(false) }
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(18.dp),
         color = containerColor,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 5.dp)
-            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = 2.dp),
