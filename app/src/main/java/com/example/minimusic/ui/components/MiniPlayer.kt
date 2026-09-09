@@ -11,7 +11,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -49,9 +49,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.minimusic.data.model.Song
+import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
+import kotlinx.coroutines.flow.StateFlow
 
 /** Corner shape for the mini player bar — rounded on top to match the app's
  *  Material Expressive shape scale, but square on the bottom two corners so
@@ -80,16 +81,20 @@ val MiniPlayerReservedHeight = 68.dp
  */
 @Composable
 fun MiniPlayer(
-    song: Song?,
-    isPlaying: Boolean,
-    positionMs: Long,
-    durationMs: Long,
+    playbackFlow: StateFlow<PlaybackUiState>,
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onClick: () -> Unit,
     onSwipeToPlayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Collected here so the position ticker recomposes only this bar — never
+    // the library list it floats above.
+    val playbackState by playbackFlow.collectAsState()
+    val song = playbackState.currentSong
+    val isPlaying = playbackState.isPlaying
+    val positionMs = playbackState.positionMs
+    val durationMs = playbackState.durationMs
     val progress by remember(positionMs, durationMs) {
         derivedStateOf {
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
@@ -122,13 +127,14 @@ fun MiniPlayer(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
+                    // Eighth-width nudge: fast spatial. Alpha halves: effects.
                     (slideInHorizontally(
                         initialOffsetX = { it / 8 },
-                        animationSpec = MiniMusicMotion.trackChangeEffects()
-                    ) + fadeIn(animationSpec = MiniMusicMotion.trackChangeEffects())) togetherWith
+                        animationSpec = MiniMusicMotion.fastSpatial()
+                    ) + fadeIn(animationSpec = MiniMusicMotion.defaultEffects())) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { -it / 8 },
-                            animationSpec = MiniMusicMotion.trackChangeEffects()
+                            animationSpec = MiniMusicMotion.fastSpatial()
                         ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()))
                 },
                 modifier = Modifier.weight(1f),
@@ -148,14 +154,7 @@ fun MiniPlayer(
                             fontWeight = FontWeight.Normal,
                             color = artColors.onSurface,
                             maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.basicMarquee(
-                                iterations = Int.MAX_VALUE,
-                                initialDelayMillis = 1_000,
-                                repeatDelayMillis = 1_400,
-                                velocity = 24.dp
-                            )
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = displayedSong?.artist ?: "Tap a song to listen",

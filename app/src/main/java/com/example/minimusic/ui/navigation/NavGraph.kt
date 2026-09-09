@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
@@ -45,6 +46,8 @@ import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private object Routes {
     const val LIBRARY = "library"
@@ -68,7 +71,12 @@ fun MiniMusicNavGraph(
     navController: NavHostController = rememberNavController()
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
-    val playbackState by playerViewModel.uiState.collectAsState()
+    // Sliced so the 20 Hz position ticker never recomposes this graph: only an
+    // actual track change flows down. Player/MiniPlayer/Lyrics collect the full
+    // playback flow themselves, scoped to their own subtrees.
+    val currentSong by remember(playerViewModel) {
+        playerViewModel.uiState.map { it.currentSong }.distinctUntilChanged()
+    }.collectAsState(initial = null)
 
     val queueSnapshot by playerViewModel.queueSnapshot.collectAsState()
     val lyricsState by playerViewModel.lyricsState.collectAsState()
@@ -94,7 +102,7 @@ fun MiniMusicNavGraph(
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
         val isLandscape = maxWidth > maxHeight && maxHeight >= 320.dp
-        val hasActiveSong = playbackState.currentSong != null
+        val hasActiveSong = currentSong != null
         val collapsedOffsetPx = (fullHeightPx - miniPlayerHeightPx).coerceAtLeast(0f)
         val sheetDragState = rememberDraggableState { delta -> sheetState.dragBy(delta) }
         val sheetDragModifier = androidx.compose.ui.Modifier.draggable(
@@ -154,7 +162,7 @@ fun MiniMusicNavGraph(
         // library instead of exposing a stale frame while the back stack changes.
         LibraryScreen(
             uiState = libraryState,
-            playbackState = playbackState,
+            currentSongId = currentSong?.id,
             events = libraryViewModel.events,
             onSearchQueryChange = libraryViewModel::onSearchQueryChange,
             onSortOrderChange = libraryViewModel::onSortOrderChange,
@@ -237,7 +245,7 @@ fun MiniMusicNavGraph(
             FilteredSongsScreen(
                 title = songs.firstOrNull()?.album ?: "Album",
                 songs = songs,
-                currentSongId = playbackState.currentSong?.id,
+                currentSongId = currentSong?.id,
                 onBack = { navController.popBackStack() },
                 onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
                 onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
@@ -254,7 +262,7 @@ fun MiniMusicNavGraph(
             FilteredSongsScreen(
                 title = artistName,
                 songs = songs,
-                currentSongId = playbackState.currentSong?.id,
+                currentSongId = currentSong?.id,
                 onBack = { navController.popBackStack() },
                 onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
                 onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
@@ -284,7 +292,7 @@ fun MiniMusicNavGraph(
                         .zIndex(4f)
                 ) {
                     LyricsScreen(
-                        playbackState = playbackState,
+                        playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
                         onSeekTo = playerViewModel::seekTo,
                         onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
@@ -292,7 +300,7 @@ fun MiniMusicNavGraph(
                 }
             } else {
                 LyricsScreen(
-                    playbackState = playbackState,
+                    playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
                     onSeekTo = playerViewModel::seekTo,
                     onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
@@ -325,7 +333,7 @@ fun MiniMusicNavGraph(
                     )
             ) {
                 PlayerScreen(
-                    playbackState = playbackState,
+                    playbackFlow = playerViewModel.uiState,
                     queueSnapshot = queueSnapshot,
                     showAudioQualityBadge = appSettings.showAudioQualityBadge,
                     centeredTitle = appSettings.centeredTitle,
@@ -372,10 +380,7 @@ fun MiniMusicNavGraph(
                     .then(if (hasActiveSong && !queueDrawerOpen) sheetDragModifier else androidx.compose.ui.Modifier)
             ) {
                 MiniPlayer(
-                    song = playbackState.currentSong,
-                    isPlaying = playbackState.isPlaying,
-                    positionMs = playbackState.positionMs,
-                    durationMs = playbackState.durationMs,
+                    playbackFlow = playerViewModel.uiState,
                     onTogglePlayPause = playerViewModel::togglePlayPause,
                     onSkipNext = playerViewModel::skipToNext,
                     onClick = ::openPlayerWithSheetTransition,

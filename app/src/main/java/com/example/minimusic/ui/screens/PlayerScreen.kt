@@ -9,14 +9,11 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +73,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -125,10 +123,7 @@ import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
@@ -153,12 +148,6 @@ private val ContentSectionGap = 16.dp
 
 /** Gap from the seekbar to the timer/audio-quality row. */
 private val SeekbarToTimeGap = 6.dp
-
-/** Shared duration for coordinated artwork and metadata transitions. */
-private const val TrackTransitionDurationMillis = 480
-
-/** Short delay while the incoming audio metadata settles before its badge appears. */
-private const val QualityBadgeDelayMillis = 140L
 
 /** Restored control-to-control spacing requested for the lower PlayerScreen. */
 private val ControlSectionGap = 20.dp
@@ -188,7 +177,7 @@ private val SleepTimerPresetsMinutes = listOf(5, 10, 15, 20, 30, 45, 60)
  */
 @Composable
 fun PlayerScreen(
-    playbackState: PlaybackUiState,
+    playbackFlow: StateFlow<PlaybackUiState>,
     queueSnapshot: QueueSnapshot,
     showAudioQualityBadge: Boolean = true,
     centeredTitle: Boolean = false,
@@ -211,6 +200,9 @@ fun PlayerScreen(
     onCancelSleepTimer: () -> Unit = {},
     onQueueOpenChange: (Boolean) -> Unit = {}
 ) {
+    // Collected here (not in NavGraph) so the 20 Hz position ticker recomposes
+    // only this screen — never the library list underneath it.
+    val playbackState by playbackFlow.collectAsState()
     val song = playbackState.currentSong
     if (song == null) {
         Box(
@@ -629,42 +621,30 @@ private fun NowPlayingPanel(
     val badgeAlpha = remember { Animatable(0f) }
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
+    var lastQueueIndex by remember { mutableStateOf(playbackState.currentIndex) }
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
-        badgeReady = false
-        badgeAlpha.snapTo(0f)
-
-        coroutineScope {
-            val formatJob = async(Dispatchers.IO) {
-                readAudioFormatInfo(context, song.contentUri)
-            }
-            val artworkJob = async(Dispatchers.IO) {
-                val artworkUri = song.albumArtUri
-                if (artworkUri != null) {
-                    val request = ImageRequest.Builder(context)
-                        .data(artworkUri)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .build()
-                    context.imageLoader.execute(request)
-                }
-            }
-
-            if (latestSong.id == song.id) {
-                // Artwork is released to the carousel independently of the badge,
-                // so metadata extraction cannot delay the visual track switch.
-                artworkJob.await()
-                if (latestSong.id == song.id) {
-                    displayedArtworkSong = song
-                }
-            } else {
-                artworkJob.cancel()
-            }
-
-            formatInfo = formatJob.await()
+        // Auto-advance, skip-back, and shuffle jumps set the carousel direction
+        // from the real queue movement; taps override it before seeking.
+        transitionDirection = if (playbackState.currentIndex >= lastQueueIndex) 1 else -1
+        lastQueueIndex = playbackState.currentIndex
+        // Swap immediately — never gate the visual switch on image decoding or
+        // metadata reads. The spatial spring makes the swap itself the motion.
+        displayedArtworkSong = song
+        // Warm the memory cache without blocking; AsyncImage crossfades on load.
+        song.albumArtUri?.let { uri ->
+            context.imageLoader.enqueue(
+                ImageRequest.Builder(context)
+                    .data(uri)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .build()
+            )
         }
 
-        delay(QualityBadgeDelayMillis)
+        badgeReady = false
+        badgeAlpha.snapTo(0f)
+        formatInfo = readAudioFormatInfo(context, song.contentUri)
         if (latestSong.id == song.id) {
             badgeReady = true
             badgeAlpha.animateTo(
@@ -700,15 +680,17 @@ private fun NowPlayingPanel(
                 targetState = displayedArtworkSong,
                 transitionSpec = {
                     val direction = transitionDirection
+                    // Spatial spring for the positional swap, effects springs for
+                    // the alpha halves — never one tween for both (M3E rule).
                     (slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = MiniMusicMotion.trackChangeEffects()
+                        animationSpec = MiniMusicMotion.defaultSpatial()
                     ) + fadeIn(
-                        animationSpec = MiniMusicMotion.trackChangeEffects()
+                        animationSpec = MiniMusicMotion.defaultEffects()
                     )) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = MiniMusicMotion.trackChangeEffects()
+                            animationSpec = MiniMusicMotion.defaultSpatial()
                         ) + fadeOut(
                             animationSpec = MiniMusicMotion.trackChangeExitEffects()
                         ))
@@ -724,8 +706,17 @@ private fun NowPlayingPanel(
                         tint = artColors.onPrimaryContainer
                     )
                 } else {
+                    // Bitmap fades in via an effects crossfade once decoded; the
+                    // carousel swap itself is animated by the spatial spring.
+                    val artLoadRequest = remember(displayedSong.albumArtUri) {
+                        ImageRequest.Builder(context)
+                            .data(displayedSong.albumArtUri)
+                            .crossfade(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .build()
+                    }
                     AsyncImage(
-                        model = displayedSong.albumArtUri,
+                        model = artLoadRequest,
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxSize()
@@ -743,15 +734,17 @@ private fun NowPlayingPanel(
                 targetState = song,
                 transitionSpec = {
                     val direction = transitionDirection
+                    // Eighth-width nudges are small-component movement: fast
+                    // spatial. Alpha halves stay on effects springs.
                     (slideInHorizontally(
                         initialOffsetX = { width -> direction * (width / 8) },
-                        animationSpec = MiniMusicMotion.trackChangeEffects()
+                        animationSpec = MiniMusicMotion.fastSpatial()
                     ) + fadeIn(
-                        animationSpec = MiniMusicMotion.trackChangeEffects()
+                        animationSpec = MiniMusicMotion.defaultEffects()
                     )) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { width -> -direction * (width / 8) },
-                            animationSpec = MiniMusicMotion.trackChangeEffects()
+                            animationSpec = MiniMusicMotion.fastSpatial()
                         ) + fadeOut(
                             animationSpec = MiniMusicMotion.trackChangeExitEffects()
                         ))
@@ -770,16 +763,8 @@ private fun NowPlayingPanel(
                         color = artColors.onBackground,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .basicMarquee(
-                            iterations = Int.MAX_VALUE,
-                            initialDelayMillis = 1_000,
-                            repeatDelayMillis = 1_400,
-                            velocity = 24.dp
-                        )
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Text(
@@ -1065,9 +1050,11 @@ private fun animateArtColorRoles(target: ArtColorRoles): ArtColorRoles {
         fromRoles = fromRoles.lerpTo(toRoles, progress.value)
         toRoles = target
         progress.snapTo(0f)
+        // One critically-damped effects spring drives the whole roles lerp —
+        // color must never overshoot (M3E effects rule).
         progress.animateTo(
             targetValue = 1f,
-            animationSpec = MiniMusicMotion.trackChangeEffects()
+            animationSpec = MiniMusicMotion.defaultEffects()
         )
     }
 

@@ -2,7 +2,9 @@ package com.example.minimusic.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -68,7 +70,13 @@ private val DarkColors = darkColorScheme(
  * Monet roles; older devices use the complete warm-neutral fallback above.
  * Every screen receives the same primary/secondary/tertiary and surface-role
  * contract, while the player may add its album-art accent locally.
+ *
+ * The motion scheme is the official expressive physics scheme
+ * ([MotionScheme.expressive]): spatial springs may overshoot, effects springs
+ * (color/alpha) never do. All M3 components and [MiniMusicMotion] custom
+ * motion derive from these tokens.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MiniMusicTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -104,6 +112,7 @@ fun MiniMusicTheme(
 
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
         shapes = MiniMusicShapes,
         typography = MiniMusicTypography,
         content = content

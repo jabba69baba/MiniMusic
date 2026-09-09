@@ -16,8 +16,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
@@ -367,7 +365,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     LaunchedEffect(isOpen, panelHeight) {
         offsetY.animateTo(
             if (isOpen) 0f else closedOffset.value,
-            animationSpec = tween(280, easing = FastOutSlowInEasing)
+            animationSpec = MiniMusicMotion.defaultSpatial()
         )
         if (isOpen) openRequest++
     }
@@ -414,7 +412,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                                 scope.launch {
                                     offsetY.animateTo(
                                         if (shouldOpen) 0f else closedOffset.value,
-                                        animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                        animationSpec = MiniMusicMotion.defaultSpatial()
                                     )
                                 }
                                 onOpenChange(shouldOpen)
@@ -530,7 +528,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
 
     LaunchedEffect(isOpen, fullHeightPx) {
         val target = if (isOpen) openOffsetPx else closedOffsetPx
-        offsetY.animateTo(target, animationSpec = tween(280, easing = FastOutSlowInEasing))
+        offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
         if (isOpen) openRequest++
     }
 
@@ -573,7 +571,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 scope.launch {
                                     offsetY.animateTo(
                                         target,
-                                        animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                        animationSpec = MiniMusicMotion.defaultSpatial()
                                     )
                                 }
                                 onOpenChange(shouldOpen)
@@ -693,7 +691,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                             scope.launch {
                                 offsetY.animateTo(
                                     if (shouldClose) closedOffsetPx else openOffsetPx,
-                                    animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                    animationSpec = MiniMusicMotion.defaultSpatial()
                                 )
                             }
                             if (shouldClose) onOpenChange(false)

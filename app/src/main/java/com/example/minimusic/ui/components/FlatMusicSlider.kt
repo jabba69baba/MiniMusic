@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.example.minimusic.ui.theme.MiniMusicMotion
 import kotlin.math.max
 
 /**
@@ -70,9 +69,10 @@ fun FlatMusicSlider(
             lastTransitionKey = transitionKey
             isTrackResetting = true
             resetFraction.snapTo(startFraction)
+            // New-track reset is a small follower sweep: fast effects spring.
             resetFraction.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = 480, easing = LinearEasing)
+                animationSpec = MiniMusicMotion.fastEffects()
             )
             isTrackResetting = false
             lastStableFraction = 0f

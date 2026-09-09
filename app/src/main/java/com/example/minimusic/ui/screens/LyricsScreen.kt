@@ -3,9 +3,7 @@ package com.example.minimusic.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -29,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +50,7 @@ import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LyricsState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -66,8 +66,6 @@ private val LrcTimestampRegex = Regex(
 
 private const val READING_BAND_FRACTION = 0.36f
 private const val LYRIC_TARGET_TOLERANCE_PX = 2
-private const val SCROLL_ANIMATION_DURATION_MS = 520
-private val GramophoneMotionEasing = CubicBezierEasing(0.4f, 0.2f, 0f, 1f)
 
 private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
     return text.lines()
@@ -99,11 +97,13 @@ private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
 
 @Composable
 fun LyricsScreen(
-    playbackState: PlaybackUiState,
+    playbackFlow: StateFlow<PlaybackUiState>,
     lyricsState: LyricsState,
     onSeekTo: (Long) -> Unit,
     onBack: () -> Unit
 ) {
+    // Collected here so the position ticker recomposes only this screen.
+    val playbackState by playbackFlow.collectAsState()
     var isExiting by remember { mutableStateOf(false) }
     val exitScope = rememberCoroutineScope()
     BackHandler(enabled = !isExiting) {
@@ -222,6 +222,8 @@ fun LyricsScreen(
                         LaunchedEffect(activeIndex, hasTimedLines, readingBandPx) {
                             scrollJob?.cancel()
                             if (!hasTimedLines || activeIndex < 0) return@LaunchedEffect
+                            // Direct manipulation wins: never fight the user's finger.
+                            if (listState.isScrollInProgress) return@LaunchedEffect
 
                             val targetLineIndex = activeIndex + 1 // account for the top spacer
                             val bandCenter = listState.layoutInfo.viewportStartOffset + readingBandPx
@@ -242,12 +244,10 @@ fun LyricsScreen(
                                 val delta = measuredLineCenter - bandCenter
 
                                 if (abs(delta) > LYRIC_TARGET_TOLERANCE_PX) {
+                                    // Positional travel: default spatial spring.
                                     listState.animateScrollBy(
                                         value = delta.toFloat(),
-                                        animationSpec = tween(
-                                            durationMillis = SCROLL_ANIMATION_DURATION_MS,
-                                            easing = GramophoneMotionEasing
-                                        )
+                                        animationSpec = MiniMusicMotion.defaultSpatial()
                                     )
                                 }
 
@@ -298,20 +298,16 @@ fun LyricsScreen(
                                     )
                                 } else {
                                     val isActive = index == activeIndex
+                                    // Color and scale are effects: fast, critically-damped,
+                                    // never overshooting (M3E effects rule).
                                     val color by animateColorAsState(
                                         targetValue = if (isActive) activeColor else inactiveColor,
-                                        animationSpec = tween(
-                                            durationMillis = SCROLL_ANIMATION_DURATION_MS,
-                                            easing = GramophoneMotionEasing
-                                        ),
+                                        animationSpec = MiniMusicMotion.fastEffects(),
                                         label = "lyricsLineColor"
                                     )
                                     val emphasis by animateFloatAsState(
                                         targetValue = if (isActive) 1.015f else 1f,
-                                        animationSpec = tween(
-                                            durationMillis = SCROLL_ANIMATION_DURATION_MS,
-                                            easing = GramophoneMotionEasing
-                                        ),
+                                        animationSpec = MiniMusicMotion.fastEffects(),
                                         label = "lyricsLineEmphasis"
                                     )
                                     Text(

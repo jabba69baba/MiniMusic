@@ -69,7 +69,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     // Material 3, including the Expressive APIs (MaterialExpressiveTheme, expressive shapes/typography)
-    implementation("androidx.compose.material3:material3:1.5.0-alpha20")
+    // 1.5.0-alpha27: official M3E physics motion system (MotionScheme) confirmed in this version.
+    implementation("androidx.compose.material3:material3:1.5.0-alpha27")
     implementation("com.google.android.material:material:1.14.0")
     implementation("androidx.compose.material:material-icons-extended")
 

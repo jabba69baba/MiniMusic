@@ -94,7 +94,6 @@ import androidx.compose.ui.unit.dp
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
 import com.example.minimusic.data.model.Song
-import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.components.AlbumGridItem
 import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
@@ -129,7 +128,7 @@ private val LibraryDrawerShape = RoundedCornerShape(
 @Composable
 fun LibraryScreen(
     uiState: LibraryUiState,
-    playbackState: PlaybackUiState,
+    currentSongId: Long?,
     events: SharedFlow<LibraryEvent>,
     onSearchQueryChange: (String) -> Unit,
     onSortOrderChange: (SongSortOrder) -> Unit,
@@ -431,7 +430,7 @@ fun LibraryScreen(
                             else -> when (selectedTab) {
                                 LibraryTab.SONGS -> SongsTab(
                                     songs = filteredSongs,
-                                    currentSongId = playbackState.currentSong?.id,
+                                    currentSongId = currentSongId,
                                     jumpToCurrentRequest = jumpToCurrentRequest,
                                     stopScrollRequest = stopSongScrollRequest,
                                     bottomContentPadding = footerHeight,
