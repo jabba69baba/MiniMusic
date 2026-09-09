@@ -2,7 +2,7 @@ name: Build MiniMusic APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, m3e-expressive-rollout ]
   workflow_dispatch:
 
 jobs:
