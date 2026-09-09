@@ -95,6 +95,31 @@ class MainActivity : ComponentActivity() {
                         contract = ActivityResultContracts.RequestPermission()
                     ) { granted -> hasPermission = granted }
 
+                    // Android 13+ needs an explicit runtime grant for the
+                    // playback notification declared in the manifest.
+                    // Without this the foreground-service notification is silent.
+                    var hasNotificationPermission by remember {
+                        mutableStateOf(
+                            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                                ContextCompat.checkSelfPermission(
+                                    this,
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                ) == PackageManager.PERMISSION_GRANTED
+                        )
+                    }
+                    val notificationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.RequestPermission()
+                    ) { granted -> hasNotificationPermission = granted }
+
+                    LaunchedEffect(hasPermission) {
+                        if (hasPermission &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            !hasNotificationPermission
+                        ) {
+                            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
                     LaunchedEffect(Unit) {
                         playerViewModel.connect()
                     }

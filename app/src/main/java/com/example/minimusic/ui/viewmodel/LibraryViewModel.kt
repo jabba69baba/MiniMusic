@@ -169,6 +169,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun songsForAlbum(albumId: Long): List<Song> =
         _uiState.value.allSongs.filter { it.albumId == albumId }
+            .sortedWith(compareBy<Song> { it.trackNumber.takeIf { n -> n > 0 } ?: Int.MAX_VALUE }.thenBy { it.title.lowercase() })
 
     fun songsForArtist(artistName: String): List<Song> =
         _uiState.value.allSongs.filter { it.artist == artistName }

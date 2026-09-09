@@ -50,10 +50,6 @@ class PlayerController(private val context: Context) {
         MusicService.ACTION_APPLY_SHUFFLE_ORDER,
         Bundle()
     )
-    private val alphabeticalSongComparator = compareBy<Song> {
-        it.title.trim().lowercase()
-    }.thenBy { it.artist.trim().lowercase() }
-        .thenBy { it.id }
     private var positionTicker: Job? = null
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
@@ -105,15 +101,10 @@ class PlayerController(private val context: Context) {
         val c = controller ?: return
         if (songs.isEmpty()) return
 
-        val selectedId = songs.getOrNull(startIndex)?.id
-        val orderedSongs = songs.sortedWith(alphabeticalSongComparator)
-        val selectedIndex = selectedId?.let { id ->
-            orderedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
-        }
-        // Keep the physical queue alphabetical. The selected item is the
-        // starting point, so playback proceeds from it through Z and ends;
-        // rows before it remain available as visible history-style entries.
-        val queueSongs = orderedSongs
+        // Preserve the caller's order (album track order, user's chosen sort).
+        // Re-sorting here broke album playback and discarded the Songs-tab sort.
+        val safeIndex = startIndex.coerceIn(0, songs.lastIndex)
+        val queueSongs = songs
 
         currentQueueEntries = queueSongs.map { song ->
             QueueEntry(entryId = nextQueueEntryId++, song = song)
@@ -126,7 +117,7 @@ class PlayerController(private val context: Context) {
         val mediaItems = currentQueueEntries.map { entry ->
             entry.song.toMediaItem(mediaId = entry.entryId.toString())
         }
-        c.setMediaItems(mediaItems, selectedIndex ?: 0, 0L)
+        c.setMediaItems(mediaItems, safeIndex, 0L)
         c.prepare()
         c.play()
     }
@@ -135,12 +126,10 @@ class PlayerController(private val context: Context) {
     fun startShufflePlayback(songs: List<Song>, startIndex: Int) {
         val c = controller ?: return
         if (songs.isEmpty()) return
-        val selectedId = songs.getOrNull(startIndex)?.id
-        val orderedSongs = songs.sortedWith(alphabeticalSongComparator)
-        val orderedStartIndex = selectedId?.let { id ->
-            orderedSongs.indexOfFirst { it.id == id }.takeIf { it >= 0 }
-        } ?: 0
-        val newEntries = orderedSongs.map { song ->
+        // Keep caller order as the base; native shuffle randomizes traversal.
+        // Sorting here only destroyed album/sort order for no benefit.
+        val safeIndex = startIndex.coerceIn(0, songs.lastIndex)
+        val newEntries = songs.map { song ->
             QueueEntry(entryId = nextQueueEntryId++, song = song)
         }
         val mediaItems = newEntries.map { entry ->
@@ -153,7 +142,7 @@ class PlayerController(private val context: Context) {
             manualQueueOrderEntryIds = null
             shuffleActive = true
             pendingSeekPositionMs = null
-            c.setMediaItems(mediaItems, orderedStartIndex, 0L)
+            c.setMediaItems(mediaItems, safeIndex, 0L)
             c.shuffleModeEnabled = true
             c.prepare()
             c.play()
@@ -202,12 +191,11 @@ class PlayerController(private val context: Context) {
     }
 
     fun playFromQueue(index: Int) {
-        val entry = currentQueueEntries
-            .getOrNull(_uiState.value.queue.getOrNull(index)?.let { song ->
-                currentQueueEntries.indexOfFirst { it.song.id == song.id }
-            } ?: -1)
+        // Resolve by entryId via the visible order, not by song.id.
+        // Matching by song.id collapsed duplicates to the first occurrence.
+        val entryId = _queueSnapshot.value.visibleEntries.getOrNull(index)?.entryId
             ?: return
-        playQueueEntry(entry.entryId)
+        playQueueEntry(entryId)
     }
 
     fun playQueueEntry(entryId: Long) {
