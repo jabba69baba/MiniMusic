@@ -51,6 +51,14 @@ private val artworkSeedCache = LinkedHashMap<Uri, Color>()
 private const val ARTWORK_SEED_CACHE_MAX_SIZE = 64
 
 /**
+ * Last resolved seed, used as the next track's starting point. Without this,
+ * every track change would flash the wallpaper fallback first and then snap
+ * to the real art color mid-settle — a visible color stomp. Handing off from
+ * the previous seed makes cross-track color a continuous glide instead.
+ */
+private var lastResolvedSeed: Color? = null
+
+/**
  * Extracts one local album-art seed. The seed is only an input to Material's
  * Tonal Spot scheme; no raw vibrant swatch is ever painted directly into UI.
  */
@@ -59,7 +67,7 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
     val context = LocalContext.current
     val fallback = MaterialTheme.colorScheme.primary
     val seed by produceState(
-        initialValue = artworkSeedCache[albumArtUri] ?: fallback,
+        initialValue = artworkSeedCache[albumArtUri] ?: lastResolvedSeed ?: fallback,
         key1 = albumArtUri,
         key2 = fallback
     ) {
@@ -108,6 +116,7 @@ private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
         swatch?.let {
             val resolved = normalizeArtworkSeed(Color(it.rgb))
             value = resolved
+            lastResolvedSeed = resolved
             artworkSeedCache[albumArtUri] = resolved
             if (artworkSeedCache.size > ARTWORK_SEED_CACHE_MAX_SIZE) {
                 artworkSeedCache.remove(artworkSeedCache.keys.first())

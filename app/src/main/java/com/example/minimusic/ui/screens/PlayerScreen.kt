@@ -11,6 +11,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -227,14 +229,21 @@ fun PlayerScreen(
     val view = LocalView.current
 
     val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
+    // Window attributes are system calls: only re-apply when the resolved
+    // colors actually change, never on every position-tick recomposition.
+    var lastAppliedBars by remember { mutableStateOf<Pair<Color, Color>?>(null) }
     SideEffect {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val controller = WindowCompat.getInsetsController(window, view)
-            window.statusBarColor = artColors.background.toArgb()
-            window.navigationBarColor = visibleNavigationSurface.toArgb()
-            controller.isAppearanceLightStatusBars = artColors.background.luminance() > 0.52f
-            controller.isAppearanceLightNavigationBars = visibleNavigationSurface.luminance() > 0.52f
+        val barsKey = artColors.background to visibleNavigationSurface
+        if (lastAppliedBars != barsKey) {
+            lastAppliedBars = barsKey
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                window.statusBarColor = artColors.background.toArgb()
+                window.navigationBarColor = visibleNavigationSurface.toArgb()
+                controller.isAppearanceLightStatusBars = artColors.background.luminance() > 0.52f
+                controller.isAppearanceLightNavigationBars = visibleNavigationSurface.luminance() > 0.52f
+            }
         }
     }
 
@@ -679,20 +688,22 @@ private fun NowPlayingPanel(
                 modifier = Modifier.fillMaxSize(),
                 targetState = displayedArtworkSong,
                 transitionSpec = {
-                    val direction = transitionDirection
-                    // Spatial spring for the positional swap, effects springs for
-                    // the alpha halves — never one tween for both (M3E rule).
-                    (slideInHorizontally(
-                        initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = MiniMusicMotion.defaultSpatial()
-                    ) + fadeIn(
+                    // Fade-through (official M3E pattern for content swaps): a
+                    // sliding full-bleed frame exposes an empty slot while the
+                    // incoming bitmap is still decoding, which reads as a pop.
+                    // Alpha halves stay on effects springs; the gentle scale is
+                    // small-component spatial movement.
+                    (fadeIn(
                         animationSpec = MiniMusicMotion.defaultEffects()
+                    ) + scaleIn(
+                        initialScale = 0.96f,
+                        animationSpec = MiniMusicMotion.fastSpatial()
                     )) togetherWith
-                        (slideOutHorizontally(
-                            targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = MiniMusicMotion.defaultSpatial()
-                        ) + fadeOut(
+                        (fadeOut(
                             animationSpec = MiniMusicMotion.trackChangeExitEffects()
+                        ) + scaleOut(
+                            targetScale = 0.96f,
+                            animationSpec = MiniMusicMotion.fastSpatial()
                         ))
                 },
                 contentKey = { it.id },

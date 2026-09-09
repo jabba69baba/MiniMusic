@@ -35,7 +35,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -168,24 +167,23 @@ fun MiniPlayer(
                 }
             }
 
-            // Play/pause control with a circular progress ring. The ring uses
-            // the same 44dp footprint as the next control so the mini-player
-            // remains optically symmetrical.
-            key(song?.id ?: -1L) {
-                val animatedProgress by animateFloatAsState(
-                    targetValue = progress,
-                    animationSpec = tween(durationMillis = 220, easing = LinearEasing),
-                    label = "miniPlayerCircularProgress"
-                )
-                CircularProgressPlayButton(
-                    progress = animatedProgress,
-                    enabled = song != null,
-                    isPlaying = isPlaying,
-                    progressColor = progressRingColor,
-                    controlTint = controlTint,
-                    onClick = onTogglePlayPause
-                )
-            }
+            // Play/pause control with a circular progress ring. No key() around
+            // the track change: remounting snaps the ring and pops the icon.
+            // The progress spring retargets interruptibly instead (M3E rule),
+            // so a switch reads as a quick rewind sweep, never a stomp.
+            val animatedProgress by animateFloatAsState(
+                targetValue = progress,
+                animationSpec = tween(durationMillis = 220, easing = LinearEasing),
+                label = "miniPlayerCircularProgress"
+            )
+            CircularProgressPlayButton(
+                progress = animatedProgress,
+                enabled = song != null,
+                isPlaying = isPlaying,
+                progressColor = progressRingColor,
+                controlTint = controlTint,
+                onClick = onTogglePlayPause
+            )
             // Skip next: plain icon, no background, right-aligned next to play/pause.
             Box(
                 modifier = Modifier

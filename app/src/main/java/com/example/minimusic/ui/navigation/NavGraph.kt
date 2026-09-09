@@ -20,6 +20,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -310,9 +311,30 @@ fun MiniMusicNavGraph(
     }
 
 
-        if (hasActiveSong &&
-            (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS || sheetState.progress > 0.001f)
-        ) {
+        // Read the sheet progress through derived state: drag/settle frames must
+        // not recompose this whole graph (library list included) — only the
+        // boolean handoffs below may trigger composition. The translationY
+        // itself stays in graphicsLayer (layout phase, no recomposition).
+        val playerSheetVisible by remember(sheetState, hasActiveSong, currentRoute) {
+            derivedStateOf {
+                hasActiveSong &&
+                    (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS ||
+                        sheetState.progress > 0.001f)
+            }
+        }
+        val playerSheetInteractive by remember(sheetState, currentRoute, queueDrawerOpen) {
+            derivedStateOf {
+                currentRoute != Routes.LYRICS && sheetState.progress > 0.001f && !queueDrawerOpen
+            }
+        }
+        val miniPlayerVisible by remember(sheetState, currentRoute) {
+            derivedStateOf {
+                currentRoute != Routes.LYRICS &&
+                    (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
+            }
+        }
+
+        if (playerSheetVisible) {
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxSize()
@@ -325,7 +347,7 @@ fun MiniMusicNavGraph(
                     // Keep the player surface beneath Lyrics, but above the stable Home base.
                     .zIndex(2f)
                     .then(
-                        if (currentRoute != Routes.LYRICS && sheetState.progress > 0.001f && !queueDrawerOpen) {
+                        if (playerSheetInteractive) {
                             sheetDragModifier
                         } else {
                             androidx.compose.ui.Modifier
@@ -362,9 +384,7 @@ fun MiniMusicNavGraph(
             }
         }
 
-        if (currentRoute != Routes.LYRICS &&
-            (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
-        ) {
+        if (miniPlayerVisible) {
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .align(Alignment.BottomCenter)

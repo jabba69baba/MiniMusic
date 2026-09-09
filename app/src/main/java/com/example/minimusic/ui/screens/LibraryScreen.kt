@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,7 +34,9 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -90,6 +93,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
@@ -507,7 +511,6 @@ private fun SongsTab(
     val scrollScope = rememberCoroutineScope()
     val context = LocalContext.current
     var locateJob by remember { mutableStateOf<Job?>(null) }
-    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(songs) { it.title }
 
     LaunchedEffect(songs) {
@@ -530,7 +533,6 @@ private fun SongsTab(
     LaunchedEffect(stopScrollRequest) {
         if (stopScrollRequest == 0) return@LaunchedEffect
         locateJob?.cancel()
-        fastScrollJob?.cancel()
         listState.scroll(MutatePriority.PreventUserInput) {}
     }
 
@@ -541,7 +543,6 @@ private fun SongsTab(
             // Locate cancels any active fling/fast-scroll before moving to the
             // target, preventing old velocity from carrying into the new position.
             locateJob?.cancel()
-            fastScrollJob?.cancel()
             locateJob = scrollScope.launch {
                 listState.scroll(MutatePriority.PreventUserInput) {}
                 listState.animateScrollToItem(index = index, scrollOffset = 0)
@@ -577,25 +578,13 @@ private fun SongsTab(
             }
         }
 
-        AlphabetScrollbar(
+        // Reads scroll position inside its own subtree: scrubbing the list no
+        // longer recomposes every row on each visible-index change.
+        SongsScrollbarOverlay(
+            listState = listState,
             itemCount = songs.size,
-            currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
-            onScrollToIndex = { index ->
-                // Do not queue one jump per pointer event. Only the newest
-                // target is relevant while the finger is on the scrollbar.
-                fastScrollJob?.cancel()
-                fastScrollJob = scrollScope.launch {
-                    listState.scrollToItem(index = index, scrollOffset = 0)
-                }
-            },
-            // The top remains aligned with the first song container. The bottom
-            // Keep the same 3dp visual inset at both ends: the top is 8dp
-            // versus the first card's 5dp, so the bottom is shortened by 3dp.
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding + 12.dp)
+            bottomContentPadding = bottomContentPadding
         )
     }
 }
@@ -607,8 +596,6 @@ private fun AlbumsTab(
     onAlbumClick: (Album) -> Unit
 ) {
     val gridState = rememberLazyGridState()
-    val scrollScope = rememberCoroutineScope()
-    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(albums) { it.title }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -627,20 +614,11 @@ private fun AlbumsTab(
             }
         }
 
-        AlphabetScrollbar(
+        AlbumsScrollbarOverlay(
+            gridState = gridState,
             itemCount = albums.size,
-            currentIndex = gridState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
-            onScrollToIndex = { index ->
-                fastScrollJob?.cancel()
-                fastScrollJob = scrollScope.launch {
-                    gridState.scrollToItem(index = index, scrollOffset = 0)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(top = 12.dp, bottom = bottomContentPadding + 12.dp)
+            bottomContentPadding = bottomContentPadding
         )
     }
 }
@@ -652,8 +630,6 @@ private fun ArtistsTab(
     onArtistClick: (Artist) -> Unit
 ) {
     val listState = rememberLazyListState()
-    val scrollScope = rememberCoroutineScope()
-    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(artists) { it.name }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -670,22 +646,102 @@ private fun ArtistsTab(
             }
         }
 
-        AlphabetScrollbar(
+        ArtistsScrollbarOverlay(
+            listState = listState,
             itemCount = artists.size,
-            currentIndex = listState.firstVisibleItemIndex,
             letterForIndex = letterForIndex,
-            onScrollToIndex = { index ->
-                fastScrollJob?.cancel()
-                fastScrollJob = scrollScope.launch {
-                    listState.scrollToItem(index = index, scrollOffset = 0)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(top = 8.dp, bottom = bottomContentPadding)
+            bottomContentPadding = bottomContentPadding
         )
     }
+}
+
+/**
+ * Scrollbar overlays read the list/grid scroll position inside their own
+ * subtree. Scrubbing the list therefore recomposes only the thumb and its
+ * letter bubble — never the rows — which keeps fast flings smooth even in
+ * very large libraries.
+ */
+@Composable
+private fun BoxScope.SongsScrollbarOverlay(
+    listState: LazyListState,
+    itemCount: Int,
+    letterForIndex: (Int) -> Char?,
+    bottomContentPadding: Dp
+) {
+    val scrollScope = rememberCoroutineScope()
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+    AlphabetScrollbar(
+        itemCount = itemCount,
+        currentIndex = listState.firstVisibleItemIndex,
+        letterForIndex = letterForIndex,
+        onScrollToIndex = { index ->
+            // Do not queue one jump per pointer event. Only the newest
+            // target is relevant while the finger is on the scrollbar.
+            fastScrollJob?.cancel()
+            fastScrollJob = scrollScope.launch {
+                listState.scrollToItem(index = index, scrollOffset = 0)
+            }
+        },
+        // The top remains aligned with the first song container. The bottom
+        // Keep the same 3dp visual inset at both ends: the top is 8dp
+        // versus the first card's 5dp, so the bottom is shortened by 3dp.
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .fillMaxHeight()
+            .padding(top = 8.dp, bottom = bottomContentPadding + 12.dp)
+    )
+}
+
+@Composable
+private fun BoxScope.AlbumsScrollbarOverlay(
+    gridState: LazyGridState,
+    itemCount: Int,
+    letterForIndex: (Int) -> Char?,
+    bottomContentPadding: Dp
+) {
+    val scrollScope = rememberCoroutineScope()
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+    AlphabetScrollbar(
+        itemCount = itemCount,
+        currentIndex = gridState.firstVisibleItemIndex,
+        letterForIndex = letterForIndex,
+        onScrollToIndex = { index ->
+            fastScrollJob?.cancel()
+            fastScrollJob = scrollScope.launch {
+                gridState.scrollToItem(index = index, scrollOffset = 0)
+            }
+        },
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .fillMaxHeight()
+            .padding(top = 12.dp, bottom = bottomContentPadding + 12.dp)
+    )
+}
+
+@Composable
+private fun BoxScope.ArtistsScrollbarOverlay(
+    listState: LazyListState,
+    itemCount: Int,
+    letterForIndex: (Int) -> Char?,
+    bottomContentPadding: Dp
+) {
+    val scrollScope = rememberCoroutineScope()
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+    AlphabetScrollbar(
+        itemCount = itemCount,
+        currentIndex = listState.firstVisibleItemIndex,
+        letterForIndex = letterForIndex,
+        onScrollToIndex = { index ->
+            fastScrollJob?.cancel()
+            fastScrollJob = scrollScope.launch {
+                listState.scrollToItem(index = index, scrollOffset = 0)
+            }
+        },
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .fillMaxHeight()
+            .padding(top = 8.dp, bottom = bottomContentPadding)
+    )
 }
 
 /** Fixed height shared by every [PillButton] segment across both control
