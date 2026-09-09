@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.screens
 
 import android.app.Activity
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import android.content.Context
 import androidx.compose.animation.AnimatedContent
@@ -11,8 +12,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -114,6 +113,7 @@ import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.playback.RepeatMode
+import com.example.minimusic.ui.components.AlbumArtImage
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.LandscapeQueueContent
 import com.example.minimusic.ui.components.QueueDrawer
@@ -631,6 +631,11 @@ private fun NowPlayingPanel(
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
     var lastQueueIndex by remember { mutableStateOf(playbackState.currentIndex) }
+    // Art rendered behind the incoming frame during the carousel slide, so the
+    // travel never exposes an empty slot while the new bitmap decodes. Resolved
+    // from the previously-playing song; null when unknown or identical.
+    var stackArtUri by remember { mutableStateOf<Uri?>(null) }
+    var lastSongId by remember { mutableStateOf<Long?>(null) }
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
@@ -638,6 +643,12 @@ private fun NowPlayingPanel(
         // from the real queue movement; taps override it before seeking.
         transitionDirection = if (playbackState.currentIndex >= lastQueueIndex) 1 else -1
         lastQueueIndex = playbackState.currentIndex
+        // Snapshot the outgoing art before replacing the id below. It was on
+        // screen a frame ago, so it resolves from the memory cache instantly.
+        stackArtUri = lastSongId?.let { prevId ->
+            playbackState.queue.firstOrNull { it.id == prevId }?.albumArtUri
+        }.takeIf { it != null && it != song.albumArtUri }
+        lastSongId = song.id
         // Swap immediately — never gate the visual switch on image decoding or
         // metadata reads. The spatial spring makes the swap itself the motion.
         displayedArtworkSong = song
@@ -688,22 +699,23 @@ private fun NowPlayingPanel(
                 modifier = Modifier.fillMaxSize(),
                 targetState = displayedArtworkSong,
                 transitionSpec = {
-                    // Fade-through (official M3E pattern for content swaps): a
-                    // sliding full-bleed frame exposes an empty slot while the
-                    // incoming bitmap is still decoding, which reads as a pop.
-                    // Alpha halves stay on effects springs; the gentle scale is
-                    // small-component spatial movement.
-                    (fadeIn(
+                    val direction = transitionDirection
+                    // Shared-axis carousel: spatial spring for the positional
+                    // travel, effects springs for the alpha halves. The
+                    // incoming frame always carries the previous art behind
+                    // the new bitmap (see stackArtUri), so the slide never
+                    // exposes an empty slot while decoding.
+                    (slideInHorizontally(
+                        initialOffsetX = { fullWidth -> direction * fullWidth },
+                        animationSpec = MiniMusicMotion.defaultSpatial()
+                    ) + fadeIn(
                         animationSpec = MiniMusicMotion.defaultEffects()
-                    ) + scaleIn(
-                        initialScale = 0.96f,
-                        animationSpec = MiniMusicMotion.fastSpatial()
                     )) togetherWith
-                        (fadeOut(
+                        (slideOutHorizontally(
+                            targetOffsetX = { fullWidth -> -direction * fullWidth },
+                            animationSpec = MiniMusicMotion.defaultSpatial()
+                        ) + fadeOut(
                             animationSpec = MiniMusicMotion.trackChangeExitEffects()
-                        ) + scaleOut(
-                            targetScale = 0.96f,
-                            animationSpec = MiniMusicMotion.fastSpatial()
                         ))
                 },
                 contentKey = { it.id },
@@ -719,6 +731,8 @@ private fun NowPlayingPanel(
                 } else {
                     // Bitmap fades in via an effects crossfade once decoded; the
                     // carousel swap itself is animated by the spatial spring.
+                    // The previous art sits behind (memory-cached, instant), so
+                    // the slide travels over artwork, never an empty slot.
                     val artLoadRequest = remember(displayedSong.albumArtUri) {
                         ImageRequest.Builder(context)
                             .data(displayedSong.albumArtUri)
@@ -726,14 +740,25 @@ private fun NowPlayingPanel(
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build()
                     }
-                    AsyncImage(
-                        model = artLoadRequest,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(ArtCornerShape),
-                        contentScale = ContentScale.Crop
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        stackArtUri?.let { behind ->
+                            AlbumArtImage(
+                                model = behind,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                shape = ArtCornerShape,
+                                crossfadeMillis = 0
+                            )
+                        }
+                        AsyncImage(
+                            model = artLoadRequest,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(ArtCornerShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
             }
         }

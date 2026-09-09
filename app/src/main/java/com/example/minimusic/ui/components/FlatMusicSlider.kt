@@ -67,14 +67,21 @@ fun FlatMusicSlider(
         if (transitionKey != lastTransitionKey) {
             val startFraction = lastStableFraction.coerceIn(0f, 1f)
             lastTransitionKey = transitionKey
+            // Tape-rewind sweep back to zero. Default effects spring: slow
+            // enough to read as a rewind (~1/4s), critically damped so it
+            // lands without overshoot — never a rubberband snap. The finally
+            // matters: a second skip mid-sweep cancels this block, and the
+            // flag must still release or the bar would freeze mid-track.
             isTrackResetting = true
-            resetFraction.snapTo(startFraction)
-            // New-track reset is a small follower sweep: fast effects spring.
-            resetFraction.animateTo(
-                targetValue = 0f,
-                animationSpec = MiniMusicMotion.fastEffects()
-            )
-            isTrackResetting = false
+            try {
+                resetFraction.snapTo(startFraction)
+                resetFraction.animateTo(
+                    targetValue = 0f,
+                    animationSpec = MiniMusicMotion.defaultEffects()
+                )
+            } finally {
+                isTrackResetting = false
+            }
             lastStableFraction = 0f
         }
     }
