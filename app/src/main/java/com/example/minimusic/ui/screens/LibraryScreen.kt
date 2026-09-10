@@ -41,7 +41,6 @@ import androidx.compose.foundation.lazy.animateItem
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.animateItem
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
@@ -636,12 +635,8 @@ private fun AlbumsTab(
                 bottom = bottomContentPadding + 12.dp
             )
         ) {
-            gridItems(albums, key = { it.id }, contentType = { "album-grid-item" }) { album ->
-                AlbumGridItem(
-                    album = album,
-                    onClick = { onAlbumClick(album) },
-                    modifier = Modifier.animateItem()
-                )
+            gridItems(albums, key = { it.id }) { album ->
+                AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
             }
         }
 
