@@ -1,6 +1,8 @@
 package com.example.minimusic.ui.screens
 
 import android.app.Activity
+import android.content.Context
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -113,6 +115,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.Job
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
@@ -545,7 +548,24 @@ private fun SongsTab(
             locateJob?.cancel()
             locateJob = scrollScope.launch {
                 listState.scroll(MutatePriority.PreventUserInput) {}
-                listState.animateScrollToItem(index = index, scrollOffset = 0)
+                // Warm the target window FIRST: rows must land with art ready,
+                // not cold-decode it after arrival.
+                preloadArtWindow(context, songs.size, index, ArtPreloadRadius, RowArtSizePx) {
+                    songs.getOrNull(it)?.albumArtUri
+                }
+                val distance = abs(index - listState.firstVisibleItemIndex)
+                if (distance > LocateAnimateThreshold) {
+                    // Jump to just outside the target, then glide the final
+                    // stretch. A full-distance animateScrollToItem composes and
+                    // art-loads every intermediate row — the sustained loading
+                    // lag felt after shuffle-then-locate across a big library.
+                    val staged = (index + if (index > listState.firstVisibleItemIndex) -LocateGlideTail else LocateGlideTail)
+                        .coerceIn(0, songs.size - 1)
+                    listState.scrollToItem(index = staged, scrollOffset = 0)
+                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         }
     }
@@ -579,12 +599,14 @@ private fun SongsTab(
         }
 
         // Reads scroll position inside its own subtree: scrubbing the list no
-        // longer recomposes every row on each visible-index change.
+        // longer recomposes every row on each visible-index change. The landing
+        // window's art is warmed before each jump (same 96px key the rows use).
         SongsScrollbarOverlay(
             listState = listState,
             itemCount = songs.size,
             letterForIndex = letterForIndex,
-            bottomContentPadding = bottomContentPadding
+            bottomContentPadding = bottomContentPadding,
+            artUriAt = { songs.getOrNull(it)?.albumArtUri }
         )
     }
 }
@@ -609,7 +631,7 @@ private fun AlbumsTab(
                 bottom = bottomContentPadding + 12.dp
             )
         ) {
-            gridItems(albums, key = { it.id }) { album ->
+            gridItems(albums, key = { it.id }, contentType = { "album-grid-item" }) { album ->
                 AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
             }
         }
@@ -618,7 +640,8 @@ private fun AlbumsTab(
             gridState = gridState,
             itemCount = albums.size,
             letterForIndex = letterForIndex,
-            bottomContentPadding = bottomContentPadding
+            bottomContentPadding = bottomContentPadding,
+            artUriAt = { albums.getOrNull(it)?.albumArtUri }
         )
     }
 }
@@ -655,6 +678,54 @@ private fun ArtistsTab(
     }
 }
 
+/** Beyond this row distance, locate jumps instead of animating the whole flight. */
+private const val LocateAnimateThreshold = 40
+/** Rows covered by the closing glide after a long-distance locate jump. */
+private const val LocateGlideTail = 20
+/** Artwork warmup radius around a locate target. */
+private const val ArtPreloadRadius = 16
+/** Artwork warmup radius around a scrollbar landing (fires per pointer event). */
+private const val ScrubPreloadRadius = 12
+/** Must match the row/grid art request sizes or the warmup misses the cache. */
+private const val RowArtSizePx = 96
+private const val GridArtSizePx = 512
+
+/**
+ * Enqueues Coil memory-cache warmups for the artwork window around [center]
+ * before a programmatic jump lands there. Scrubbing and long-distance locate
+ * otherwise cold-decode a full window of MediaStore thumbnails on arrival,
+ * which is the stutter users feel as "loading lag" — the scrollbar thumb
+ * itself stays smooth while the rows hitch behind it.
+ */
+private fun preloadArtWindow(
+    context: Context,
+    itemCount: Int,
+    center: Int,
+    radius: Int,
+    sizePx: Int,
+    uriAt: (Int) -> Uri?
+) {
+    if (itemCount <= 0) return
+    val from = (center - radius).coerceAtLeast(0)
+    val to = (center + radius).coerceAtMost(itemCount - 1)
+    if (from > to) return
+    // Distinct and bounded: scrub gestures fire this per pointer event, so the
+    // enqueue burst stays small even mid-fling.
+    val seen = HashSet<Uri>(radius * 2 + 1)
+    for (i in from..to) {
+        val uri = uriAt(i) ?: continue
+        if (!seen.add(uri)) continue
+        context.imageLoader.enqueue(
+            ImageRequest.Builder(context)
+                .data(uri)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .size(sizePx)
+                .build()
+        )
+    }
+}
+
 /**
  * Scrollbar overlays read the list/grid scroll position inside their own
  * subtree. Scrubbing the list therefore recomposes only the thumb and its
@@ -666,9 +737,11 @@ private fun BoxScope.SongsScrollbarOverlay(
     listState: LazyListState,
     itemCount: Int,
     letterForIndex: (Int) -> Char?,
-    bottomContentPadding: Dp
+    bottomContentPadding: Dp,
+    artUriAt: (Int) -> Uri? = { null }
 ) {
     val scrollScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     AlphabetScrollbar(
         itemCount = itemCount,
@@ -679,6 +752,10 @@ private fun BoxScope.SongsScrollbarOverlay(
             // target is relevant while the finger is on the scrollbar.
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
+                // Warm the landing window before jumping: scrubbing through
+                // unseen territory otherwise cold-decodes a full window of
+                // MediaStore thumbnails per pointer event.
+                preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, RowArtSizePx, artUriAt)
                 listState.scrollToItem(index = index, scrollOffset = 0)
             }
         },
@@ -697,9 +774,11 @@ private fun BoxScope.AlbumsScrollbarOverlay(
     gridState: LazyGridState,
     itemCount: Int,
     letterForIndex: (Int) -> Char?,
-    bottomContentPadding: Dp
+    bottomContentPadding: Dp,
+    artUriAt: (Int) -> Uri? = { null }
 ) {
     val scrollScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     AlphabetScrollbar(
         itemCount = itemCount,
@@ -708,6 +787,7 @@ private fun BoxScope.AlbumsScrollbarOverlay(
         onScrollToIndex = { index ->
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
+                preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, GridArtSizePx, artUriAt)
                 gridState.scrollToItem(index = index, scrollOffset = 0)
             }
         },
