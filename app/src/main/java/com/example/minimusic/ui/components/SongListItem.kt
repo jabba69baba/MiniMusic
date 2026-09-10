@@ -46,7 +46,8 @@ fun SongListItem(
     onAddToQueue: (Song) -> Unit = {},
     onShufflePlayFrom: (Song) -> Unit = {},
     onDelete: (Song) -> Unit = {},
-    onOpenDetails: (Song) -> Unit = {}
+    onOpenDetails: (Song) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val containerColor = if (isPlaying) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
@@ -59,7 +60,7 @@ fun SongListItem(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
         color = containerColor,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
@@ -74,7 +75,9 @@ fun SongListItem(
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 iconSize = 26.dp,
-                crossfadeMillis = 0,
+                // Short crossfade on the effects clock: rows land pre-warmed,
+                // so this only softens the rare cold load instead of flashing.
+                crossfadeMillis = 120,
                 requestSizePx = 96
             )
 

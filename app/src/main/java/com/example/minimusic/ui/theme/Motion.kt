@@ -1,6 +1,8 @@
 package com.example.minimusic.ui.theme
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 
 /**
@@ -71,6 +73,30 @@ object MiniMusicMotion {
     /** `md.sys.motion.spring.slow.spatial` — full-screen positional movement. */
     fun <T> slowSpatial(): FiniteAnimationSpec<T> =
         spring(dampingRatio = 0.8f, stiffness = 200f)
+
+    /**
+     * Carousel programmatic travel: critically-damped, no overshoot. A
+     * documented exception to the "spatial may overshoot" rule — full-bleed
+     * art frames pay per-frame measure/clip through the whole settle tail, so
+     * a bouncy default spatial reads as lag on track switches. Same reasoning
+     * as PixelPlayer's carousel, reimplemented on our tokens.
+     */
+    fun <T> carouselSpatial(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+
+    // Screen transitions use emphasized *tweens*, not springs: M3 container
+    // motion is easing-based while springs stay reserved for components.
+    // Cubic values are the M3 motion spec's emphasized curves, cross-checked
+    // against the material-components-android toolkit (emphasized standard +
+    // accelerate; decelerate is the spec's canonical mirror).
+    /** Emphasized easing for elements entering the screen (decelerate). */
+    val navEnterEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+    /** Emphasized easing for elements leaving the screen (accelerate). */
+    val navExitEasing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+
+    /** Screen-transition duration at 1x animator scale. */
+    const val navTransitionDurationMillis = 400
 
     fun <T> fastEffectsSpring(): FiniteAnimationSpec<T> = fastEffects()
 

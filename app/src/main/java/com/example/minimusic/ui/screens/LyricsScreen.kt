@@ -298,17 +298,37 @@ fun LyricsScreen(
                                     )
                                 } else {
                                     val isActive = index == activeIndex
-                                    // Color and scale are effects: fast, critically-damped,
-                                    // never overshooting (M3E effects rule).
+                                    // Fisheye emphasis by distance from the active line:
+                                    // the current line grows and brightens while
+                                    // neighbors step down in scale and alpha. Color and
+                                    // alpha are effects (critically-damped, never
+                                    // overshoot per the M3E effects rule); scale is
+                                    // spatial, so it rides a fast spatial spring.
+                                    // Everything stays in graphicsLayer — no reflow,
+                                    // no recomposition of neighboring lines.
+                                    val distance = abs(index - activeIndex)
                                     val color by animateColorAsState(
                                         targetValue = if (isActive) activeColor else inactiveColor,
                                         animationSpec = MiniMusicMotion.fastEffects(),
                                         label = "lyricsLineColor"
                                     )
-                                    val emphasis by animateFloatAsState(
-                                        targetValue = if (isActive) 1.015f else 1f,
-                                        animationSpec = MiniMusicMotion.fastEffects(),
-                                        label = "lyricsLineEmphasis"
+                                    val lineScale by animateFloatAsState(
+                                        targetValue = when {
+                                            isActive -> 1.06f
+                                            distance == 1 -> 1f
+                                            else -> 0.94f
+                                        },
+                                        animationSpec = MiniMusicMotion.fastSpatial(),
+                                        label = "lyricsLineScale"
+                                    )
+                                    val lineAlpha by animateFloatAsState(
+                                        targetValue = when {
+                                            isActive -> 1f
+                                            distance == 1 -> 0.6f
+                                            else -> 0.42f
+                                        },
+                                        animationSpec = MiniMusicMotion.defaultEffects(),
+                                        label = "lyricsLineAlpha"
                                     )
                                     Text(
                                         text = line.text,
@@ -325,8 +345,9 @@ fun LyricsScreen(
                                                 line.startMs?.let(onSeekTo)
                                             }
                                             .graphicsLayer {
-                                                scaleX = emphasis
-                                                scaleY = emphasis
+                                                scaleX = lineScale
+                                                scaleY = lineScale
+                                                alpha = lineAlpha
                                             }
                                     )
                                 }

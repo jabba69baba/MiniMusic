@@ -37,9 +37,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.animateItem
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.animateItem
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
@@ -593,7 +595,13 @@ private fun SongsTab(
                     onAddToQueue = onAddToQueue,
                     onShufflePlayFrom = onShufflePlayFrom,
                     onDelete = onDelete,
-                    onOpenDetails = onOpenDetails
+                    onOpenDetails = onOpenDetails,
+                    // Reorder glide on sort/search changes: positional travel
+                    // uses the default spatial token. Keys + contentType above
+                    // are the prerequisites; this is the Metrolist pattern.
+                    modifier = Modifier.animateItem(
+                        placementSpec = MiniMusicMotion.defaultSpatial()
+                    )
                 )
             }
         }
@@ -632,7 +640,13 @@ private fun AlbumsTab(
             )
         ) {
             gridItems(albums, key = { it.id }, contentType = { "album-grid-item" }) { album ->
-                AlbumGridItem(album = album, onClick = { onAlbumClick(album) })
+                AlbumGridItem(
+                    album = album,
+                    onClick = { onAlbumClick(album) },
+                    modifier = Modifier.animateItem(
+                        placementSpec = MiniMusicMotion.defaultSpatial()
+                    )
+                )
             }
         }
 
@@ -665,7 +679,13 @@ private fun ArtistsTab(
                 key = { it.name },
                 contentType = { "artist-row" }
             ) { artist ->
-                ArtistListItem(artist = artist, onClick = { onArtistClick(artist) })
+                ArtistListItem(
+                    artist = artist,
+                    onClick = { onArtistClick(artist) },
+                    modifier = Modifier.animateItem(
+                        placementSpec = MiniMusicMotion.defaultSpatial()
+                    )
+                )
             }
         }
 

@@ -35,7 +35,8 @@ fun AlbumGridItem(album: Album, onClick: () -> Unit, modifier: Modifier = Modifi
                 .aspectRatio(1f),
             shape = RoundedCornerShape(20.dp),
             iconSize = 42.dp,
-            crossfadeMillis = 0,
+            // Short crossfade on the effects clock, same reasoning as rows.
+            crossfadeMillis = 120,,
             // Capped decode size: grid cells previously decoded full-size
             // bitmaps per landing, which stalled album scrub. 512px stays
             // sharp in a ~180dp cell and matches the scrollbar warmup key.

@@ -2,6 +2,12 @@ package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -205,10 +211,88 @@ fun MiniMusicNavGraph(
                 }
             )
             .zIndex(3f),
-        enterTransition = { fadeIn(MiniMusicMotion.fastEffects()) },
-        exitTransition = { fadeOut(MiniMusicMotion.fastEffects()) },
-        popEnterTransition = { fadeIn(MiniMusicMotion.fastEffects()) },
-        popExitTransition = { fadeOut(MiniMusicMotion.fastEffects()) }
+        enterTransition = {
+            // Shared-axis push: entering screen slides in half-width with a
+            // slight scale-up on the decelerate curve; alpha trails on the
+            // accelerate curve so the fade never arrives before the slide.
+            slideInHorizontally(
+                initialOffsetX = { (it * 0.5f).toInt() },
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            ) + scaleIn(
+                initialScale = 0.92f,
+                transformOrigin = TransformOrigin(0.5f, 0.5f),
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            ) + fadeIn(
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navExitEasing
+                )
+            )
+        },
+        exitTransition = {
+            // Exiting screen recedes a quarter-width (parallax) and fades in
+            // half the time on the accelerate curve.
+            slideOutHorizontally(
+                targetOffsetX = { -(it * 0.25f).toInt() },
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navExitEasing
+                )
+            ) + fadeOut(
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis / 2,
+                    easing = MiniMusicMotion.navExitEasing
+                )
+            )
+        },
+        popEnterTransition = {
+            slideInHorizontally(
+                initialOffsetX = { -(it * 0.25f).toInt() },
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            ) + scaleIn(
+                initialScale = 0.95f,
+                transformOrigin = TransformOrigin(0.5f, 0.5f),
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            ) + fadeIn(
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis / 2,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            )
+        },
+        popExitTransition = {
+            slideOutHorizontally(
+                targetOffsetX = { (it * 0.5f).toInt() },
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navExitEasing
+                )
+            ) + scaleOut(
+                targetScale = 0.92f,
+                transformOrigin = TransformOrigin(0.5f, 0.5f),
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navExitEasing
+                )
+            ) + fadeOut(
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis / 2,
+                    easing = MiniMusicMotion.navExitEasing
+                )
+            )
+        }
     ) {
 
         composable(Routes.LIBRARY) {

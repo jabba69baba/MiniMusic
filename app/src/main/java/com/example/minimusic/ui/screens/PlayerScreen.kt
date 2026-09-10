@@ -700,20 +700,22 @@ private fun NowPlayingPanel(
                 targetState = displayedArtworkSong,
                 transitionSpec = {
                     val direction = transitionDirection
-                    // Shared-axis carousel: spatial spring for the positional
-                    // travel, effects springs for the alpha halves. The
-                    // incoming frame always carries the previous art behind
-                    // the new bitmap (see stackArtUri), so the slide never
-                    // exposes an empty slot while decoding.
+                    // Shared-axis carousel: the no-bounce carousel token for the
+                    // positional travel (a bouncy spatial pays per-frame
+                    // measure/clip through its settle tail on full-bleed art),
+                    // effects springs for the alpha halves. The incoming frame
+                    // always carries the previous art behind the new bitmap
+                    // (see stackArtUri), so the slide never exposes an empty
+                    // slot while decoding.
                     (slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = MiniMusicMotion.defaultSpatial()
+                        animationSpec = MiniMusicMotion.carouselSpatial()
                     ) + fadeIn(
                         animationSpec = MiniMusicMotion.defaultEffects()
                     )) togetherWith
                         (slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = MiniMusicMotion.defaultSpatial()
+                            animationSpec = MiniMusicMotion.carouselSpatial()
                         ) + fadeOut(
                             animationSpec = MiniMusicMotion.trackChangeExitEffects()
                         ))

@@ -57,6 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
@@ -127,12 +130,35 @@ fun DetailsScreen(
                         modifier = Modifier.size(42.dp)
                     )
                 } else {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = "Album art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+                    // Crossfade on the effects clock so the bitmap arrives
+                    // softly; on decode failure fall back to the note icon
+                    // instead of an empty tile.
+                    val detailsArtRequest = remember(song.albumArtUri) {
+                        ImageRequest.Builder(context)
+                            .data(song.albumArtUri)
+                            .crossfade(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .build()
+                    }
+                    var detailsArtFailed by remember(song.albumArtUri) { mutableStateOf(false) }
+                    if (detailsArtFailed) {
+                        Icon(
+                            Icons.Filled.MusicNote,
+                            contentDescription = null,
+                            tint = artColors.onPrimaryContainer,
+                            modifier = Modifier.size(42.dp)
+                        )
+                    } else {
+                        AsyncImage(
+                            model = detailsArtRequest,
+                            contentDescription = "Album art",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                            onState = { state ->
+                                if (state is AsyncImagePainter.State.Error) detailsArtFailed = true
+                            }
+                        )
+                    }
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
