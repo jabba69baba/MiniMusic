@@ -596,12 +596,9 @@ private fun SongsTab(
                     onShufflePlayFrom = onShufflePlayFrom,
                     onDelete = onDelete,
                     onOpenDetails = onOpenDetails,
-                    // Reorder glide on sort/search changes: positional travel
-                    // uses the default spatial token. Keys + contentType above
-                    // are the prerequisites; this is the Metrolist pattern.
-                    modifier = Modifier.animateItem(
-                        placementSpec = MiniMusicMotion.defaultSpatial()
-                    )
+                    // Reorder glide on sort/search changes (Metrolist pattern:
+                    // stable keys + contentType above, animateItem on the row).
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -643,9 +640,7 @@ private fun AlbumsTab(
                 AlbumGridItem(
                     album = album,
                     onClick = { onAlbumClick(album) },
-                    modifier = Modifier.animateItem(
-                        placementSpec = MiniMusicMotion.defaultSpatial()
-                    )
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -682,9 +677,7 @@ private fun ArtistsTab(
                 ArtistListItem(
                     artist = artist,
                     onClick = { onArtistClick(artist) },
-                    modifier = Modifier.animateItem(
-                        placementSpec = MiniMusicMotion.defaultSpatial()
-                    )
+                    modifier = Modifier.animateItem()
                 )
             }
         }
