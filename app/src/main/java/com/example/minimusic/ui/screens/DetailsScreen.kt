@@ -2,8 +2,6 @@ package com.example.minimusic.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
@@ -130,13 +128,12 @@ fun DetailsScreen(
                         modifier = Modifier.size(42.dp)
                     )
                 } else {
-                    // Crossfade on the effects clock so the bitmap arrives
-                    // softly; on decode failure fall back to the note icon
-                    // instead of an empty tile.
+                    // No bitmap fade: swaps the instant it decodes. On decode
+                    // failure falls back to the note icon, never an empty tile.
                     val detailsArtRequest = remember(song.albumArtUri) {
                         ImageRequest.Builder(context)
                             .data(song.albumArtUri)
-                            .crossfade(true)
+                            .crossfade(false)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build()
                     }
@@ -186,10 +183,10 @@ fun DetailsScreen(
         AnimatedContent(
             targetState = loaded != null,
             transitionSpec = {
-                (fadeIn(animationSpec = MiniMusicMotion.defaultEffects()) +
-                    scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects())) togetherWith
-                    (fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
-                        scaleOut(targetScale = 0.96f, animationSpec = MiniMusicMotion.fastEffects()))
+                // Scale-only appear, no fade: content grows 0.96 -> 1 over
+                // the static loading indicator it replaces.
+                scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects()) togetherWith
+                    scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
             },
             label = "detailsContentTransition"
         ) { hasDetails ->

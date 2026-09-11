@@ -7,8 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
@@ -258,10 +256,10 @@ fun LibraryScreen(
                 trailingIcon = {
                     AnimatedVisibility(
                         visible = uiState.searchQuery.isNotEmpty(),
-                        enter = fadeIn(animationSpec = MiniMusicMotion.fastEffects()) +
-                            scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
-                        exit = fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
-                            scaleOut(targetScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects())
+                        // Scale-only pop, no fade — the clear button grows
+                        // over the static search field.
+                        enter = scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
+                        exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
                     ) {
                         IconButton(onClick = { onSearchQueryChange("") }) {
                             Icon(Icons.Filled.Clear, contentDescription = "Clear search")
@@ -1160,10 +1158,9 @@ private fun SortDirectionOption(
 private fun LoadingState() {
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(animationSpec = MiniMusicMotion.defaultEffects()) +
-            scaleIn(initialScale = 0.94f, animationSpec = MiniMusicMotion.selectionEffects()),
-        exit = fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
-            scaleOut(targetScale = 0.94f, animationSpec = MiniMusicMotion.fastEffects()),
+        // Scale-only appear, no fade.
+        enter = scaleIn(initialScale = 0.94f, animationSpec = MiniMusicMotion.selectionEffects()),
+        exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects()),
         modifier = Modifier.fillMaxSize()
     ) {
         Box(

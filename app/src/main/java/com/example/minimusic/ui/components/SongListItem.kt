@@ -75,9 +75,6 @@ fun SongListItem(
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 iconSize = 26.dp,
-                // Short crossfade on the effects clock: rows land pre-warmed,
-                // so this only softens the rare cold load instead of flashing.
-                crossfadeMillis = 120,
                 requestSizePx = 96
             )
 

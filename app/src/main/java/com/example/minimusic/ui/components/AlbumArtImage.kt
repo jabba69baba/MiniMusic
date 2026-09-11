@@ -34,7 +34,10 @@ fun AlbumArtImage(
     iconSize: Dp = 28.dp,
     contentDescription: String? = null,
     contentScale: ContentScale = ContentScale.Crop,
-    crossfadeMillis: Int = 180,
+    // No bitmap fades anywhere in the app: art swaps the instant it decodes
+    // and motion comes from slides/scales. List rows land pre-warmed, so the
+    // swap is rarely even visible.
+    crossfadeMillis: Int = 0,
     requestSizePx: Int? = null
 ) {
     val context = LocalContext.current

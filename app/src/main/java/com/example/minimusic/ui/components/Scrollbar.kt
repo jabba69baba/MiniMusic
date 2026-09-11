@@ -1,8 +1,6 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
@@ -185,10 +183,9 @@ fun AlphabetScrollbar(
         val bubbleSize = 48.dp
         AnimatedVisibility(
             visible = showBubble,
-            enter = fadeIn(animationSpec = MiniMusicMotion.fastEffects()) +
-                scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
-            exit = fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
-                scaleOut(targetScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
+            // Scale-only pop, no fade — the bubble grows over the track.
+            enter = scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
+            exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects()),
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .offset {

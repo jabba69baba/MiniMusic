@@ -10,8 +10,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -627,7 +625,8 @@ private fun NowPlayingPanel(
     val context = LocalContext.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
     var badgeReady by remember(song.id) { mutableStateOf(false) }
-    val badgeAlpha = remember { Animatable(0f) }
+    // Badge appear is a scale, not a fade: grows 0.8 -> 1 over the static row.
+    val badgeScale = remember { Animatable(0.8f) }
     var displayedArtworkSong by remember { mutableStateOf(song) }
     var transitionDirection by remember { mutableStateOf(1) }
     var lastQueueIndex by remember { mutableStateOf(playbackState.currentIndex) }
@@ -652,7 +651,7 @@ private fun NowPlayingPanel(
         // Swap immediately — never gate the visual switch on image decoding or
         // metadata reads. The spatial spring makes the swap itself the motion.
         displayedArtworkSong = song
-        // Warm the memory cache without blocking; AsyncImage crossfades on load.
+        // Warm the memory cache without blocking; the bitmap swaps in on load.
         song.albumArtUri?.let { uri ->
             context.imageLoader.enqueue(
                 ImageRequest.Builder(context)
@@ -663,13 +662,13 @@ private fun NowPlayingPanel(
         }
 
         badgeReady = false
-        badgeAlpha.snapTo(0f)
+        badgeScale.snapTo(0.8f)
         formatInfo = readAudioFormatInfo(context, song.contentUri)
         if (latestSong.id == song.id) {
             badgeReady = true
-            badgeAlpha.animateTo(
+            badgeScale.animateTo(
                 targetValue = 1f,
-                animationSpec = MiniMusicMotion.trackChangeExitEffects()
+                animationSpec = MiniMusicMotion.fastSpatial()
             )
         }
     }
@@ -700,25 +699,18 @@ private fun NowPlayingPanel(
                 targetState = displayedArtworkSong,
                 transitionSpec = {
                     val direction = transitionDirection
-                    // Shared-axis carousel: the no-bounce carousel token for the
-                    // positional travel (a bouncy spatial pays per-frame
-                    // measure/clip through its settle tail on full-bleed art),
-                    // effects springs for the alpha halves. The incoming frame
-                    // always carries the previous art behind the new bitmap
-                    // (see stackArtUri), so the slide never exposes an empty
-                    // slot while decoding.
-                    (slideInHorizontally(
+                    // Card overlap, no fade anywhere: the incoming frame
+                    // slides over the outgoing one (which holds perfectly
+                    // still) on the no-bounce carousel token. Outgoing uses a
+                    // zero-travel slide as the static hold — AnimatedContent
+                    // needs an exit, but it must not move or fade.
+                    slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
                         animationSpec = MiniMusicMotion.carouselSpatial()
-                    ) + fadeIn(
-                        animationSpec = MiniMusicMotion.defaultEffects()
-                    )) togetherWith
-                        (slideOutHorizontally(
-                            targetOffsetX = { fullWidth -> -direction * fullWidth },
-                            animationSpec = MiniMusicMotion.carouselSpatial()
-                        ) + fadeOut(
-                            animationSpec = MiniMusicMotion.trackChangeExitEffects()
-                        ))
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { 0 },
+                        animationSpec = MiniMusicMotion.carouselSpatial()
+                    )
                 },
                 contentKey = { it.id },
                 label = "albumArtCarouselTransition"
@@ -731,14 +723,14 @@ private fun NowPlayingPanel(
                         tint = artColors.onPrimaryContainer
                     )
                 } else {
-                    // Bitmap fades in via an effects crossfade once decoded; the
-                    // carousel swap itself is animated by the spatial spring.
-                    // The previous art sits behind (memory-cached, instant), so
-                    // the slide travels over artwork, never an empty slot.
+                    // No bitmap fade: the bitmap swaps the instant it decodes
+                    // and the slide itself is the motion. The previous art
+                    // sits behind (memory-cached, instant), so the incoming
+                    // frame always travels over artwork, never an empty slot.
                     val artLoadRequest = remember(displayedSong.albumArtUri) {
                         ImageRequest.Builder(context)
                             .data(displayedSong.albumArtUri)
-                            .crossfade(true)
+                            .crossfade(false)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build()
                     }
@@ -771,14 +763,18 @@ private fun NowPlayingPanel(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    // Fade only, identical both directions: the eighth-width
-                    // positional nudge bounced on skips (spring overshoot on
-                    // text) and drifted out of sync with the art carousel.
-                    // The carousel carries the motion; titles just crossfade.
-                    fadeIn(
-                        animationSpec = MiniMusicMotion.defaultEffects()
-                    ) togetherWith fadeOut(
-                        animationSpec = MiniMusicMotion.trackChangeExitEffects()
+                    // Title overlap, no fade: the incoming title slides a
+                    // quarter-width over the static outgoing one, direction
+                    // aware (next/previous symmetric). No-bounce token, so no
+                    // overshoot wobble on text. The carousel carries the big
+                    // motion; titles just overlap past each other.
+                    val direction = transitionDirection
+                    slideInHorizontally(
+                        initialOffsetX = { width -> direction * (width / 4) },
+                        animationSpec = MiniMusicMotion.carouselSpatial()
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { 0 },
+                        animationSpec = MiniMusicMotion.carouselSpatial()
                     )
                 },
                 contentKey = { it.id },
@@ -849,7 +845,10 @@ private fun NowPlayingPanel(
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = artColors.surfaceVariant,
-                                modifier = Modifier.graphicsLayer { alpha = badgeAlpha.value }
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = badgeScale.value
+                                    scaleY = badgeScale.value
+                                }
                             ) {
                                 Text(
                                     text = badgeText,
@@ -1198,16 +1197,15 @@ private fun PlayPauseButton(
             AnimatedContent(
                 targetState = isPlaying,
                 transitionSpec = {
-                    (androidx.compose.animation.fadeIn(animationSpec = MiniMusicMotion.fastEffects()) +
-                        androidx.compose.animation.scaleIn(
-                            initialScale = 0.72f,
-                            animationSpec = MiniMusicMotion.selectionEffects()
-                        )) togetherWith
-                        (androidx.compose.animation.fadeOut(animationSpec = MiniMusicMotion.fastEffects()) +
-                            androidx.compose.animation.scaleOut(
-                                targetScale = 0.72f,
-                                animationSpec = MiniMusicMotion.fastEffects()
-                            ))
+                    // Scale-only morph, no fade: incoming scales up over the
+                    // static outgoing icon. Small-component spatial motion.
+                    androidx.compose.animation.scaleIn(
+                        initialScale = 0.72f,
+                        animationSpec = MiniMusicMotion.selectionEffects()
+                    ) togetherWith androidx.compose.animation.scaleOut(
+                        targetScale = 1f,
+                        animationSpec = MiniMusicMotion.fastEffects()
+                    )
                 },
                 label = "playPauseMorph"
             ) { playing ->

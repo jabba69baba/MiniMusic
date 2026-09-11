@@ -1,8 +1,8 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,9 +29,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -98,6 +100,14 @@ fun MiniPlayer(
         }
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri)
+    // Title overlap direction follows real queue movement, same as the player
+    // carousel: next slides in from the right, previous from the left.
+    var titleDirection by remember { mutableIntStateOf(1) }
+    var lastMiniIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
+    LaunchedEffect(song?.id) {
+        titleDirection = if (playbackState.currentIndex >= lastMiniIndex) 1 else -1
+        lastMiniIndex = playbackState.currentIndex
+    }
     val miniPlayerColor = artColors.surfaceVariant
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val progressRingColor = readableProgressColor(
@@ -124,11 +134,17 @@ fun MiniPlayer(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    // Fade only, identical both directions — same reasoning as
-                    // the player metadata: no positional bounce on text, the
-                    // art carousel carries the motion.
-                    fadeIn(animationSpec = MiniMusicMotion.defaultEffects()) togetherWith
-                        fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects())
+                    // Title overlap, no fade: incoming slides a quarter-width
+                    // over the static outgoing row, direction aware. No-bounce
+                    // token so text never wobbles.
+                    val direction = titleDirection
+                    slideInHorizontally(
+                        initialOffsetX = { width -> direction * (width / 4) },
+                        animationSpec = MiniMusicMotion.carouselSpatial()
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { 0 },
+                        animationSpec = MiniMusicMotion.carouselSpatial()
+                    )
                 },
                 modifier = Modifier.weight(1f),
                 contentKey = { it?.id ?: -1L },
