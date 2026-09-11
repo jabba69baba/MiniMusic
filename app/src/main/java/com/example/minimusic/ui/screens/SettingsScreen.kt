@@ -184,7 +184,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Crossfade",
-                        subtitle = "Preference saved; Media3 crossfade is not active in the current player service",
+                        subtitle = "Fade out and back in on every track change, using the duration below",
                         checked = settings.crossfadeEnabled,
                         onCheckedChange = onCrossfadeEnabledChange
                     )
@@ -201,7 +201,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Mono Audio",
-                        subtitle = "Preference saved; channel mixing will be wired into playback next",
+                        subtitle = "Downmix stereo to a single channel (takes effect on toggle)",
                         checked = settings.monoAudio,
                         onCheckedChange = onMonoAudioChange
                     )

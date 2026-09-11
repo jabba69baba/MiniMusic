@@ -30,6 +30,7 @@ class MainApplication : Application() {
         musicRepository = MusicRepository(this)
         playerController = PlayerController(this)
         settingsRepository = SettingsRepository(this)
+        playerController.attachSettings(settingsRepository.settings)
         lyricsReader = LyricsReader(this)
     }
 }

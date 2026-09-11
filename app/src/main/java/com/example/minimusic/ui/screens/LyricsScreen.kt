@@ -1,7 +1,8 @@
 package com.example.minimusic.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -49,7 +50,6 @@ import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LyricsState
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -106,13 +106,6 @@ fun LyricsScreen(
     val playbackState by playbackFlow.collectAsState()
     var isExiting by remember { mutableStateOf(false) }
     val exitScope = rememberCoroutineScope()
-    BackHandler(enabled = !isExiting) {
-        isExiting = true
-        exitScope.launch {
-            delay(MiniMusicMotion.sheetDurationMillis.toLong())
-            onBack()
-        }
-    }
 
     val lines = remember(lyricsState) {
         if (lyricsState is LyricsState.Found) parseDisplayLyrics(lyricsState.text) else emptyList()
@@ -150,24 +143,41 @@ fun LyricsScreen(
     val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
     val activeColor = artColors.primary
 
-    AnimatedVisibility(
-        visible = !isExiting,
-        // One owner and one trajectory for both directions. The player remains
-        // composed underneath in NavGraph, so closing reveals it continuously
-        // instead of exposing a transient blank/home frame.
-        enter = androidx.compose.animation.slideInVertically(
-            initialOffsetY = { it },
-            animationSpec = MiniMusicMotion.sheetSpatial()
-        ),
-        exit = androidx.compose.animation.slideOutVertically(
-            targetOffsetY = { it },
-            animationSpec = MiniMusicMotion.sheetSpatial()
-        ),
-        modifier = Modifier.fillMaxSize()
-    ) {
+    // Single motion owner for this card: one vertical offset drives open
+    // (rise) and close (fall) — symmetric, directional, same emphasized clock
+    // as every other card. The NavHost LYRICS transitions are None and there
+    // is no nested AnimatedVisibility: the old triple-drive (route tween +
+    // visibility spring + sheet progress) is what made close fall, stick,
+    // then slide left, and open pop out of nowhere.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val fullHeightPx = with(density) { maxHeight.toPx() }
+        val cardOffsetY = remember(fullHeightPx) { Animatable(fullHeightPx) }
+        LaunchedEffect(fullHeightPx) {
+            cardOffsetY.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            )
+        }
+        BackHandler(enabled = !isExiting) {
+            isExiting = true
+            exitScope.launch {
+                cardOffsetY.animateTo(
+                    targetValue = fullHeightPx,
+                    animationSpec = tween(
+                        MiniMusicMotion.navTransitionDurationMillis,
+                        easing = MiniMusicMotion.navExitEasing
+                    )
+                )
+                onBack()
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { translationY = cardOffsetY.value }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
         ) {
         when (lyricsState) {
@@ -298,26 +308,20 @@ fun LyricsScreen(
                                     )
                                 } else {
                                     val isActive = index == activeIndex
-                                    // Fisheye emphasis by distance from the active line:
-                                    // the current line grows and brightens while
-                                    // neighbors step down in scale. No alpha
-                                    // animation anywhere in the app — emphasis
-                                    // comes from scale (spatial spring) and
-                                    // color only. Everything stays in
-                                    // graphicsLayer — no reflow, no
-                                    // recomposition of neighboring lines.
-                                    val distance = abs(index - activeIndex)
+                                    // Fisheye emphasis lives ONLY on the active line:
+                                    // it grows and brightens while every other
+                                    // line stays identical. No alpha animation
+                                    // anywhere in the app — emphasis comes from
+                                    // scale (spatial spring) and color only.
+                                    // Everything stays in graphicsLayer — no
+                                    // reflow, no recomposition of other lines.
                                     val color by animateColorAsState(
                                         targetValue = if (isActive) activeColor else inactiveColor,
                                         animationSpec = MiniMusicMotion.fastEffects(),
                                         label = "lyricsLineColor"
                                     )
                                     val lineScale by animateFloatAsState(
-                                        targetValue = when {
-                                            isActive -> 1.06f
-                                            distance == 1 -> 1f
-                                            else -> 0.94f
-                                        },
+                                        targetValue = if (isActive) 1.06f else 1f,
                                         animationSpec = MiniMusicMotion.fastSpatial(),
                                         label = "lyricsLineScale"
                                     )

@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
+import com.example.minimusic.data.AppSettings
 import com.example.minimusic.data.model.Song
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +52,18 @@ class PlayerController(private val context: Context) {
         MusicService.ACTION_APPLY_SHUFFLE_ORDER,
         Bundle()
     )
+    private val fadeOutCommand = SessionCommand(MusicService.ACTION_FADE_OUT, Bundle())
+    private val fadeInCommand = SessionCommand(MusicService.ACTION_FADE_IN, Bundle())
+    private val setMonoCommand = SessionCommand(MusicService.ACTION_SET_MONO, Bundle())
+
+    // Crossfade engine state. Fades themselves run service-side (the volume
+    // ramp lives next to the ExoPlayer); this side only decides WHEN.
+    private var crossfadeEnabled = false
+    private var crossfadeSeconds = 5
+    /** Media id already faded out, so the 50ms ticker fires once per track. */
+    private var fadeOutMarker: String? = null
+    private var lastTickPositionMs = 0L
+    private var lastSentMono: Boolean? = null
     private var positionTicker: Job? = null
     private var playbackTransitionToken = 0L
     private var suppressIsPlayingUntilMs = 0L
@@ -75,6 +89,9 @@ class PlayerController(private val context: Context) {
                     controller = future.get().also { it.addListener(playerListener) }
                     startPositionTicker()
                     connecting = false
+                    // Sync the persisted mono state: the service boots stereo,
+                    // so a stored mono=true must rebuild once after connect.
+                    lastSentMono?.let { sendSetMono(it) }
                 } catch (_: Exception) {
                     connecting = false
                     scope.launch {
@@ -94,6 +111,49 @@ class PlayerController(private val context: Context) {
         controller?.removeListener(playerListener)
         controller?.release()
         controller = null
+    }
+
+    /**
+     * Feeds audio settings into the crossfade engine and mono switch. Called
+     * once from [MainApplication]; the shared repository instance must be
+     * passed in (a second DataStore on the same file would corrupt prefs).
+     */
+    fun attachSettings(settings: Flow<AppSettings>) {
+        scope.launch {
+            settings.collect { appSettings ->
+                crossfadeEnabled = appSettings.crossfadeEnabled
+                crossfadeSeconds = appSettings.crossfadeSeconds.coerceIn(2, 10)
+                if (lastSentMono != appSettings.monoAudio) {
+                    lastSentMono = appSettings.monoAudio
+                    sendSetMono(appSettings.monoAudio)
+                }
+            }
+        }
+    }
+
+    private fun fadeWindowMs(): Long = crossfadeSeconds * 1000L
+
+    private fun sendFade(command: SessionCommand, durationMs: Long) {
+        val c = controller ?: return
+        val args = Bundle().apply {
+            putLong(MusicService.EXTRA_FADE_DURATION_MS, durationMs.coerceAtLeast(0L))
+        }
+        try {
+            c.sendCustomCommand(command, args)
+        } catch (_: Exception) {
+            // Session gone mid-fade: the switch itself already happened (or is
+            // about to) via the direct controller call — volume just stays.
+        }
+    }
+
+    private fun sendSetMono(enabled: Boolean) {
+        val c = controller ?: return
+        val args = Bundle().apply { putBoolean(MusicService.EXTRA_MONO_ENABLED, enabled) }
+        try {
+            c.sendCustomCommand(setMonoCommand, args)
+        } catch (_: Exception) {
+            lastSentMono = null // retry on the next settings emission/connect
+        }
     }
 
     /** Loads [songs] as the new queue and starts playback at [startIndex]. */
@@ -157,6 +217,10 @@ class PlayerController(private val context: Context) {
         suppressIsPlayingUntilMs = 0L
         _uiState.value = _uiState.value.copy(isPlaying = shouldPlay)
         if (shouldPlay) c.play() else c.pause()
+        // Resuming always restores full volume instantly: covers pause
+        // mid-fade-out and any other stuck-low state. The service has the same
+        // rule as a catch-all, so this is belt and braces.
+        if (shouldPlay) sendFade(fadeInCommand, 0L)
     }
 
     fun skipToNext() {
@@ -172,6 +236,10 @@ class PlayerController(private val context: Context) {
         val c = controller ?: return
         // Restart the current song if we're more than 3s in, like most players do.
         if (c.currentPosition > 3000L || !c.hasPreviousMediaItem()) {
+            // Same-item restart fires no transition: restore full volume here
+            // or a restart from inside the fade zone would play out quietly.
+            fadeOutMarker = null
+            sendFade(fadeInCommand, 0L)
             c.seekTo(0L)
         } else {
             holdPlaybackStateAcrossTransition()
@@ -187,6 +255,11 @@ class PlayerController(private val context: Context) {
         // position and the seekbar appears to snap backward.
         pendingSeekPositionMs = target
         holdPlaybackStateAcrossTransition()
+        // A seek invalidates any armed auto fade-out and restores full volume
+        // instantly, so seeking back from the fade zone never leaves the track
+        // playing quietly.
+        fadeOutMarker = null
+        sendFade(fadeInCommand, 0L)
         c.seekTo(target)
     }
 
@@ -308,6 +381,7 @@ class PlayerController(private val context: Context) {
     /** Stops playback and empties the active queue without releasing the controller. */
     fun clearQueue() {
         val c = controller ?: return
+        fadeOutMarker = null
         c.stop()
         c.clearMediaItems()
         currentQueueEntries = emptyList()
@@ -442,7 +516,11 @@ class PlayerController(private val context: Context) {
             _uiState.value = _uiState.value.copy(positionMs = 0L)
             holdPlaybackStateAcrossTransition()
             syncQueueFromController()
+            // Every track change — auto-advance, skip, repeat-one restart —
+            // fades the new track in, and re-arms the end-of-track fade-out.
+            fadeOutMarker = null
             if (pauseAfterTransition) controller?.pause()
+            if (crossfadeEnabled) sendFade(fadeInCommand, fadeWindowMs())
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -643,6 +721,24 @@ class PlayerController(private val context: Context) {
                         positionMs = displayPosition,
                         durationMs = c.duration.coerceAtLeast(0L)
                     )
+                    // Auto fade-out: when natural playback (not a seek jump)
+                    // enters the final fade window of a track long enough to
+                    // deserve one, ramp down once. Short tracks only fade in.
+                    if (crossfadeEnabled && c.isPlaying && !c.isCurrentMediaItemDynamic) {
+                        val trackDuration = c.duration.coerceAtLeast(0L)
+                        val fadeWindow = fadeWindowMs()
+                        val mediaId = c.currentMediaItem?.mediaId
+                        if (trackDuration > fadeWindow + 2000L && mediaId != null) {
+                            val remaining = trackDuration - actualPosition
+                            val advancedNaturally =
+                                actualPosition in (lastTickPositionMs + 1)..(lastTickPositionMs + 1500)
+                            if (fadeOutMarker != mediaId && advancedNaturally && remaining in 0..fadeWindow) {
+                                fadeOutMarker = mediaId
+                                sendFade(fadeOutCommand, remaining.coerceAtLeast(300L))
+                            }
+                        }
+                    }
+                    lastTickPositionMs = actualPosition
                 }
                 // Keep lyric highlighting responsive while avoiding a busy loop when paused.
                 delay(if (c?.isPlaying == true) 50L else 250L)

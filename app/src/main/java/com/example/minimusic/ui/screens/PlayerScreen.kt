@@ -76,6 +76,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
@@ -628,8 +629,19 @@ private fun NowPlayingPanel(
     // Badge appear is a scale, not a fade: grows 0.8 -> 1 over the static row.
     val badgeScale = remember { Animatable(0.8f) }
     var displayedArtworkSong by remember { mutableStateOf(song) }
-    var transitionDirection by remember { mutableStateOf(1) }
-    var lastQueueIndex by remember { mutableStateOf(playbackState.currentIndex) }
+    // Carousel direction is derived SYNCHRONOUSLY during composition from the
+    // queue index — never in an effect. Updating it in LaunchedEffect(song.id)
+    // arrived after the transition's first frames, so rapid skips started
+    // sliding the wrong way and overlapping text mixed directions mid-burst.
+    // The SideEffect commit converges after one frame with no loop (same value
+    // writes settle silently).
+    var lastDirectionIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
+    // Manual taps override the derivation for the next change (a tap's intent
+    // beats queue geography); the song-change effect below consumes it.
+    var tapDirectionOverride by remember { mutableStateOf<Int?>(null) }
+    val transitionDirection = tapDirectionOverride
+        ?: if (playbackState.currentIndex >= lastDirectionIndex) 1 else -1
+    SideEffect { lastDirectionIndex = playbackState.currentIndex }
     // Art rendered behind the incoming frame during the carousel slide, so the
     // travel never exposes an empty slot while the new bitmap decodes. Resolved
     // from the previously-playing song; null when unknown or identical.
@@ -638,10 +650,7 @@ private fun NowPlayingPanel(
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
-        // Auto-advance, skip-back, and shuffle jumps set the carousel direction
-        // from the real queue movement; taps override it before seeking.
-        transitionDirection = if (playbackState.currentIndex >= lastQueueIndex) 1 else -1
-        lastQueueIndex = playbackState.currentIndex
+        tapDirectionOverride = null
         // Snapshot the outgoing art before replacing the id below. It was on
         // screen a frame ago, so it resolves from the memory cache instantly.
         stackArtUri = lastSongId?.let { prevId ->
@@ -673,11 +682,13 @@ private fun NowPlayingPanel(
         }
     }
 
-    LaunchedEffect(playbackState.queue) {
-        playbackState.queue
-            .drop((playbackState.currentIndex + 1).coerceAtLeast(1))
-            .take(2)
-            .forEach { preloadAlbumArt(context, it) }
+    LaunchedEffect(playbackState.queue, playbackState.currentIndex) {
+        // Preload both travel directions: skip-back art must be decoded before
+        // it is needed too, or the carousel hitches exactly when travelling
+        // backwards. Same neighbor-prefetch reasoning as PixelPlayer.
+        ((playbackState.currentIndex - 2)..(playbackState.currentIndex + 2))
+            .filter { it in playbackState.queue.indices && it != playbackState.currentIndex }
+            .forEach { preloadAlbumArt(context, playbackState.queue[it]) }
     }
 
     val landscapeTransportButtonSize = if (isLandscape) 64.dp else TransportButtonSize
@@ -889,7 +900,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
-                    transitionDirection = -1
+                    tapDirectionOverride = -1
                     onSkipPrevious()
                 },
                 modifier = Modifier.requiredSize(landscapeTransportCircleSize)
@@ -910,7 +921,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
-                    transitionDirection = 1
+                    tapDirectionOverride = 1
                     onSkipNext()
                 },
                 modifier = Modifier.requiredSize(landscapeTransportCircleSize)
@@ -1209,24 +1220,23 @@ private fun PlayPauseButton(
                 },
                 label = "playPauseMorph"
             ) { playing ->
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playing) "Pause" else "Play",
-                        tint = contentColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Text(
-                        text = if (playing) "Pause" else "Play",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = contentColor,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
+                // Icon-only morph: the Play/Pause glyphs scale over each
+                // other. The text label below swaps instantly outside the
+                // transition — overlapping "Play"+"Pause" glyphs mid-morph is
+                // what read as mixed-up text on rapid toggles.
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing) "Pause" else "Play",
+                    tint = contentColor,
+                    modifier = Modifier.size(28.dp)
+                )
             }
+            Text(
+                text = if (isPlaying) "Pause" else "Play",
+                style = MaterialTheme.typography.titleMedium,
+                color = contentColor,
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
         Box(
             modifier = Modifier

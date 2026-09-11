@@ -1,5 +1,7 @@
 package com.example.minimusic.ui.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
@@ -345,7 +347,16 @@ fun MiniMusicNavGraph(
             Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
         }
 
-        composable(Routes.LYRICS) {
+        composable(
+            Routes.LYRICS,
+            // No route motion: LyricsScreen owns its single vertical
+            // open/close animation. Any NavHost tween here would double-drive
+            // the card (the old fall-stick-slide-left bug).
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) {
             if (isLandscape) {
                 Box(
                     modifier = androidx.compose.ui.Modifier

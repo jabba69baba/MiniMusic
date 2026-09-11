@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -494,6 +496,7 @@ private fun <T> rememberLetterIndex(items: List<T>, labelOf: (T) -> String): (In
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SongsTab(
     songs: List<Song>,
@@ -508,24 +511,29 @@ private fun SongsTab(
     onDelete: (Song) -> Unit,
     onOpenDetails: (Song) -> Unit
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(cacheWindow = ListPrefetchWindow)
     val scrollScope = rememberCoroutineScope()
     val context = LocalContext.current
     var locateJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(songs) { it.title }
 
     LaunchedEffect(songs) {
+        // Front-loaded at app open (Auxio-style): decode the first screenfuls
+        // into the memory cache while the user is still orienting, instead of
+        // trickling background loads that compete with scroll animations for
+        // minutes afterwards. Enqueueing is cheap; decodes run on Coil's own
+        // dispatcher and never block composition.
         songs.asSequence()
             .mapNotNull { it.albumArtUri }
             .distinct()
-            .take(40)
+            .take(200)
             .forEach { artworkUri ->
                 context.imageLoader.enqueue(
                     ImageRequest.Builder(context)
                         .data(artworkUri)
                         .memoryCachePolicy(CachePolicy.ENABLED)
                         .diskCachePolicy(CachePolicy.ENABLED)
-                        .size(96)
+                        .size(RowArtSizePx)
                         .build()
                 )
             }
@@ -626,6 +634,26 @@ private fun AlbumsTab(
 ) {
     val gridState = rememberLazyGridState()
     val letterForIndex = rememberLetterIndex(albums) { it.title }
+    val context = LocalContext.current
+
+    // Same front-load contract as Songs: grid cells decode at 512px, so warm
+    // the opening window at exactly that key on first mount.
+    LaunchedEffect(albums) {
+        albums.asSequence()
+            .mapNotNull { it.albumArtUri }
+            .distinct()
+            .take(80)
+            .forEach { artworkUri ->
+                context.imageLoader.enqueue(
+                    ImageRequest.Builder(context)
+                        .data(artworkUri)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .size(GridArtSizePx)
+                        .build()
+                )
+            }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -653,13 +681,14 @@ private fun AlbumsTab(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ArtistsTab(
     artists: List<Artist>,
     bottomContentPadding: androidx.compose.ui.unit.Dp,
     onArtistClick: (Artist) -> Unit
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(cacheWindow = ListPrefetchWindow)
     val letterForIndex = rememberLetterIndex(artists) { it.name }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -692,6 +721,16 @@ private fun ArtistsTab(
         )
     }
 }
+
+/**
+ * Extra composition window ahead of/behind the viewport, in dp. This is the
+ * Compose equivalent of RecyclerView's GapWorker prefetch (the reason the
+ * View-based queue drawer never hitches): rows ahead of a fling are composed
+ * and their Coil decodes enqueued before they enter the viewport, instead of
+ * just-in-time on arrival. ~70dp rows: ~11 ahead, ~6 behind.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private val ListPrefetchWindow = LazyLayoutCacheWindow(ahead = 800.dp, behind = 400.dp)
 
 /** Beyond this row distance, locate jumps instead of animating the whole flight. */
 private const val LocateAnimateThreshold = 40

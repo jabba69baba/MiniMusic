@@ -67,10 +67,10 @@ fun FlatMusicSlider(
         if (transitionKey != lastTransitionKey) {
             val startFraction = lastStableFraction.coerceIn(0f, 1f)
             lastTransitionKey = transitionKey
-            // Tape-rewind sweep back to zero, choreographed with the album-art
-            // carousel (~1/3s settle on both, so bar and art read as one
-            // motion on every track change, next or previous). Slow effects:
-            // visible, critically damped, never a rubberband snap. The
+            // Tape-rewind sweep back to zero on the SHARED carousel clock: the
+            // exact same spec instance drives the art slide, so bar and art
+            // settle together as one motion on every track change, next or
+            // previous. Critically damped, never a rubberband snap. The
             // finally freezes the handoff at the CURRENT VISUAL position: a
             // second skip mid-sweep cancels this block, and the restart must
             // continue from what's on screen — restarting from the stale
@@ -80,7 +80,7 @@ fun FlatMusicSlider(
                 resetFraction.snapTo(startFraction)
                 resetFraction.animateTo(
                     targetValue = 0f,
-                    animationSpec = MiniMusicMotion.slowEffects()
+                    animationSpec = MiniMusicMotion.carouselSpatial()
                 )
             } finally {
                 lastStableFraction = resetFraction.value.coerceIn(0f, 1f)

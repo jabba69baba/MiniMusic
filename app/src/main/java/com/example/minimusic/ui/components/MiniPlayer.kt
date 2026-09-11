@@ -29,7 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -100,14 +100,12 @@ fun MiniPlayer(
         }
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri)
-    // Title overlap direction follows real queue movement, same as the player
-    // carousel: next slides in from the right, previous from the left.
-    var titleDirection by remember { mutableIntStateOf(1) }
+    // Title overlap direction follows real queue movement, derived
+    // synchronously like the player carousel: effect-updated direction
+    // arrives after the transition starts, which jittered rapid switches.
     var lastMiniIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
-    LaunchedEffect(song?.id) {
-        titleDirection = if (playbackState.currentIndex >= lastMiniIndex) 1 else -1
-        lastMiniIndex = playbackState.currentIndex
-    }
+    val titleDirection = if (playbackState.currentIndex >= lastMiniIndex) 1 else -1
+    SideEffect { lastMiniIndex = playbackState.currentIndex }
     val miniPlayerColor = artColors.surfaceVariant
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val progressRingColor = readableProgressColor(

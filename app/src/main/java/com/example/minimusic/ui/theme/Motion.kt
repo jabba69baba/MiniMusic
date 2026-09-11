@@ -79,10 +79,15 @@ object MiniMusicMotion {
      * documented exception to the "spatial may overshoot" rule — full-bleed
      * art frames pay per-frame measure/clip through the whole settle tail, so
      * a bouncy default spatial reads as lag on track switches. Same reasoning
-     * as PixelPlayer's carousel, reimplemented on our tokens.
+     * as PixelPlayer's carousel, reimplemented on our tokens. Stiffness 300
+     * settles the full-width travel in roughly half a second: deliberately
+     * slower than default spatial so the switch reads clearly. The seekbar
+     * rewind shares this exact spec, so bar and art move as one choreography
+     * (damping 1.0 also satisfies the effects no-overshoot rule, which is
+     * what lets a positional token drive a progress value).
      */
     fun <T> carouselSpatial(): FiniteAnimationSpec<T> =
-        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f)
 
     // Screen transitions use emphasized *tweens*, not springs: M3 container
     // motion is easing-based while springs stay reserved for components.
