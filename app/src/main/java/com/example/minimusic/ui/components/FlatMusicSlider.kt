@@ -67,22 +67,25 @@ fun FlatMusicSlider(
         if (transitionKey != lastTransitionKey) {
             val startFraction = lastStableFraction.coerceIn(0f, 1f)
             lastTransitionKey = transitionKey
-            // Tape-rewind sweep back to zero. Default effects spring: slow
-            // enough to read as a rewind (~1/4s), critically damped so it
-            // lands without overshoot — never a rubberband snap. The finally
-            // matters: a second skip mid-sweep cancels this block, and the
-            // flag must still release or the bar would freeze mid-track.
+            // Tape-rewind sweep back to zero, choreographed with the album-art
+            // carousel (~1/3s settle on both, so bar and art read as one
+            // motion on every track change, next or previous). Slow effects:
+            // visible, critically damped, never a rubberband snap. The
+            // finally freezes the handoff at the CURRENT VISUAL position: a
+            // second skip mid-sweep cancels this block, and the restart must
+            // continue from what's on screen — restarting from the stale
+            // frozen value is exactly what read as "snap, then rewind again".
             isTrackResetting = true
             try {
                 resetFraction.snapTo(startFraction)
                 resetFraction.animateTo(
                     targetValue = 0f,
-                    animationSpec = MiniMusicMotion.defaultEffects()
+                    animationSpec = MiniMusicMotion.slowEffects()
                 )
             } finally {
+                lastStableFraction = resetFraction.value.coerceIn(0f, 1f)
                 isTrackResetting = false
             }
-            lastStableFraction = 0f
         }
     }
 
@@ -100,6 +103,11 @@ fun FlatMusicSlider(
         isDragging -> dragFraction
         pendingFraction != null -> pendingFraction!!
         isTrackResetting -> resetFraction.value
+        // Between a track change and its sweep start (or between a cancelled
+        // sweep and its restart), hold the frozen frame — never flash the new
+        // track's live position for a frame. That flash was the "snap to zero
+        // before the rewind" stutter.
+        transitionKey != lastTransitionKey -> lastStableFraction
         else -> committedFraction
     }
     val trackColor = inactiveColor ?: MaterialTheme.colorScheme.surfaceVariant

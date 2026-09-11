@@ -771,21 +771,15 @@ private fun NowPlayingPanel(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    val direction = transitionDirection
-                    // Eighth-width nudges are small-component movement: fast
-                    // spatial. Alpha halves stay on effects springs.
-                    (slideInHorizontally(
-                        initialOffsetX = { width -> direction * (width / 8) },
-                        animationSpec = MiniMusicMotion.fastSpatial()
-                    ) + fadeIn(
+                    // Fade only, identical both directions: the eighth-width
+                    // positional nudge bounced on skips (spring overshoot on
+                    // text) and drifted out of sync with the art carousel.
+                    // The carousel carries the motion; titles just crossfade.
+                    fadeIn(
                         animationSpec = MiniMusicMotion.defaultEffects()
-                    )) togetherWith
-                        (slideOutHorizontally(
-                            targetOffsetX = { width -> -direction * (width / 8) },
-                            animationSpec = MiniMusicMotion.fastSpatial()
-                        ) + fadeOut(
-                            animationSpec = MiniMusicMotion.trackChangeExitEffects()
-                        ))
+                    ) togetherWith fadeOut(
+                        animationSpec = MiniMusicMotion.trackChangeExitEffects()
+                    )
                 },
                 contentKey = { it.id },
                 label = "songMetadataTransition"

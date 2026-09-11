@@ -3,8 +3,6 @@ package com.example.minimusic.ui.components
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -126,15 +124,11 @@ fun MiniPlayer(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    // Eighth-width nudge: fast spatial. Alpha halves: effects.
-                    (slideInHorizontally(
-                        initialOffsetX = { it / 8 },
-                        animationSpec = MiniMusicMotion.fastSpatial()
-                    ) + fadeIn(animationSpec = MiniMusicMotion.defaultEffects())) togetherWith
-                        (slideOutHorizontally(
-                            targetOffsetX = { -it / 8 },
-                            animationSpec = MiniMusicMotion.fastSpatial()
-                        ) + fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects()))
+                    // Fade only, identical both directions — same reasoning as
+                    // the player metadata: no positional bounce on text, the
+                    // art carousel carries the motion.
+                    fadeIn(animationSpec = MiniMusicMotion.defaultEffects()) togetherWith
+                        fadeOut(animationSpec = MiniMusicMotion.trackChangeExitEffects())
                 },
                 modifier = Modifier.weight(1f),
                 contentKey = { it?.id ?: -1L },

@@ -520,7 +520,7 @@ private fun SongsTab(
         songs.asSequence()
             .mapNotNull { it.albumArtUri }
             .distinct()
-            .take(16)
+            .take(40)
             .forEach { artworkUri ->
                 context.imageLoader.enqueue(
                     ImageRequest.Builder(context)
@@ -596,7 +596,13 @@ private fun SongsTab(
                     onOpenDetails = onOpenDetails,
                     // Reorder glide on sort/search changes (Metrolist pattern:
                     // stable keys + contentType above, animateItem on the row).
-                    modifier = Modifier.animateItem()
+                    // Fades stay null: newly-composed rows must not spend
+                    // their first frames on alpha layers during fast flings.
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = null,
+                        placementSpec = MiniMusicMotion.defaultSpatial(),
+                        fadeOutSpec = null
+                    )
                 )
             }
         }
@@ -671,7 +677,11 @@ private fun ArtistsTab(
                 ArtistListItem(
                     artist = artist,
                     onClick = { onArtistClick(artist) },
-                    modifier = Modifier.animateItem()
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = null,
+                        placementSpec = MiniMusicMotion.defaultSpatial(),
+                        fadeOutSpec = null
+                    )
                 )
             }
         }

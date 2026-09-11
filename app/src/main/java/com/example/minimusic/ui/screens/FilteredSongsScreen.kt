@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.SongListItem
+import com.example.minimusic.ui.theme.MiniMusicMotion
 
 @Composable
 fun FilteredSongsScreen(
@@ -59,7 +60,11 @@ fun FilteredSongsScreen(
                     isPlaying = song.id == currentSongId,
                     onClick = { onPlaySong(song) },
                     onOpenDetails = onOpenDetails,
-                    modifier = Modifier.animateItem()
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = null,
+                        placementSpec = MiniMusicMotion.defaultSpatial(),
+                        fadeOutSpec = null
+                    )
                 )
             }
         }
