@@ -254,10 +254,12 @@ fun LyricsScreen(
                                 val delta = measuredLineCenter - bandCenter
 
                                 if (abs(delta) > LYRIC_TARGET_TOLERANCE_PX) {
-                                    // Positional travel: default spatial spring.
+                                    // No-bounce glide: an underdamped spring
+                                    // here overshoots past the reading band and
+                                    // corrects back — the visible stomp.
                                     listState.animateScrollBy(
                                         value = delta.toFloat(),
-                                        animationSpec = MiniMusicMotion.defaultSpatial()
+                                        animationSpec = MiniMusicMotion.carouselSpatial()
                                     )
                                 }
 
@@ -310,11 +312,10 @@ fun LyricsScreen(
                                     val isActive = index == activeIndex
                                     // Fisheye emphasis lives ONLY on the active line:
                                     // it grows and brightens while every other
-                                    // line stays identical. No alpha animation
-                                    // anywhere in the app — emphasis comes from
-                                    // scale (spatial spring) and color only.
-                                    // Everything stays in graphicsLayer — no
-                                    // reflow, no recomposition of other lines.
+                                    // line stays identical. Scale rides a
+                                    // critically-damped effects spring — the
+                                    // underdamped spatial overshoot is what
+                                    // stomped. No alpha animation anywhere.
                                     val color by animateColorAsState(
                                         targetValue = if (isActive) activeColor else inactiveColor,
                                         animationSpec = MiniMusicMotion.fastEffects(),
@@ -322,7 +323,7 @@ fun LyricsScreen(
                                     )
                                     val lineScale by animateFloatAsState(
                                         targetValue = if (isActive) 1.06f else 1f,
-                                        animationSpec = MiniMusicMotion.fastSpatial(),
+                                        animationSpec = MiniMusicMotion.defaultEffects(),
                                         label = "lyricsLineScale"
                                     )
                                     Text(

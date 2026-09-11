@@ -103,6 +103,7 @@ import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.AlbumGridItem
 import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
+import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.theme.MiniMusicMotion
@@ -528,7 +529,7 @@ private fun SongsTab(
             .distinct()
             .take(200)
             .forEach { artworkUri ->
-                context.imageLoader.enqueue(
+                MiniMusicImageLoader.get(context).enqueue(
                     ImageRequest.Builder(context)
                         .data(artworkUri)
                         .memoryCachePolicy(CachePolicy.ENABLED)
@@ -644,7 +645,7 @@ private fun AlbumsTab(
             .distinct()
             .take(80)
             .forEach { artworkUri ->
-                context.imageLoader.enqueue(
+                MiniMusicImageLoader.get(context).enqueue(
                     ImageRequest.Builder(context)
                         .data(artworkUri)
                         .memoryCachePolicy(CachePolicy.ENABLED)
@@ -769,7 +770,7 @@ private fun preloadArtWindow(
     for (i in from..to) {
         val uri = uriAt(i) ?: continue
         if (!seen.add(uri)) continue
-        context.imageLoader.enqueue(
+        MiniMusicImageLoader.get(context).enqueue(
             ImageRequest.Builder(context)
                 .data(uri)
                 .memoryCachePolicy(CachePolicy.ENABLED)

@@ -41,6 +41,9 @@ fun AlbumArtImage(
     requestSizePx: Int? = null
 ) {
     val context = LocalContext.current
+    // App-owned stack: album rows resolve from the OS thumbnail cache with
+    // matching size keys, so list, grid and warmup share one memory cache.
+    val imageLoader = remember(context) { MiniMusicImageLoader.get(context) }
     val request = remember(model) {
         ImageRequest.Builder(context)
             .data(model)
@@ -63,6 +66,7 @@ fun AlbumArtImage(
         if (model != null) {
             AsyncImage(
                 model = request,
+                imageLoader = imageLoader,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),

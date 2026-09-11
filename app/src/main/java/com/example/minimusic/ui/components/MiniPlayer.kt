@@ -133,15 +133,19 @@ fun MiniPlayer(
                 targetState = song,
                 transitionSpec = {
                     // Title overlap, no fade: incoming slides a quarter-width
-                    // over the static outgoing row, direction aware. No-bounce
-                    // token so text never wobbles.
+                    // over the outgoing row, direction aware. Outgoing clears
+                    // fast so rapid switches never stack. No-bounce token so
+                    // text never wobbles.
                     val direction = titleDirection
                     slideInHorizontally(
                         initialOffsetX = { width -> direction * (width / 4) },
                         animationSpec = MiniMusicMotion.carouselSpatial()
                     ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { 0 },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
+                        targetOffsetX = { width -> -direction * (width / 4) },
+                        animationSpec = tween(
+                            durationMillis = 150,
+                            easing = MiniMusicMotion.navExitEasing
+                        )
                     )
                 },
                 modifier = Modifier.weight(1f),

@@ -61,6 +61,7 @@ import coil.request.ImageRequest
 import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -148,6 +149,7 @@ fun DetailsScreen(
                     } else {
                         AsyncImage(
                             model = detailsArtRequest,
+                            imageLoader = MiniMusicImageLoader.get(context),
                             contentDescription = "Album art",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,

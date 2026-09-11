@@ -13,6 +13,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        // Our own strings are English-only; this drops the 100+ locales bundled
+        // by the support libraries from resources.arsc.
+        androidResources {
+            localeFilters += "en"
+        }
     }
 
     buildTypes {
@@ -23,7 +28,12 @@ android {
             versionNameSuffix = "-${ciSha ?: "dev"}"
         }
         release {
-            isMinifyEnabled = false
+            // Auxio/Gramophone recipe: R8 + resource shrinking is the entire
+            // reason they ship at 10-11MB with equal-or-larger feature sets.
+            // Our debug APK carries ~80MB of unshaken dex (unused icons,
+            // Compose/Media3 modules); this strips it for release only.
+            isMinifyEnabled = true
+            isShrinkResources = true
             // CI test releases are signed with the generated debug key so the
             // release-variant APK remains installable without committing a
             // private signing key. This does not alter playback or UI code.

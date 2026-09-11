@@ -10,6 +10,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -115,6 +116,7 @@ import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.AlbumArtImage
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.LandscapeQueueContent
+import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
@@ -598,7 +600,9 @@ private fun preloadAlbumArt(context: Context, song: Song) {
         .data(artworkUri)
         .memoryCachePolicy(CachePolicy.ENABLED)
         .build()
-    context.imageLoader.enqueue(request)
+    // Same ImageLoader instance as every display site: otherwise this warms a
+    // cache nobody reads.
+    MiniMusicImageLoader.get(context).enqueue(request)
 }
 
 @Composable
@@ -660,9 +664,9 @@ private fun NowPlayingPanel(
         // Swap immediately — never gate the visual switch on image decoding or
         // metadata reads. The spatial spring makes the swap itself the motion.
         displayedArtworkSong = song
-        // Warm the memory cache without blocking; the bitmap swaps in on load.
+        // Warm the shared memory cache without blocking; the bitmap swaps in.
         song.albumArtUri?.let { uri ->
-            context.imageLoader.enqueue(
+            MiniMusicImageLoader.get(context).enqueue(
                 ImageRequest.Builder(context)
                     .data(uri)
                     .memoryCachePolicy(CachePolicy.ENABLED)
@@ -710,17 +714,21 @@ private fun NowPlayingPanel(
                 targetState = displayedArtworkSong,
                 transitionSpec = {
                     val direction = transitionDirection
-                    // Card overlap, no fade anywhere: the incoming frame
-                    // slides over the outgoing one (which holds perfectly
-                    // still) on the no-bounce carousel token. Outgoing uses a
-                    // zero-travel slide as the static hold — AnimatedContent
-                    // needs an exit, but it must not move or fade.
+                    // Card overlap, no fade: the incoming frame slides over the
+                    // outgoing one on the no-bounce carousel token. The
+                    // outgoing clears fast (180ms exit on the emphasized
+                    // accelerate curve) instead of holding still — under rapid
+                    // skips a static outgoing stacked 3-deep and read as
+                    // mixed-up mush; a fast exit keeps at most two layers.
                     slideInHorizontally(
                         initialOffsetX = { fullWidth -> direction * fullWidth },
                         animationSpec = MiniMusicMotion.carouselSpatial()
                     ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { 0 },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
+                        targetOffsetX = { fullWidth -> -direction * fullWidth },
+                        animationSpec = tween(
+                            durationMillis = 180,
+                            easing = MiniMusicMotion.navExitEasing
+                        )
                     )
                 },
                 contentKey = { it.id },
@@ -775,17 +783,20 @@ private fun NowPlayingPanel(
                 targetState = song,
                 transitionSpec = {
                     // Title overlap, no fade: the incoming title slides a
-                    // quarter-width over the static outgoing one, direction
-                    // aware (next/previous symmetric). No-bounce token, so no
-                    // overshoot wobble on text. The carousel carries the big
-                    // motion; titles just overlap past each other.
+                    // quarter-width over the outgoing one, direction aware
+                    // (next/previous symmetric). The outgoing clears fast so
+                    // rapid switches never stack three titles deep. No-bounce
+                    // token throughout, so text never wobbles.
                     val direction = transitionDirection
                     slideInHorizontally(
                         initialOffsetX = { width -> direction * (width / 4) },
                         animationSpec = MiniMusicMotion.carouselSpatial()
                     ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { 0 },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
+                        targetOffsetX = { width -> -direction * (width / 4) },
+                        animationSpec = tween(
+                            durationMillis = 150,
+                            easing = MiniMusicMotion.navExitEasing
+                        )
                     )
                 },
                 contentKey = { it.id },
