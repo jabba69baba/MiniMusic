@@ -16,6 +16,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Stamp every CI/local build so "which APK is installed" is always
+            // answerable from Settings > About (versionName is shown there).
+            val ciSha = System.getenv("GITHUB_SHA")?.take(7)
+            versionNameSuffix = "-${ciSha ?: "dev"}"
+        }
         release {
             isMinifyEnabled = false
             // CI test releases are signed with the generated debug key so the
