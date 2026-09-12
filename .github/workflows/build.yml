@@ -27,6 +27,13 @@ jobs:
           set -o pipefail
           ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
 
+      - name: Report Gradle diagnostics
+        if: failure()
+        run: |
+          echo "Gradle diagnostics (last 120 lines):"
+          tail -120 build-debug.log
+          while IFS= read -r line; do echo "::error::$line"; done < <(tail -40 build-debug.log)
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
