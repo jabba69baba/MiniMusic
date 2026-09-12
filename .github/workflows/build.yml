@@ -32,7 +32,8 @@ jobs:
         run: |
           echo "Gradle diagnostics (last 120 lines):"
           tail -120 build-debug.log
-          while IFS= read -r line; do echo "::error::$line"; done < <(tail -40 build-debug.log)
+          grep -E "(^e: |error:|Error:|FAILURE:)" build-debug.log | tail -80 || true
+          while IFS= read -r line; do echo "::error::$line"; done < <(grep -E "(^e: |error:|Error:|FAILURE:)" build-debug.log | tail -80)
 
       - name: Upload build log
         if: always()
