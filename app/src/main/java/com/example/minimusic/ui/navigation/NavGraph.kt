@@ -51,6 +51,7 @@ import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
+import kotlinx.coroutines.launch
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -258,18 +259,22 @@ fun MiniMusicNavGraph(
             )
         },
         popExitTransition = {
+            // Close mirrors open exactly (same duration, same decelerate
+            // curve, reversed direction): open must not feel faster than
+            // close. The M3 default pairs decelerate-enter with
+            // accelerate-exit, but that asymmetry read as a speed mismatch.
             slideOutHorizontally(
                 targetOffsetX = { (it * 0.5f).toInt() },
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navExitEasing
+                    easing = MiniMusicMotion.navEnterEasing
                 )
             ) + scaleOut(
                 targetScale = 0.92f,
                 transformOrigin = TransformOrigin(0.5f, 0.5f),
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navExitEasing
+                    easing = MiniMusicMotion.navEnterEasing
                 )
             )
         }
@@ -369,7 +374,20 @@ fun MiniMusicNavGraph(
                         playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
                         onSeekTo = playerViewModel::seekTo,
-                        onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
+                        // Back always lands on the player card: pop to PLAYER
+                        // when it's in the stack (tap/drag-open path), else
+                        // rebuild it above Home (drag-open path has no PLAYER
+                        // entry, and a failed pop would strand the back press).
+                        onBack = {
+                            val popped =
+                                navController.popBackStack(Routes.PLAYER, inclusive = false)
+                            if (!popped) {
+                                navController.navigate(Routes.PLAYER) {
+                                    popUpTo(Routes.LIBRARY)
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
                     )
                 }
             } else {
@@ -377,7 +395,16 @@ fun MiniMusicNavGraph(
                     playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
                     onSeekTo = playerViewModel::seekTo,
-                    onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
+                    onBack = {
+                        val popped =
+                            navController.popBackStack(Routes.PLAYER, inclusive = false)
+                        if (!popped) {
+                            navController.navigate(Routes.PLAYER) {
+                                popUpTo(Routes.LIBRARY)
+                                launchSingleTop = true
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -404,6 +431,24 @@ fun MiniMusicNavGraph(
             derivedStateOf {
                 currentRoute != Routes.LYRICS &&
                     (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
+            }
+        }
+        // Back at Home with the sheet dragged up collapses the sheet instead
+        // of exiting the app: every back press must close the current layer
+        // and reveal the previous one (lyrics -> player -> home -> exit).
+        val sheetExpandedAtHome by remember(sheetState, currentRoute) {
+            derivedStateOf {
+                currentRoute == Routes.LIBRARY && sheetState.progress > 0.5f
+            }
+        }
+        androidx.activity.compose.BackHandler(enabled = sheetExpandedAtHome) {
+            scope.launch {
+                sheetState.settle(
+                    velocityPxPerSecond = 0f,
+                    targetProgressOverride = 0f,
+                    onExpanded = {},
+                    onCollapsed = {}
+                )
             }
         }
 

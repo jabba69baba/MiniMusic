@@ -24,8 +24,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -183,7 +183,7 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsSectionHeader("Audio", Icons.Filled.Audiotrack)
+                SettingsSectionHeader("Audio", Icons.Filled.GraphicEq)
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Crossfade",

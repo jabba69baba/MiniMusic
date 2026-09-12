@@ -1,9 +1,5 @@
 package com.example.minimusic.ui.components
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -29,11 +25,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -49,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.minimusic.playback.PlaybackUiState
-import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import kotlinx.coroutines.flow.StateFlow
 
@@ -100,12 +94,6 @@ fun MiniPlayer(
         }
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri)
-    // Title overlap direction follows real queue movement, derived
-    // synchronously like the player carousel: effect-updated direction
-    // arrives after the transition starts, which jittered rapid switches.
-    var lastMiniIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
-    val titleDirection = if (playbackState.currentIndex >= lastMiniIndex) 1 else -1
-    SideEffect { lastMiniIndex = playbackState.currentIndex }
     val miniPlayerColor = artColors.surfaceVariant
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val progressRingColor = readableProgressColor(
@@ -129,55 +117,41 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AnimatedContent(
-                targetState = song,
-                transitionSpec = {
-                    // Title overlap, no fade: incoming slides a quarter-width
-                    // over the outgoing row, direction aware. Outgoing clears
-                    // fast so rapid switches never stack. No-bounce token so
-                    // text never wobbles.
-                    val direction = titleDirection
-                    slideInHorizontally(
-                        initialOffsetX = { width -> direction * (width / 4) },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
-                    ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { width -> -direction * (width / 4) },
-                        animationSpec = tween(
-                            durationMillis = 150,
-                            easing = MiniMusicMotion.navExitEasing
-                        )
+            // Track content swaps instantly on song change (Auxio-style: no
+            // transition on the miniplayer). The player carousel carries all
+            // track-change motion; animating this bar too doubled the motion
+            // and jittered under rapid switches.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Keyed so a new bitmap never cross-dissolves over the old
+                // tile: the art swaps the instant its request resolves.
+                key(song?.id ?: -1L) {
+                    MiniPlayerArt(artUri = song?.albumArtUri)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = song?.title ?: "What's the vibe?",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = artColors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                },
-                modifier = Modifier.weight(1f),
-                contentKey = { it?.id ?: -1L },
-                label = "miniPlayerTrackContent"
-            ) { displayedSong ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MiniPlayerArt(artUri = displayedSong?.albumArtUri)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = displayedSong?.title ?: "What's the vibe?",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Normal,
-                            color = artColors.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = displayedSong?.artist ?: "Tap a song to listen",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = artColors.onSurfaceVariant,
-                            maxLines = 1,
+                    Text(
+                        text = song?.artist ?: "Tap a song to listen",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = artColors.onSurfaceVariant,
+                        maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-            }
 
             // Play/pause control with a circular progress ring. No key() around
             // the track change: remounting snaps the ring and pops the icon.

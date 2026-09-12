@@ -167,11 +167,13 @@ fun LyricsScreen(
         BackHandler(enabled = !isExiting) {
             isExiting = true
             exitScope.launch {
+                // Close mirrors open (same duration, same decelerate curve,
+                // reversed direction) so neither feels faster.
                 cardOffsetY.animateTo(
                     targetValue = fullHeightPx,
                     animationSpec = tween(
                         MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navExitEasing
+                        easing = MiniMusicMotion.navEnterEasing
                     )
                 )
                 onBack()
