@@ -267,8 +267,7 @@ fun MiniMusicNavGraph(
             // transition can leave a stale frame painted at the edge.
             if (initialState.destination.route == Routes.SETTINGS ||
                 initialState.destination.route?.startsWith("details/") == true
-            ) return@NavHost EnterTransition.None
-            slideInHorizontally(
+            ) EnterTransition.None else slideInHorizontally(
                 initialOffsetX = { -(it * 0.25f).toInt() },
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
@@ -289,7 +288,7 @@ fun MiniMusicNavGraph(
             // the route transition is settling.
             if (initialState.destination.route == Routes.SETTINGS ||
                 initialState.destination.route?.startsWith("details/") == true
-            ) return@NavHost ExitTransition.None
+            ) ExitTransition.None else {
             // Close mirrors open exactly (same duration, same decelerate
             // curve, reversed direction): open must not feel faster than
             // close. The M3 default pairs decelerate-enter with
@@ -308,6 +307,7 @@ fun MiniMusicNavGraph(
                     easing = MiniMusicMotion.navEnterEasing
                 )
             )
+            }
         }
     ) {
 
