@@ -25,27 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.FormatAlignCenter
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -139,16 +125,14 @@ fun SettingsScreen(
                             ThemeMode.SYSTEM to "Auto"
                         ),
                         selected = settings.themeMode,
-                        onSelect = onThemeModeChange,
-                        icon = Icons.Filled.Style
+                        onSelect = onThemeModeChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "AMOLED black mode",
                         subtitle = "Use true-black surfaces when dark theme is active",
                         checked = settings.amoledBlackMode,
-                        onCheckedChange = onAmoledBlackModeChange,
-                        icon = Icons.Filled.DarkMode
+                        onCheckedChange = onAmoledBlackModeChange
                     )
                 }
             }
@@ -160,16 +144,14 @@ fun SettingsScreen(
                         title = "Audio quality badge",
                         subtitle = "Show sample rate, bitrate, and format on the player",
                         checked = settings.showAudioQualityBadge,
-                        onCheckedChange = onShowAudioQualityBadgeChange,
-                        icon = Icons.Filled.Badge
+                        onCheckedChange = onShowAudioQualityBadgeChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Centered title",
                         subtitle = "Center the current song title and artist in the player",
                         checked = settings.centeredTitle,
-                        onCheckedChange = onCenteredTitleChange,
-                        icon = Icons.Filled.FormatAlignCenter
+                        onCheckedChange = onCenteredTitleChange
                     )
                 }
             }
@@ -181,24 +163,21 @@ fun SettingsScreen(
                         title = "Resume on launch",
                         subtitle = "Retain queue order on launch; queue restoration is not active yet",
                         checked = settings.resumeOnLaunch,
-                        onCheckedChange = onResumeOnLaunchChange,
-                        icon = Icons.Filled.Restore
+                        onCheckedChange = onResumeOnLaunchChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Stop on dismiss",
                         subtitle = "Pause playback when the app is cleared from Recents; service hook pending",
                         checked = settings.stopOnDismiss,
-                        onCheckedChange = onStopOnDismissChange,
-                        icon = Icons.Filled.ExitToApp
+                        onCheckedChange = onStopOnDismissChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Haptic feedback",
                         subtitle = "Vibrate on touches and drags; interaction hooks pending",
                         checked = settings.hapticFeedback,
-                        onCheckedChange = onHapticFeedbackChange,
-                        icon = Icons.Filled.Vibration
+                        onCheckedChange = onHapticFeedbackChange
                     )
                 }
             }
@@ -210,8 +189,7 @@ fun SettingsScreen(
                         title = "Crossfade",
                         subtitle = "Preference saved; Media3 crossfade is not active in the current player service",
                         checked = settings.crossfadeEnabled,
-                        onCheckedChange = onCrossfadeEnabledChange,
-                        icon = Icons.Filled.Tune
+                        onCheckedChange = onCrossfadeEnabledChange
                     )
                     SettingsDivider()
                     SettingsSliderRow(
@@ -221,16 +199,14 @@ fun SettingsScreen(
                         valueRange = 2f..10f,
                         steps = 7,
                         enabled = settings.crossfadeEnabled,
-                        onValueChange = { onCrossfadeSecondsChange(it.toInt()) },
-                        icon = Icons.Filled.Timer
+                        onValueChange = { onCrossfadeSecondsChange(it.toInt()) }
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Mono Audio",
                         subtitle = "Preference saved; channel mixing will be wired into playback next",
                         checked = settings.monoAudio,
-                        onCheckedChange = onMonoAudioChange,
-                        icon = Icons.Filled.GraphicEq
+                        onCheckedChange = onMonoAudioChange
                     )
                 }
             }
@@ -245,8 +221,7 @@ fun SettingsScreen(
                         valueRange = 0f..60f,
                         steps = 3,
                         enabled = true,
-                        onValueChange = { onMinDurationChange((it / 15f).toInt() * 15) },
-                        icon = Icons.Filled.HourglassEmpty
+                        onValueChange = { onMinDurationChange((it / 15f).toInt() * 15) }
                     )
                     SettingsDivider()
                     ListItem(
@@ -288,26 +263,17 @@ fun SettingsScreen(
                 SettingsGroup {
                     ListItem(
                         headlineContent = { Text("The App") },
-                        supportingContent = { Text("MiniMusic · Version $appVersion · offline and FOSS") },
-                        leadingContent = {
-                            Icon(Icons.Filled.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        }
+                        supportingContent = { Text("MiniMusic · Version $appVersion · offline and FOSS") }
                     )
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("The Developer") },
-                        supportingContent = { Text("MiniMusic is developed as an offline, open-source music player") },
-                        leadingContent = {
-                            Icon(Icons.Filled.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        }
+                        supportingContent = { Text("MiniMusic is developed as an offline, open-source music player") }
                     )
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Support the dev using") },
                         supportingContent = { Text("Telegram ID: Not configured") },
-                        leadingContent = {
-                            Icon(Icons.Filled.Help, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        },
                         trailingContent = { Text("Not configured", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
                 }
@@ -355,15 +321,11 @@ private fun SettingsSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    onCheckedChange: (Boolean) -> Unit
 ) {
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle) },
-        leadingContent = {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        },
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
         modifier = Modifier.fillMaxWidth()
     )
@@ -375,8 +337,7 @@ private fun <T> SettingsChoiceRow(
     subtitle: String,
     options: List<Pair<T, String>>,
     selected: T,
-    onSelect: (T) -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    onSelect: (T) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selectedLabel = options.firstOrNull { it.first == selected }?.second.orEmpty()
@@ -388,9 +349,6 @@ private fun <T> SettingsChoiceRow(
                 .clickable { expanded = true },
             headlineContent = { Text(title) },
             supportingContent = { Text(subtitle) },
-            leadingContent = {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            },
             trailingContent = {
                 Text(
                     text = selectedLabel,
@@ -440,16 +398,9 @@ private fun SettingsSliderRow(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     enabled: Boolean,
-    onValueChange: (Float) -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    onValueChange: (Float) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Column(modifier = Modifier.weight(1f)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Slider(
@@ -468,7 +419,6 @@ private fun SettingsSliderRow(
                 )
             }
         )
-        }
     }
 }
 

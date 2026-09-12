@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,11 +37,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -188,31 +191,43 @@ fun LyricsScreen(
                 .windowInsetsPadding(WindowInsets.systemBars)
         )
 
-        LyricsState.NotFound -> Text(
-            text = "No embedded lyrics found",
-            color = artColors.onBackground,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
+        // No-lyrics states (including instrumentals) center on screen; synced
+        // lyric lines stay left-aligned below.
+        LyricsState.NotFound -> Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(artColors.background)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(horizontal = 40.dp, vertical = 48.dp)
-        )
+                .windowInsetsPadding(WindowInsets.systemBars),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No embedded lyrics found",
+                color = artColors.onBackground,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 40.dp)
+            )
+        }
 
         is LyricsState.Found -> {
             if (lines.isEmpty()) {
-                Text(
-                    text = "Lyrics could not be displayed",
-                    color = artColors.onBackground,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(artColors.background)
-                        .windowInsetsPadding(WindowInsets.systemBars)
-                        .padding(horizontal = 40.dp, vertical = 48.dp)
-                )
+                        .windowInsetsPadding(WindowInsets.systemBars),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Lyrics could not be displayed",
+                        color = artColors.onBackground,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 40.dp)
+                    )
+                }
             } else {
                 Box(
                     modifier = Modifier
@@ -337,7 +352,11 @@ fun LyricsScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 14.dp)
-                                            .clickable(enabled = line.startMs != null) {
+                                            .clickable(
+                                                enabled = line.startMs != null,
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null
+                                            ) {
                                                 line.startMs?.let(onSeekTo)
                                             }
                                             .graphicsLayer {

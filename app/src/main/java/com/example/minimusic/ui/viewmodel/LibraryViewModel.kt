@@ -6,10 +6,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.minimusic.MainApplication
 import com.example.minimusic.data.DeleteResult
-import coil.imageLoader
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
 import com.example.minimusic.data.model.Song
+import com.example.minimusic.ui.components.MiniMusicImageLoader
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -135,14 +137,25 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     /** Clears local artwork memory and re-reads MediaStore for the Settings action. */
     fun rescanLibrary() {
-        getApplication<Application>().imageLoader.memoryCache?.clear()
+        // The app-owned stack, not the default singleton: rows, grid, player
+        // and warmups all read from MiniMusicImageLoader's cache.
+        MiniMusicImageLoader.get(getApplication()).memoryCache?.clear()
         loadLibrary()
     }
+
+    private var searchJob: Job? = null
 
     fun onSearchQueryChange(query: String) {
         val state = _uiState.value
         _uiState.value = state.copy(searchQuery = query)
-        recomputeFilteredSongs(query, state.sortOrder, state.allSongs)
+        // Debounced so each keystroke doesn't reorder the list under the
+        // finger: rapid typing used to glide rows via animateItem on every
+        // character, and tapping mid-glide played the wrong row.
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch(Dispatchers.Default) {
+            delay(250L)
+            recomputeFilteredSongs(query, _uiState.value.sortOrder, _uiState.value.allSongs)
+        }
     }
 
     fun onSortOrderChange(sortOrder: SongSortOrder) {
