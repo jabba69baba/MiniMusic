@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.screens
 
 import android.app.Activity
+import android.view.HapticFeedbackConstants
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import android.content.Context
@@ -14,7 +15,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -89,6 +95,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -631,6 +638,7 @@ private fun NowPlayingPanel(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
     var badgeReady by remember(song.id) { mutableStateOf(false) }
     // Badge appear is a scale, not a fade: grows 0.8 -> 1 over the static row.
@@ -776,7 +784,9 @@ private fun NowPlayingPanel(
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(ArtCornerShape),
+                                .shadow(5.dp, ArtCornerShape)
+                                .clip(ArtCornerShape)
+                                .border(5.dp, artColors.onBackground.copy(alpha = 0.12f), ArtCornerShape),
                             contentScale = ContentScale.Crop
                         )
                     }
@@ -790,25 +800,14 @@ private fun NowPlayingPanel(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    // Clip the outgoing/incoming content to the metadata slot.
-                    // Without a bounded transition, two different title heights
-                    // can paint into the artist row during rapid track changes.
-                    // Title overlap, no fade: the incoming title slides a
-                    // quarter-width over the outgoing one, direction aware
-                    // (next/previous symmetric). The outgoing clears fast so
-                    // rapid switches never stack three titles deep. No-bounce
-                    // token throughout, so text never wobbles.
-                    val direction = transitionDirection
-                    slideInHorizontally(
-                        initialOffsetX = { width -> direction * (width / 4) },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
-                    ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { width -> -direction * (width / 4) },
-                        animationSpec = tween(
-                            durationMillis = 150,
-                            easing = MiniMusicMotion.navExitEasing
-                        )
-                    ) using SizeTransform(clip = true)
+                    // PixelPlayer keeps the metadata slot stable and switches
+                    // the song/artist as a soft vertical reveal, rather than
+                    // throwing text sideways across the player.
+                    (fadeIn(tween(180)) + slideInVertically(
+                        initialOffsetY = { it / 3 }, animationSpec = tween(220)
+                    )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
+                        targetOffsetY = { -it / 4 }, animationSpec = tween(120)
+                    )) using SizeTransform(clip = true)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -933,6 +932,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     tapDirectionOverride = -1
                     onSkipPrevious()
                 },
@@ -942,7 +942,10 @@ private fun NowPlayingPanel(
                 isPlaying = playbackState.isPlaying,
                 containerColor = artColors.primary,
                 contentColor = artColors.onPrimary,
-                onClick = onTogglePlayPause,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    onTogglePlayPause()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .requiredHeight(landscapeTransportButtonSize)
@@ -954,6 +957,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     tapDirectionOverride = 1
                     onSkipNext()
                 },

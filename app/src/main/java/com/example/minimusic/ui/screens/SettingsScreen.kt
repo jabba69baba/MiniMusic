@@ -157,13 +157,17 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSliderRow(
                         title = "Lyric text size",
-                        subtitle = "${settings.lyricTextScalePercent}%",
+                        subtitle = when (settings.lyricTextScalePercent) {
+                            in Int.MIN_VALUE..79 -> "Small"
+                            80..92 -> "Medium"
+                            else -> "Large"
+                        },
                         value = settings.lyricTextScalePercent.toFloat(),
-                        valueRange = 75f..125f,
+                        valueRange = 75f..100f,
                         steps = 0,
                         enabled = true,
                         onValueChange = { raw ->
-                            val scale = listOf(75, 85, 100, 115, 125)
+                            val scale = listOf(75, 85, 100)
                                 .minByOrNull { kotlin.math.abs(it - raw) } ?: 100
                             onLyricTextScaleChange(scale)
                         }

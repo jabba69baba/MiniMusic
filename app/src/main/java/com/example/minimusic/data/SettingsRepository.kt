@@ -10,13 +10,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val AllowedMinimumDurations = listOf(0, 15, 30, 45, 60)
-private val AllowedLyricScales = listOf(75, 85, 100, 115, 125)
+private val AllowedLyricScales = listOf(75, 85, 100)
 
 private fun nearestMinimumDuration(seconds: Int): Int =
     AllowedMinimumDurations.minByOrNull { kotlin.math.abs(it - seconds) } ?: 15
 
 private fun nearestLyricScale(percent: Int): Int =
-    AllowedLyricScales.minByOrNull { kotlin.math.abs(it - percent) } ?: 100
+    AllowedLyricScales.minByOrNull { kotlin.math.abs(it - percent) } ?: 85
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -32,7 +32,7 @@ data class AppSettings(
     val crossfadeEnabled: Boolean = false,
     val crossfadeSeconds: Int = 5,
     val monoAudio: Boolean = false,
-    val lyricTextScalePercent: Int = 100,
+    val lyricTextScalePercent: Int = 85,
     val minDurationSeconds: Int = 15,
     val telegramSupportAddress: String = ""
 )
@@ -77,7 +77,7 @@ class SettingsRepository(private val context: Context) {
             crossfadeEnabled = prefs[Keys.CROSSFADE_ENABLED] ?: false,
             crossfadeSeconds = (prefs[Keys.CROSSFADE_SECONDS] ?: 5).coerceIn(2, 10),
             monoAudio = prefs[Keys.MONO_AUDIO] ?: false,
-            lyricTextScalePercent = nearestLyricScale(prefs[Keys.LYRIC_TEXT_SCALE_PERCENT] ?: 100),
+            lyricTextScalePercent = nearestLyricScale(prefs[Keys.LYRIC_TEXT_SCALE_PERCENT] ?: 85),
             minDurationSeconds = nearestMinimumDuration(prefs[Keys.MIN_DURATION_SECONDS] ?: 15),
             telegramSupportAddress = prefs[Keys.TELEGRAM_SUPPORT_ADDRESS].orEmpty()
         )

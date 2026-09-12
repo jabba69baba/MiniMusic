@@ -1,5 +1,7 @@
 package com.example.minimusic.ui.navigation
 
+import androidx.activity.compose.PredictiveBackHandler
+
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleIn
@@ -101,6 +103,14 @@ fun MiniMusicNavGraph(
     }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+
+    // Android 13+ predictive-back participates in the same route pop as the
+    // regular BackHandler. Collecting the gesture keeps cancellation safe;
+    // navigation only occurs once the system commits the gesture.
+    PredictiveBackHandler(enabled = currentRoute != null && currentRoute != Routes.LIBRARY) {
+        it.collect { }
+        navController.popBackStack()
+    }
 
     fun openPlayer() {
         if (navController.currentDestination?.route != Routes.PLAYER) {
@@ -252,6 +262,12 @@ fun MiniMusicNavGraph(
             )
         },
         popEnterTransition = {
+            // Settings and song-info are opaque overlays. Letting the
+            // underlying library participate in the reverse shared-axis
+            // transition can leave a stale frame painted at the edge.
+            if (initialState.destination.route == Routes.SETTINGS ||
+                initialState.destination.route?.startsWith("details/") == true
+            ) return@NavHost EnterTransition.None
             slideInHorizontally(
                 initialOffsetX = { -(it * 0.25f).toInt() },
                 animationSpec = tween(
@@ -268,6 +284,12 @@ fun MiniMusicNavGraph(
             )
         },
         popExitTransition = {
+            // These screens are full-coverage routes. Remove them atomically
+            // on Back so their content cannot stick behind the library while
+            // the route transition is settling.
+            if (initialState.destination.route == Routes.SETTINGS ||
+                initialState.destination.route?.startsWith("details/") == true
+            ) return@NavHost ExitTransition.None
             // Close mirrors open exactly (same duration, same decelerate
             // curve, reversed direction): open must not feel faster than
             // close. The M3 default pairs decelerate-enter with
