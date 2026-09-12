@@ -11,9 +11,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -782,6 +784,9 @@ private fun NowPlayingPanel(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
+                    // Clip the outgoing/incoming content to the metadata slot.
+                    // Without a bounded transition, two different title heights
+                    // can paint into the artist row during rapid track changes.
                     // Title overlap, no fade: the incoming title slides a
                     // quarter-width over the outgoing one, direction aware
                     // (next/previous symmetric). The outgoing clears fast so
@@ -797,7 +802,7 @@ private fun NowPlayingPanel(
                             durationMillis = 150,
                             easing = MiniMusicMotion.navExitEasing
                         )
-                    )
+                    ) using SizeTransform(clip = true)
                 },
                 contentKey = { it.id },
                 label = "songMetadataTransition"
@@ -813,8 +818,15 @@ private fun NowPlayingPanel(
                         color = artColors.onBackground,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                repeatDelayMillis = 900,
+                                initialDelayMillis = 700,
+                                velocity = 28.dp
+                            )
                     )
 
                     Text(

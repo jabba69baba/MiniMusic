@@ -75,6 +75,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun connect() = controller.connect()
+    fun restoreLastSession(songs: List<Song>, playOnLaunch: Boolean) =
+        controller.restoreLastSession(songs, playOnLaunch)
     fun playQueue(songs: List<Song>, startIndex: Int) = controller.playQueue(songs, startIndex)
     fun startShufflePlayback(songs: List<Song>, startIndex: Int) =
         controller.startShufflePlayback(songs, startIndex)

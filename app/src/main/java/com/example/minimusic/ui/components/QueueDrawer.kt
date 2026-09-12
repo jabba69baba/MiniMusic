@@ -816,7 +816,7 @@ private fun ColumnScope.QueueDrawerList(
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
-                        layout.scrollToPositionWithOffset(currentPosition, 0)
+                        animateQueueScroll(recyclerView, currentPosition)
                     }
                 }
             }
@@ -827,12 +827,26 @@ private fun ColumnScope.QueueDrawerList(
                     recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     if (adapter.itemCount > 0) {
-                        layout.scrollToPositionWithOffset(0, 0)
+                        animateQueueScroll(recyclerView, 0)
                     }
                 }
             }
         }
     )
+}
+
+/** Matches the library locate motion: stage long jumps, then glide the final tail. */
+private fun animateQueueScroll(recyclerView: RecyclerView, targetPosition: Int) {
+    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
+    val first = layout.findFirstVisibleItemPosition()
+    if (first < 0 || abs(targetPosition - first) <= 10) {
+        recyclerView.smoothScrollToPosition(targetPosition)
+        return
+    }
+    val staged = (targetPosition + if (targetPosition > first) -6 else 6)
+        .coerceIn(0, (recyclerView.adapter?.itemCount ?: 1) - 1)
+    layout.scrollToPositionWithOffset(staged, 0)
+    recyclerView.post { recyclerView.smoothScrollToPosition(targetPosition) }
 }
 
 private class QueueRecyclerView(

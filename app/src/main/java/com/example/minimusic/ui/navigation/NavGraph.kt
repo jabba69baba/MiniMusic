@@ -90,6 +90,15 @@ fun MiniMusicNavGraph(
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
     val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
+
+    LaunchedEffect(libraryState.allSongs, appSettings.resumeOnLaunch) {
+        if (libraryState.allSongs.isNotEmpty()) {
+            playerViewModel.restoreLastSession(
+                libraryState.allSongs,
+                playOnLaunch = appSettings.resumeOnLaunch
+            )
+        }
+    }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
