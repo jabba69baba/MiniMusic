@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.activity.ExperimentalActivityApi
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -73,6 +74,7 @@ private object Routes {
     fun details(songId: Long) = "details/$songId"
 }
 
+@OptIn(ExperimentalActivityApi::class)
 @Composable
 fun MiniMusicNavGraph(
     libraryViewModel: LibraryViewModel,
