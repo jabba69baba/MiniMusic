@@ -157,9 +157,9 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSliderRow(
                         title = "Lyric text size",
-                        subtitle = when (settings.lyricTextScalePercent) {
-                            in Int.MIN_VALUE..79 -> "Small"
-                            80..92 -> "Medium"
+                        subtitle = when {
+                            settings.lyricTextScalePercent < 80 -> "Small"
+                            settings.lyricTextScalePercent <= 92 -> "Medium"
                             else -> "Large"
                         },
                         value = settings.lyricTextScalePercent.toFloat(),
