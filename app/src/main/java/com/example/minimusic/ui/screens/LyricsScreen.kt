@@ -102,7 +102,6 @@ private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
 fun LyricsScreen(
     playbackFlow: StateFlow<PlaybackUiState>,
     lyricsState: LyricsState,
-    textScalePercent: Int = 100,
     onSeekTo: (Long) -> Unit,
     onBack: () -> Unit
 ) {
@@ -146,7 +145,6 @@ fun LyricsScreen(
     val artColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
     val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
     val activeColor = artColors.primary
-    val lyricScale = (textScalePercent.coerceIn(75, 125) / 100f)
 
     // Single motion owner for this card: one vertical offset drives open
     // (rise) and close (fall) — symmetric, directional, same emphasized clock
@@ -320,9 +318,9 @@ fun LyricsScreen(
                                         color = activeColor,
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = FontWeight.SemiBold,
-                                            fontSize = 32.sp * lyricScale,
+                                            fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 38.sp * lyricScale
+                                            lineHeight = 28.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -351,9 +349,9 @@ fun LyricsScreen(
                                         color = color,
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                            fontSize = 32.sp * lyricScale,
+                                            fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 38.sp * lyricScale
+                                            lineHeight = 28.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()

@@ -10,13 +10,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val AllowedMinimumDurations = listOf(0, 15, 30, 45, 60)
-private val AllowedLyricScales = listOf(75, 85, 100)
 
 private fun nearestMinimumDuration(seconds: Int): Int =
     AllowedMinimumDurations.minByOrNull { kotlin.math.abs(it - seconds) } ?: 15
-
-private fun nearestLyricScale(percent: Int): Int =
-    AllowedLyricScales.minByOrNull { kotlin.math.abs(it - percent) } ?: 85
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -32,7 +28,6 @@ data class AppSettings(
     val crossfadeEnabled: Boolean = false,
     val crossfadeSeconds: Int = 5,
     val monoAudio: Boolean = false,
-    val lyricTextScalePercent: Int = 85,
     val minDurationSeconds: Int = 15,
     val telegramSupportAddress: String = ""
 )
@@ -57,7 +52,6 @@ class SettingsRepository(private val context: Context) {
         val CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
         val CROSSFADE_SECONDS = intPreferencesKey("crossfade_seconds")
         val MONO_AUDIO = booleanPreferencesKey("mono_audio")
-        val LYRIC_TEXT_SCALE_PERCENT = intPreferencesKey("lyric_text_scale_percent")
         val MIN_DURATION_SECONDS = intPreferencesKey("min_duration_seconds")
         val TELEGRAM_SUPPORT_ADDRESS = stringPreferencesKey("telegram_support_address")
     }
@@ -77,7 +71,6 @@ class SettingsRepository(private val context: Context) {
             crossfadeEnabled = prefs[Keys.CROSSFADE_ENABLED] ?: false,
             crossfadeSeconds = (prefs[Keys.CROSSFADE_SECONDS] ?: 5).coerceIn(2, 10),
             monoAudio = prefs[Keys.MONO_AUDIO] ?: false,
-            lyricTextScalePercent = nearestLyricScale(prefs[Keys.LYRIC_TEXT_SCALE_PERCENT] ?: 85),
             minDurationSeconds = nearestMinimumDuration(prefs[Keys.MIN_DURATION_SECONDS] ?: 15),
             telegramSupportAddress = prefs[Keys.TELEGRAM_SUPPORT_ADDRESS].orEmpty()
         )
@@ -126,10 +119,6 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setMonoAudio(enabled: Boolean) {
         context.dataStore.edit { it[Keys.MONO_AUDIO] = enabled }
-    }
-
-    suspend fun setLyricTextScalePercent(percent: Int) {
-        context.dataStore.edit { it[Keys.LYRIC_TEXT_SCALE_PERCENT] = nearestLyricScale(percent) }
     }
 
     suspend fun setMinDurationSeconds(seconds: Int) {

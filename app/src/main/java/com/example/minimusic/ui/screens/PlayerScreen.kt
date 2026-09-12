@@ -784,10 +784,18 @@ private fun NowPlayingPanel(
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .clip(ArtCornerShape),
+                            contentScale = ContentScale.Crop
+                        )
+                        // Vivi-style treatment: keep the artwork geometry intact,
+                        // but paint the depth cue over the bitmap so it reads as a
+                        // framed surface rather than a shadow floating outside it.
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
                                 .shadow(5.dp, ArtCornerShape)
                                 .clip(ArtCornerShape)
-                                .border(5.dp, artColors.onBackground.copy(alpha = 0.12f), ArtCornerShape),
-                            contentScale = ContentScale.Crop
+                                .border(5.dp, artColors.onBackground.copy(alpha = 0.24f), ArtCornerShape)
                         )
                     }
                 }

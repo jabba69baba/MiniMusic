@@ -79,7 +79,6 @@ fun SettingsScreen(
     onCrossfadeEnabledChange: (Boolean) -> Unit,
     onCrossfadeSecondsChange: (Int) -> Unit,
     onMonoAudioChange: (Boolean) -> Unit,
-    onLyricTextScaleChange: (Int) -> Unit,
     onMinDurationChange: (Int) -> Unit,
     onRescanLibrary: () -> Unit
 ) {
@@ -155,23 +154,6 @@ fun SettingsScreen(
                         onCheckedChange = onCenteredTitleChange
                     )
                     SettingsDivider()
-                    SettingsSliderRow(
-                        title = "Lyric text size",
-                        subtitle = when {
-                            settings.lyricTextScalePercent < 80 -> "Small"
-                            settings.lyricTextScalePercent <= 92 -> "Medium"
-                            else -> "Large"
-                        },
-                        value = settings.lyricTextScalePercent.toFloat(),
-                        valueRange = 75f..100f,
-                        steps = 0,
-                        enabled = true,
-                        onValueChange = { raw ->
-                            val scale = listOf(75, 85, 100)
-                                .minByOrNull { kotlin.math.abs(it - raw) } ?: 100
-                            onLyricTextScaleChange(scale)
-                        }
-                    )
                 }
             }
 
@@ -344,7 +326,6 @@ private fun SettingsSwitchRow(
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = { Text(subtitle) },
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
         modifier = Modifier.fillMaxWidth()
     )
@@ -367,7 +348,6 @@ private fun <T> SettingsChoiceRow(
                 .fillMaxWidth()
                 .clickable { expanded = true },
             headlineContent = { Text(title) },
-            supportingContent = { Text(subtitle) },
             trailingContent = {
                 Text(
                     text = selectedLabel,
@@ -421,7 +401,6 @@ private fun SettingsSliderRow(
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Slider(
             modifier = Modifier.height(32.dp),
             value = value,

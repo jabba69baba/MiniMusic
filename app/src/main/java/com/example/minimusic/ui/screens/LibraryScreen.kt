@@ -373,13 +373,13 @@ fun LibraryScreen(
                                     },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.First,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.MyLocation,
                                         contentDescription = "Jump to current song",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -393,13 +393,13 @@ fun LibraryScreen(
                                     },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.Middle,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.Shuffle,
                                         contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -407,13 +407,13 @@ fun LibraryScreen(
                                     onClick = { sortMenuExpanded = true },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.Last,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.Sort,
                                         contentDescription = "Sort songs",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }

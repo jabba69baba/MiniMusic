@@ -1,6 +1,8 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -252,12 +254,11 @@ fun MiniMusicNavGraph(
             )
         },
         popEnterTransition = {
-            // Settings and song-info are opaque overlays. Letting the
-            // underlying library participate in the reverse shared-axis
-            // transition can leave a stale frame painted at the edge.
             if (initialState.destination.route == Routes.SETTINGS ||
                 initialState.destination.route?.startsWith("details/") == true
-            ) EnterTransition.None else slideInHorizontally(
+            ) fadeIn(tween(220, easing = MiniMusicMotion.navEnterEasing)) +
+                slideInHorizontally(initialOffsetX = { -(it * 0.08f).toInt() }, animationSpec = tween(220))
+            else slideInHorizontally(
                 initialOffsetX = { -(it * 0.25f).toInt() },
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
@@ -273,17 +274,11 @@ fun MiniMusicNavGraph(
             )
         },
         popExitTransition = {
-            // These screens are full-coverage routes. Remove them atomically
-            // on Back so their content cannot stick behind the library while
-            // the route transition is settling.
             if (initialState.destination.route == Routes.SETTINGS ||
                 initialState.destination.route?.startsWith("details/") == true
-            ) ExitTransition.None else {
-            // Close mirrors open exactly (same duration, same decelerate
-            // curve, reversed direction): open must not feel faster than
-            // close. The M3 default pairs decelerate-enter with
-            // accelerate-exit, but that asymmetry read as a speed mismatch.
-            slideOutHorizontally(
+            ) fadeOut(tween(180, easing = MiniMusicMotion.navExitEasing)) +
+                slideOutHorizontally(targetOffsetX = { (it * 0.08f).toInt() }, animationSpec = tween(180))
+            else slideOutHorizontally(
                 targetOffsetX = { (it * 0.5f).toInt() },
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
@@ -297,7 +292,6 @@ fun MiniMusicNavGraph(
                     easing = MiniMusicMotion.navEnterEasing
                 )
             )
-            }
         }
     ) {
 
@@ -322,7 +316,6 @@ fun MiniMusicNavGraph(
                 onCrossfadeEnabledChange = settingsViewModel::setCrossfadeEnabled,
                 onCrossfadeSecondsChange = settingsViewModel::setCrossfadeSeconds,
                 onMonoAudioChange = settingsViewModel::setMonoAudio,
-                onLyricTextScaleChange = settingsViewModel::setLyricTextScalePercent,
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
                 onRescanLibrary = { libraryViewModel.rescanLibrary() }
             )
@@ -395,7 +388,6 @@ fun MiniMusicNavGraph(
                     LyricsScreen(
                         playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
-                        textScalePercent = appSettings.lyricTextScalePercent,
                         onSeekTo = playerViewModel::seekTo,
                         // Back always lands on the player card: pop to PLAYER
                         // when it's in the stack (tap/drag-open path), else
@@ -417,7 +409,6 @@ fun MiniMusicNavGraph(
                 LyricsScreen(
                     playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
-                    textScalePercent = appSettings.lyricTextScalePercent,
                     onSeekTo = playerViewModel::seekTo,
                     onBack = {
                         val popped =
