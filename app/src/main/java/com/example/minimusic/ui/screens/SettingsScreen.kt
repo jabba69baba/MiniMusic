@@ -79,6 +79,7 @@ fun SettingsScreen(
     onCrossfadeEnabledChange: (Boolean) -> Unit,
     onCrossfadeSecondsChange: (Int) -> Unit,
     onMonoAudioChange: (Boolean) -> Unit,
+    onLyricTextScaleChange: (Int) -> Unit,
     onMinDurationChange: (Int) -> Unit,
     onRescanLibrary: () -> Unit
 ) {
@@ -118,7 +119,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsChoiceRow(
                         title = "App theme",
-                        subtitle = "Dark, Light, or Auto (system)",
+                        subtitle = "Choose Light, Dark, or Auto",
                         options = listOf(
                             ThemeMode.DARK to "Dark",
                             ThemeMode.LIGHT to "Light",
@@ -130,7 +131,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "AMOLED black mode",
-                        subtitle = "Use true-black surfaces when dark theme is active",
+                        subtitle = "Use pure-black surfaces in Dark mode",
                         checked = settings.amoledBlackMode,
                         onCheckedChange = onAmoledBlackModeChange
                     )
@@ -142,16 +143,30 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Audio quality badge",
-                        subtitle = "Show sample rate, bitrate, and format on the player",
+                        subtitle = "Show format, bitrate, and sample rate",
                         checked = settings.showAudioQualityBadge,
                         onCheckedChange = onShowAudioQualityBadgeChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Centered title",
-                        subtitle = "Center the current song title and artist in the player",
+                        subtitle = "Center the player title and artist",
                         checked = settings.centeredTitle,
                         onCheckedChange = onCenteredTitleChange
+                    )
+                    SettingsDivider()
+                    SettingsSliderRow(
+                        title = "Lyric text size",
+                        subtitle = "${settings.lyricTextScalePercent}%",
+                        value = settings.lyricTextScalePercent.toFloat(),
+                        valueRange = 75f..125f,
+                        steps = 0,
+                        enabled = true,
+                        onValueChange = { raw ->
+                            val scale = listOf(75, 85, 100, 115, 125)
+                                .minByOrNull { kotlin.math.abs(it - raw) } ?: 100
+                            onLyricTextScaleChange(scale)
+                        }
                     )
                 }
             }
@@ -161,21 +176,21 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Resume on launch",
-                        subtitle = "Retain queue order on launch; queue restoration is not active yet",
+                        subtitle = "Restore the last queue and position on launch",
                         checked = settings.resumeOnLaunch,
                         onCheckedChange = onResumeOnLaunchChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Stop on dismiss",
-                        subtitle = "Pause playback when the app is cleared from Recents; service hook pending",
+                        subtitle = "Pause playback when the app is dismissed",
                         checked = settings.stopOnDismiss,
                         onCheckedChange = onStopOnDismissChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Haptic feedback",
-                        subtitle = "Vibrate on touches and drags; interaction hooks pending",
+                        subtitle = "Use haptics for key interactions",
                         checked = settings.hapticFeedback,
                         onCheckedChange = onHapticFeedbackChange
                     )
@@ -187,7 +202,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Crossfade",
-                        subtitle = "Preference saved; Media3 crossfade is not active in the current player service",
+                        subtitle = "Blend adjacent tracks · not active yet",
                         checked = settings.crossfadeEnabled,
                         onCheckedChange = onCrossfadeEnabledChange
                     )
@@ -204,7 +219,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Mono Audio",
-                        subtitle = "Preference saved; channel mixing will be wired into playback next",
+                        subtitle = "Mix left and right channels to mono",
                         checked = settings.monoAudio,
                         onCheckedChange = onMonoAudioChange
                     )
@@ -226,7 +241,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Rescan library") },
-                        supportingContent = { Text("Clear the current library view and reload local MediaStore files") },
+                        supportingContent = { Text("Reload audio from MediaStore") },
                         trailingContent = {
                             if (libraryState.isLoading) {
                                 CircularProgressIndicator(modifier = Modifier.padding(8.dp))

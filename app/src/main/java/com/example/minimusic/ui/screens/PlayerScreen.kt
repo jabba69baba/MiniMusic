@@ -89,6 +89,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -656,7 +657,10 @@ private fun NowPlayingPanel(
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
-        tapDirectionOverride = null
+        // Keep an explicit previous/next direction alive for the full carousel
+        // transition. Clearing it before AnimatedContent starts made the art
+        // fall back to queue-index geography, which is wrong for shuffle and
+        // wraparound transitions.
         // Snapshot the outgoing art before replacing the id below. It was on
         // screen a frame ago, so it resolves from the memory cache instantly.
         stackArtUri = lastSongId?.let { prevId ->
@@ -686,6 +690,8 @@ private fun NowPlayingPanel(
                 animationSpec = MiniMusicMotion.fastSpatial()
             )
         }
+        kotlinx.coroutines.delay(420L)
+        tapDirectionOverride = null
     }
 
     LaunchedEffect(playbackState.queue, playbackState.currentIndex) {
@@ -804,6 +810,10 @@ private fun NowPlayingPanel(
                         )
                     ) using SizeTransform(clip = true)
                 },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isLandscape) 48.dp else 72.dp)
+                    .clipToBounds(),
                 contentKey = { it.id },
                 label = "songMetadataTransition"
             ) { displayedSong ->
@@ -825,7 +835,7 @@ private fun NowPlayingPanel(
                                 iterations = Int.MAX_VALUE,
                                 repeatDelayMillis = 900,
                                 initialDelayMillis = 700,
-                                velocity = 28.dp
+                                velocity = 19.dp
                             )
                     )
 

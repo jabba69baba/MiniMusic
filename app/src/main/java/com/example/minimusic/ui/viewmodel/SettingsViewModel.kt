@@ -71,4 +71,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setMonoAudio(enabled: Boolean) = viewModelScope.launch {
         repository.setMonoAudio(enabled)
     }
+
+    fun setLyricTextScalePercent(percent: Int) = viewModelScope.launch {
+        repository.setLyricTextScalePercent(percent)
+    }
 }

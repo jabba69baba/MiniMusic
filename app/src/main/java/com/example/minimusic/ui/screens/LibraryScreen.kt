@@ -527,7 +527,7 @@ private fun SongsTab(
         songs.asSequence()
             .mapNotNull { it.albumArtUri }
             .distinct()
-            .take(200)
+            .take(64)
             .forEach { artworkUri ->
                 MiniMusicImageLoader.get(context).enqueue(
                     ImageRequest.Builder(context)

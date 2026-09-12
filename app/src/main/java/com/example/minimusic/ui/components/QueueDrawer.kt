@@ -81,6 +81,7 @@ import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -839,14 +840,21 @@ private fun ColumnScope.QueueDrawerList(
 private fun animateQueueScroll(recyclerView: RecyclerView, targetPosition: Int) {
     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
     val first = layout.findFirstVisibleItemPosition()
+    fun glideToStart() {
+        val scroller = object : LinearSmoothScroller(recyclerView.context) {
+            override fun getVerticalSnapPreference(): Int = SNAP_TO_START
+        }
+        scroller.targetPosition = targetPosition
+        layout.startSmoothScroll(scroller)
+    }
     if (first < 0 || abs(targetPosition - first) <= 10) {
-        recyclerView.smoothScrollToPosition(targetPosition)
+        glideToStart()
         return
     }
     val staged = (targetPosition + if (targetPosition > first) -6 else 6)
         .coerceIn(0, (recyclerView.adapter?.itemCount ?: 1) - 1)
     layout.scrollToPositionWithOffset(staged, 0)
-    recyclerView.post { recyclerView.smoothScrollToPosition(targetPosition) }
+    recyclerView.post { glideToStart() }
 }
 
 private class QueueRecyclerView(

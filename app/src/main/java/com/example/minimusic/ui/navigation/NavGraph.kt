@@ -310,6 +310,7 @@ fun MiniMusicNavGraph(
                 onCrossfadeEnabledChange = settingsViewModel::setCrossfadeEnabled,
                 onCrossfadeSecondsChange = settingsViewModel::setCrossfadeSeconds,
                 onMonoAudioChange = settingsViewModel::setMonoAudio,
+                onLyricTextScaleChange = settingsViewModel::setLyricTextScalePercent,
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
                 onRescanLibrary = { libraryViewModel.rescanLibrary() }
             )
@@ -382,6 +383,7 @@ fun MiniMusicNavGraph(
                     LyricsScreen(
                         playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
+                        textScalePercent = appSettings.lyricTextScalePercent,
                         onSeekTo = playerViewModel::seekTo,
                         // Back always lands on the player card: pop to PLAYER
                         // when it's in the stack (tap/drag-open path), else
@@ -403,6 +405,7 @@ fun MiniMusicNavGraph(
                 LyricsScreen(
                     playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
+                    textScalePercent = appSettings.lyricTextScalePercent,
                     onSeekTo = playerViewModel::seekTo,
                     onBack = {
                         val popped =

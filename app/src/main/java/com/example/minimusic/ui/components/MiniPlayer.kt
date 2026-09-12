@@ -146,7 +146,7 @@ fun MiniPlayer(
                             iterations = Int.MAX_VALUE,
                             repeatDelayMillis = 900,
                             initialDelayMillis = 700,
-                            velocity = 28.dp
+                            velocity = 19.dp
                         )
                     )
                     Text(

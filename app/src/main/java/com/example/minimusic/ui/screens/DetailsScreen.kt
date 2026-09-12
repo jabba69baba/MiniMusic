@@ -2,6 +2,7 @@ package com.example.minimusic.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
@@ -187,8 +188,9 @@ fun DetailsScreen(
             transitionSpec = {
                 // Scale-only appear, no fade: content grows 0.96 -> 1 over
                 // the static loading indicator it replaces.
-                scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects()) togetherWith
-                    scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
+                (scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects()) togetherWith
+                    scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects()))
+                    .using(SizeTransform(clip = true))
             },
             label = "detailsContentTransition"
         ) { hasDetails ->
