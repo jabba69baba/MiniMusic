@@ -1,8 +1,5 @@
 package com.example.minimusic.ui.navigation
 
-import androidx.activity.compose.PredictiveBackHandler
-import androidx.activity.ExperimentalActivityApi
-
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleIn
@@ -57,7 +54,6 @@ import com.example.minimusic.ui.viewmodel.LibraryViewModel
 import kotlinx.coroutines.launch
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -74,7 +70,6 @@ private object Routes {
     fun details(songId: Long) = "details/$songId"
 }
 
-@OptIn(ExperimentalActivityApi::class)
 @Composable
 fun MiniMusicNavGraph(
     libraryViewModel: LibraryViewModel,
@@ -106,14 +101,6 @@ fun MiniMusicNavGraph(
     }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
-
-    // Android 13+ predictive-back participates in the same route pop as the
-    // regular BackHandler. Collecting the gesture keeps cancellation safe;
-    // navigation only occurs once the system commits the gesture.
-    PredictiveBackHandler(enabled = currentRoute != null && currentRoute != Routes.LIBRARY) {
-        it.collect { }
-        navController.popBackStack()
-    }
 
     fun openPlayer() {
         if (navController.currentDestination?.route != Routes.PLAYER) {
