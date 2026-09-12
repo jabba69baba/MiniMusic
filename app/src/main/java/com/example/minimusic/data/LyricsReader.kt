@@ -58,7 +58,14 @@ class LyricsReader(private val context: Context) {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, song.contentUri)
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LYRICS)
+            // The lyrics metadata key is not exposed consistently across Android
+            // SDK stubs. Resolve it reflectively so older compile SDKs still build.
+            val lyricsKey = runCatching {
+                MediaMetadataRetriever::class.java
+                    .getField("METADATA_KEY_LYRICS")
+                    .getInt(null)
+            }.getOrNull()
+            lyricsKey?.let { retriever.extractMetadata(it) }
                 ?.let(::cleanLyricsText)
         } catch (_: RuntimeException) {
             null
