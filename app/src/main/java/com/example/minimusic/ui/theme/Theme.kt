@@ -91,20 +91,22 @@ fun MiniMusicTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    // AMOLED is a dark-theme surface policy only. Override every Material 3 surface
-    // container so individual screens cannot fall back to warm/dynamic surfaces.
+    // AMOLED keeps only the deepest app surfaces black. Container roles remain
+    // visibly separated so cards, dividers, switches, queue rows, and the mini
+    // player do not disappear into one indistinguishable black plane.
     val colorScheme = if (darkTheme && amoledBlack) {
         baseColorScheme.copy(
             background = Color.Black,
             surface = Color.Black,
-            surfaceVariant = Color.Black,
+            surfaceVariant = Color(0xFF1D1B1E),
             surfaceDim = Color.Black,
-            surfaceBright = Color.Black,
+            surfaceBright = Color(0xFF252326),
             surfaceContainerLowest = Color.Black,
-            surfaceContainerLow = Color.Black,
-            surfaceContainer = Color.Black,
-            surfaceContainerHigh = Color.Black,
-            surfaceContainerHighest = Color.Black
+            surfaceContainerLow = Color(0xFF0D0C0E),
+            surfaceContainer = Color(0xFF121013),
+            surfaceContainerHigh = Color(0xFF1A181B),
+            surfaceContainerHighest = Color(0xFF242125),
+            outlineVariant = Color(0xFF3A363B)
         )
     } else {
         baseColorScheme
