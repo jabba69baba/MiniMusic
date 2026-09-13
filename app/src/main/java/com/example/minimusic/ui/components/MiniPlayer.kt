@@ -141,35 +141,28 @@ fun MiniPlayer(
                 // Keyed so a new bitmap never cross-dissolves over the old
                 // tile: the art swaps the instant its request resolves.
                 AnimatedContent(
-                    targetState = song,
+                    targetState = song?.id,
                     transitionSpec = {
                         (fadeIn(tween(180)) + slideInVertically(initialOffsetY = { it / 3 }, animationSpec = tween(220))) togetherWith
                             (fadeOut(tween(120)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(120)))
                     },
-                    label = "miniPlayerSongSwitch"
-                ) { displayedSong ->
-                    MiniPlayerArt(artUri = displayedSong?.albumArtUri)
-                }
-                AnimatedContent(
-                    targetState = song,
-                    transitionSpec = {
-                        (fadeIn(tween(180)) + slideInVertically(initialOffsetY = { it / 3 }, animationSpec = tween(220))) togetherWith
-                            (fadeOut(tween(120)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(120)))
-                    },
-                    label = "miniPlayerMetadataSwitch",
+                    label = "miniPlayerTrackSwitch",
                     modifier = Modifier.weight(1f)
-                ) { displayedSong ->
-                    Column {
-                        Text(
-                            text = displayedSong?.title ?: "What's the vibe?",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Normal,
-                            color = artColors.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
-                        )
-                        Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MiniPlayerArt(artUri = song?.albumArtUri)
+                        Column {
+                            Text(
+                                text = song?.title ?: "What's the vibe?",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Normal,
+                                color = artColors.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
+                            )
+                            Text(text = song?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }

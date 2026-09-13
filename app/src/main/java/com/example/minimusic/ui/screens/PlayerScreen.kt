@@ -1,7 +1,6 @@
 package com.example.minimusic.ui.screens
 
 import android.app.Activity
-import android.view.HapticFeedbackConstants
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import android.content.Context
@@ -489,12 +488,6 @@ private fun SleepTimerDialog(
                         style = MaterialTheme.typography.titleMedium,
                         color = artColors.onSurface
                     )
-                    Text(
-                        text = if (endOfCurrentSong) "Playback stops at the end" else "Playback will stop automatically",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = artColors.onSurfaceVariant,
-                        textAlign = TextAlign.End
-                    )
                 }
                 Slider(
                     modifier = Modifier.height(32.dp),
@@ -548,29 +541,24 @@ private fun SleepTimerDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onDismiss() }, colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = artColors.onSurfaceVariant), border = androidx.compose.foundation.BorderStroke(1.dp, artColors.onSurfaceVariant)) {
-                        Text("Dismiss")
+                    TextButton(onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onDismiss() }, modifier = Modifier.weight(1f)) {
+                        Text("Dismiss", color = artColors.onSurfaceVariant)
                     }
-                    OutlinedButton(
+                    TextButton(
                         onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onCancel() },
                         enabled = activeTimer != null,
-                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = artColors.primary),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, artColors.onSurfaceVariant)
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Cancel timer")
+                        Text("Cancel timer", color = if (activeTimer != null) artColors.primary else artColors.onSurfaceVariant)
                     }
-                    OutlinedButton(
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic();
-                            if (endOfCurrentSong) {
-                                onStart(0L, true)
-                            } else {
-                                onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
-                            }
+                    TextButton(
+                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                            if (endOfCurrentSong) onStart(0L, true)
+                            else onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
                         },
-                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = artColors.primary),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, artColors.primary)
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Set")
+                        Text("Set", color = artColors.primary)
                     }
                 }
             }
@@ -590,7 +578,7 @@ private fun SleepTimerSwitchRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = if (checked) artColors.primaryContainer else artColors.surfaceVariant
+        color = artColors.surfaceVariant
     ) {
         Row(
             modifier = Modifier
@@ -602,7 +590,7 @@ private fun SleepTimerSwitchRow(
         ) {
             Text(
                 text = label,
-                color = if (checked) artColors.onPrimaryContainer else artColors.onSurface,
+                color = artColors.onSurface,
                 style = MaterialTheme.typography.bodyLarge
             )
             Switch(
@@ -953,7 +941,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    if (hapticsEnabled) view.performMiniMusicHaptic()
                     tapDirectionOverride = -1
                     onSkipPrevious()
                 },
@@ -964,7 +952,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.primary,
                 contentColor = artColors.onPrimary,
                 onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    if (hapticsEnabled) view.performMiniMusicHaptic()
                     onTogglePlayPause()
                 },
                 modifier = Modifier
@@ -978,7 +966,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    if (hapticsEnabled) view.performMiniMusicHaptic()
                     tapDirectionOverride = 1
                     onSkipNext()
                 },

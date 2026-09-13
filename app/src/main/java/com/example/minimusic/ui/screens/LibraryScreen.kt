@@ -868,36 +868,35 @@ private fun SlidingCategoryControl(
     }
     Surface(
         onClick = onSelectNext,
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        tonalElevation = 2.dp,
         modifier = Modifier.width(142.dp).height(48.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedContent(
-                targetState = selected,
-                transitionSpec = {
-                    (slideInHorizontally(animationSpec = tween(220)) + fadeIn(tween(180))) togetherWith
-                        (slideOutHorizontally(animationSpec = tween(180)) + fadeOut(tween(140)))
-                },
-                label = "activeLibraryCategory"
-            ) { category ->
-                Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    AnimatedContent(targetState = selected, transitionSpec = {
+                        (slideInHorizontally(animationSpec = tween(220)) + fadeIn(tween(180))) togetherWith
+                            (slideOutHorizontally(animationSpec = tween(180)) + fadeOut(tween(140)))
+                    }, label = "activeLibraryCategory") { category ->
+                        Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
-            AnimatedContent(
-                targetState = next,
-                transitionSpec = {
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                AnimatedContent(targetState = next, transitionSpec = {
                     (slideInHorizontally(animationSpec = tween(220)) + fadeIn(tween(180))) togetherWith
                         (slideOutHorizontally(animationSpec = tween(180)) + fadeOut(tween(140)))
-                },
-                label = "nextLibraryCategory"
-            ) { category ->
-                Text(category.label, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelLarge)
+                }, label = "nextLibraryCategory") { category ->
+                    Text(category.label, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -1061,6 +1060,8 @@ private fun SortMenu(
     onDismiss: () -> Unit,
     onSelect: (SongSortOrder) -> Unit
 ) {
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     if (!expanded) return
     var selectedField by remember(selected) { mutableStateOf(sortFieldOf(selected)) }
     var ascending by remember(selected) {
@@ -1092,10 +1093,12 @@ private fun SortMenu(
                     ascending = ascending,
                     onAscending = {
                         ascending = true
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                         onSelect(sortOrderOf(selectedField, true))
                     },
                     onDescending = {
                         ascending = false
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                         onSelect(sortOrderOf(selectedField, false))
                     }
                 )
@@ -1107,6 +1110,7 @@ private fun SortMenu(
                             .clip(RoundedCornerShape(16.dp))
                             .clickable {
                                 selectedField = field
+                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                 onSelect(sortOrderOf(field, ascending))
                             },
                         shape = RoundedCornerShape(16.dp),
@@ -1134,7 +1138,8 @@ private fun SortMenu(
                                 selected = selectedFieldRow,
                                 onClick = {
                                     selectedField = field
-                                    onSelect(sortOrderOf(field, ascending))
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                onSelect(sortOrderOf(field, ascending))
                                 }
                             )
                         }
