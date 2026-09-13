@@ -172,6 +172,7 @@ fun MiniPlayer(
                         Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+            }
 
             // Play/pause control with a circular progress ring. No key() around
             // the track change: remounting snaps the ring and pops the icon.
