@@ -445,6 +445,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .clickable {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                     if (isOpen) queueTopRequest++ else onOpenChange(true)
                                 }
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
@@ -606,7 +607,10 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .clickable { queueTopRequest++ }
+                                    .clickable {
+                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                        queueTopRequest++
+                                    }
                                     .padding(horizontal = 12.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {

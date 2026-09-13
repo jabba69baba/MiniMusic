@@ -8,5 +8,5 @@ import androidx.compose.runtime.compositionLocalOf
 val LocalMiniMusicHaptics = compositionLocalOf { true }
 
 fun View.performMiniMusicHaptic() {
-    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+    performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
 }

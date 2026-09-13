@@ -1,5 +1,11 @@
 package com.example.minimusic.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -134,32 +140,36 @@ fun MiniPlayer(
             ) {
                 // Keyed so a new bitmap never cross-dissolves over the old
                 // tile: the art swaps the instant its request resolves.
-                key(song?.id ?: -1L) {
-                    MiniPlayerArt(artUri = song?.albumArtUri)
+                AnimatedContent(
+                    targetState = song,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + slideInVertically(initialOffsetY = { it / 3 }, animationSpec = tween(220))) togetherWith
+                            (fadeOut(tween(120)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(120)))
+                    },
+                    label = "miniPlayerSongSwitch"
+                ) { displayedSong ->
+                    MiniPlayerArt(artUri = displayedSong?.albumArtUri)
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song?.title ?: "What's the vibe?",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
-                        color = artColors.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier.basicMarquee(
-                            iterations = Int.MAX_VALUE,
-                            repeatDelayMillis = 900,
-                            initialDelayMillis = 700,
-                            velocity = 19.dp
+                AnimatedContent(
+                    targetState = song,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + slideInVertically(initialOffsetY = { it / 3 }, animationSpec = tween(220))) togetherWith
+                            (fadeOut(tween(120)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(120)))
+                    },
+                    label = "miniPlayerMetadataSwitch",
+                    modifier = Modifier.weight(1f)
+                ) { displayedSong ->
+                    Column {
+                        Text(
+                            text = displayedSong?.title ?: "What's the vibe?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Normal,
+                            color = artColors.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
                         )
-                    )
-                    Text(
-                        text = song?.artist ?: "Tap a song to listen",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = artColors.onSurfaceVariant,
-                        maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 

@@ -197,6 +197,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSliderRow(
                         title = "Crossfade duration",
+                        description = "Blend adjacent tracks",
                         subtitle = "${settings.crossfadeSeconds} seconds",
                         value = settings.crossfadeSeconds.toFloat(),
                         valueRange = 2f..10f,
@@ -219,6 +220,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSliderRow(
                         title = "Song minimum length",
+                        description = "Skip songs below this length",
                         subtitle = if (settings.minDurationSeconds == 0) "No minimum" else "${settings.minDurationSeconds} seconds",
                         value = settings.minDurationSeconds.toFloat(),
                         valueRange = 0f..60f,
@@ -404,6 +406,7 @@ private fun <T> SettingsChoiceRow(
 @Composable
 private fun SettingsSliderRow(
     title: String,
+    description: String? = null,
     subtitle: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
@@ -414,7 +417,10 @@ private fun SettingsSliderRow(
     val hapticsEnabled = LocalMiniMusicHaptics.current
     val hapticView = LocalView.current
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            description?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End) }
+        }
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Slider(
             modifier = Modifier.height(32.dp),
