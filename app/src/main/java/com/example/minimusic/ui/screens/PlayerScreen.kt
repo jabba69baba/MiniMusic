@@ -650,8 +650,14 @@ private fun NowPlayingPanel(
     // Manual taps override the derivation for the next change (a tap's intent
     // beats queue geography); the song-change effect below consumes it.
     var tapDirectionOverride by remember { mutableStateOf<Int?>(null) }
-    val transitionDirection = tapDirectionOverride
-        ?: if (playbackState.currentIndex >= lastDirectionIndex) 1 else -1
+    // Capture the direction once for each song. The previous implementation
+    // read the mutable override directly from transitionSpec; clearing it
+    // during the first recomposition could change a running transition from
+    // Previous to Next (or vice versa).
+    val transitionDirection = remember(song.id) {
+        tapDirectionOverride
+            ?: if (playbackState.currentIndex >= lastDirectionIndex) 1 else -1
+    }
     SideEffect { lastDirectionIndex = playbackState.currentIndex }
     // Art rendered behind the incoming frame during the carousel slide, so the
     // travel never exposes an empty slot while the new bitmap decodes. Resolved

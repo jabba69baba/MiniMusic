@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -98,6 +99,13 @@ fun MiniPlayer(
     val hapticsEnabled = LocalMiniMusicHaptics.current
     val song = playbackState.currentSong
     val isPlaying = playbackState.isPlaying
+    var lastDirectionIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
+    val trackTransitionDirection = remember(song?.id) {
+        if (playbackState.currentIndex >= lastDirectionIndex) 1 else -1
+    }
+    androidx.compose.runtime.SideEffect {
+        lastDirectionIndex = playbackState.currentIndex
+    }
     val positionMs = playbackState.positionMs
     val durationMs = playbackState.durationMs
     val progress by remember(positionMs, durationMs) {
@@ -146,9 +154,9 @@ fun MiniPlayer(
                     targetState = song,
                     transitionSpec = {
                         (fadeIn(tween(180)) + slideInVertically(
-                            initialOffsetY = { it / 3 }, animationSpec = tween(220)
+                            initialOffsetY = { trackTransitionDirection * it }, animationSpec = tween(360)
                         )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
-                            targetOffsetY = { -it / 4 }, animationSpec = tween(120)
+                            targetOffsetY = { -trackTransitionDirection * it }, animationSpec = tween(260)
                         ))
                     },
                     contentKey = { it?.id },

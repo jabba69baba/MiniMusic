@@ -1,5 +1,7 @@
 package com.example.minimusic.ui.screens
 
+import kotlin.math.roundToInt
+
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
@@ -7,7 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -84,6 +86,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -106,6 +113,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.data.model.Album
@@ -864,34 +873,77 @@ private fun SlidingCategoryControl(
     onSelectNext: () -> Unit
 ) {
     val nextInteraction = remember { MutableInteractionSource() }
-    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.background,
-        tonalElevation = 0.dp, modifier = Modifier.width(142.dp).height(48.dp)) {
+    val density = LocalDensity.current
+    val slotWidth = 67.dp
+    var displayedStart by remember { mutableStateOf(selected) }
+    val stripOffset = remember { androidx.compose.animation.core.Animatable(0f) }
+
+    // This is one physical strip, not AnimatedContent. Keeping the three
+    // possible labels in one Row prevents outgoing and incoming compositions
+    // from being drawn on top of each other (the source of the duplicate
+    // Artists/A labels seen during a switch).
+    LaunchedEffect(selected) {
+        if (selected != displayedStart) {
+            stripOffset.animateTo(
+                targetValue = -with(density) { slotWidth.toPx() },
+                animationSpec = tween(360)
+            )
+            displayedStart = selected
+            stripOffset.snapTo(0f)
+        }
+    }
+
+    val second = when (displayedStart) {
+        LibraryTab.SONGS -> LibraryTab.ARTISTS
+        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+        LibraryTab.ALBUMS -> LibraryTab.SONGS
+    }
+    val third = when (second) {
+        LibraryTab.SONGS -> LibraryTab.ARTISTS
+        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+        LibraryTab.ALBUMS -> LibraryTab.SONGS
+    }
+
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.background,
+        tonalElevation = 0.dp,
+        modifier = Modifier.width(142.dp).height(48.dp)
+    ) {
         Box(Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
-            // Geometry is fixed; this highlight never participates in motion.
-            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.padding(4.dp).fillMaxHeight().fillMaxWidth(0.5f)) {}
-            // One AnimatedContent owns the complete two-label strip. Each slot
-            // clips its own text, so the active label cannot leak past its
-            // highlighted segment while the strip travels as one unit.
-            AnimatedContent(targetState = selected, transitionSpec = {
-                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
-                    slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
-            }, label = "categoryTextStrip") { category ->
-                val following = when (category) {
-                    LibraryTab.SONGS -> LibraryTab.ARTISTS
-                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-                    LibraryTab.ALBUMS -> LibraryTab.SONGS
-                }
-                Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f).fillMaxHeight().clipToBounds(), contentAlignment = Alignment.Center) {
-                        Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), maxLines = 1)
-                    }
-                    Box(Modifier.weight(1f).fillMaxHeight().clipToBounds().clickable(
-                        interactionSource = nextInteraction, indication = null, onClick = onSelectNext
-                    ), contentAlignment = Alignment.Center) {
-                        Text(following.label, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal), maxLines = 1)
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
+            ) {}
+            Box(Modifier.fillMaxSize().clipToBounds()) {
+                Row(
+                    modifier = Modifier
+                        .offset { IntOffset(stripOffset.value.roundToInt(), 0) }
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf(displayedStart, second, third).forEachIndexed { index, category ->
+                        Box(
+                            modifier = Modifier.width(slotWidth).height(40.dp).clipToBounds()
+                                .then(if (index == 1) Modifier.clickable(
+                                    interactionSource = nextInteraction,
+                                    indication = null,
+                                    onClick = onSelectNext
+                                ) else Modifier),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = category.label,
+                                color = if (index == 0) MaterialTheme.colorScheme.onSecondaryContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
                     }
                 }
             }
