@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -880,9 +881,6 @@ private fun SlidingCategoryControl(
     }
     val slotWidth = 67.dp
 
-    // Keep both semantic labels in explicitly sized, fixed slots. The former
-    // translated Row was measured at the viewport width, so its second label
-    // could be laid out outside the clip and disappear completely.
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.background,
@@ -902,20 +900,36 @@ private fun SlidingCategoryControl(
                     .height(40.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Only the active slot animates. The inactive slot remains a
+                // fixed, always-mounted label, so the reel never creates a
+                // blank second segment or a duplicate label outside its clip.
                 Box(
                     modifier = Modifier.width(slotWidth).fillMaxHeight().clipToBounds(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = selected.label,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
+                    AnimatedContent(
+                        targetState = selected.label,
+                        transitionSpec = {
+                            (slideInHorizontally(
+                                initialOffsetX = { it }, animationSpec = tween(260)
+                            ) + fadeIn(tween(120))) togetherWith
+                                (slideOutHorizontally(
+                                    targetOffsetX = { -it }, animationSpec = tween(180)
+                                ) + fadeOut(tween(100)))
+                        },
+                        label = "activeCategoryReel"
+                    ) { label ->
+                        Text(
+                            text = label,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip
+                        )
+                    }
                 }
                 Box(
                     modifier = Modifier

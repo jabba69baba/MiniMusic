@@ -1286,12 +1286,12 @@ private fun CapsuleSegment(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (active) artColors.secondaryContainer else Color.Transparent,
+        targetValue = if (active) artColors.primary else Color.Transparent,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabBackground"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (active) artColors.onSecondaryContainer else artColors.onSurfaceVariant,
+        targetValue = if (active) artColors.onPrimary else artColors.onSurfaceVariant,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabContent"
     )
@@ -1362,12 +1362,7 @@ private fun CapsuleSegment(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = contentColor,
-            modifier = Modifier
-                .size(if (active) 28.dp else 24.dp)
-                .graphicsLayer {
-                    scaleX = if (active) 1.08f else 1f
-                    scaleY = if (active) 1.08f else 1f
-                }
+
         )
     }
 }
