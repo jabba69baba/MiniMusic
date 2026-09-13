@@ -483,8 +483,8 @@ private fun SleepTimerDialog(
         ) {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = artColors.onSurface)
-                    Text(if (endOfCurrentSong) "End of current song" else "$selectedMinutes minutes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = artColors.onSurface)
+                    Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal, color = artColors.onSurface)
+                    Text(if (endOfCurrentSong) "End of current song" else "$selectedMinutes minutes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = artColors.onSurface)
                 }
                 Slider(
                     modifier = Modifier.height(32.dp),
@@ -549,7 +549,7 @@ private fun SleepTimerAction(
         border = BorderStroke(1.dp, artColors.onSurfaceVariant)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(label, color = artColors.onSurface)
+            Text(label, color = artColors.onSurface, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -577,7 +577,8 @@ private fun SleepTimerSwitchRow(
             Text(
                 text = label,
                 color = artColors.onSurface,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
             )
             Switch(
                 checked = checked,
