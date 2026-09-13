@@ -2,7 +2,7 @@ name: Build MiniMusic APK
 
 on:
   push:
-    branches: [ main, master, m3e-expressive-rollout ]
+    branches: [ main, master, m3e-expressive-rollout, arena/01a096d7-minimusic ]
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,24 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
+
+      - name: Report Gradle diagnostics
+        if: failure()
+        run: |
+          echo "Gradle diagnostics (last 120 lines):"
+          tail -120 build-debug.log
+          grep -E "(^e: |error:|Error:|FAILURE:)" build-debug.log | tail -80 || true
+          while IFS= read -r line; do echo "::error::$line"; done < <(grep -E "(^e: |error:|Error:|FAILURE:)" build-debug.log | tail -80)
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug-log
+          path: build-debug.log
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
