@@ -7,6 +7,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
@@ -14,6 +20,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -75,6 +82,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -89,6 +97,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
@@ -97,6 +106,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.minimusic.ui.components.LocalMiniMusicHaptics
+import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
 import com.example.minimusic.data.model.Song
@@ -120,7 +131,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    SONGS("Songs", Icons.Filled.MusicNote),
+    SONGS("Tracks", Icons.Filled.MusicNote),
     ARTISTS("Artists", Icons.Filled.Person),
     ALBUMS("Albums", Icons.Filled.Album)
 }
@@ -280,7 +291,8 @@ fun LibraryScreen(
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
             var stopSongScrollRequest by remember { mutableStateOf(0) }
             var sortMenuExpanded by remember { mutableStateOf(false) }
-            var tabMenuExpanded by remember { mutableStateOf(false) }
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
 
             // One continuous drawer, rounded only at the top: the selector/
             // controls row and the song list beneath it share the same
@@ -302,60 +314,17 @@ fun LibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Split selector: the active view remains centered in the
-                        // wide segment with its category icon; the smaller chevron
-                        // opens the matching-width dropdown.
-                        Box {
-                            Row(
-                                modifier = Modifier.width(SelectorPillWidth),
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                PillButton(
-                                    onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 10.dp,
-                                    shape = PillGroupShapes.First,
-                                    modifier = Modifier.width(94.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = selectedTab.icon,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = selectedTab.label,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Clip
-                                    )
-                                }
-                                PillButton(
-                                    onClick = { tabMenuExpanded = true },
-                                    horizontalPadding = 6.dp,
-                                    shape = PillGroupShapes.Last,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.KeyboardArrowDown,
-                                        contentDescription = "Choose library view",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                        SlidingCategoryControl(
+                            selected = selectedTab,
+                            onSelectNext = {
+                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                selectedTab = when (selectedTab) {
+                                    LibraryTab.SONGS -> LibraryTab.ARTISTS
+                                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+                                    LibraryTab.ALBUMS -> LibraryTab.SONGS
                                 }
                             }
-                            LibraryTabMenu(
-                                expanded = tabMenuExpanded,
-                                selected = selectedTab,
-                                onDismiss = { tabMenuExpanded = false },
-                                onSelect = {
-                                    selectedTab = it
-                                    tabMenuExpanded = false
-                                }
-                            )
-                        }
+                        )
 
                         // Right controls: Locate, Shuffle, Sort — three
                         // segments of one continuous pill silhouette, same
@@ -368,23 +337,25 @@ fun LibraryScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 PillButton(
                                     onClick = {
+                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                         stopSongScrollRequest++
                                         jumpToCurrentRequest++
                                     },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.First,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.MyLocation,
                                         contentDescription = "Jump to current song",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 PillButton(
                                     onClick = {
+                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                         stopSongScrollRequest++
                                         if (filteredSongs.isNotEmpty()) {
                                             val startSong = filteredSongs.random()
@@ -393,27 +364,27 @@ fun LibraryScreen(
                                     },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.Middle,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.Shuffle,
                                         contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
                                 PillButton(
-                                    onClick = { sortMenuExpanded = true },
+                                    onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); sortMenuExpanded = true },
                                     horizontalPadding = 12.dp,
                                     shape = PillGroupShapes.Last,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     modifier = Modifier.width(ControlSegmentWidth)
                                 ) {
                                     Icon(
                                         Icons.Filled.Sort,
-                                        contentDescription = "Sort songs",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        contentDescription = "Sort tracks",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -527,7 +498,7 @@ private fun SongsTab(
         songs.asSequence()
             .mapNotNull { it.albumArtUri }
             .distinct()
-            .take(200)
+            .take(64)
             .forEach { artworkUri ->
                 MiniMusicImageLoader.get(context).enqueue(
                     ImageRequest.Builder(context)
@@ -887,6 +858,47 @@ private fun BoxScope.ArtistsScrollbarOverlay(
  *  pill sit at visibly different heights before. */
 private val PillButtonHeight = 44.dp
 
+@Composable
+private fun SlidingCategoryControl(
+    selected: LibraryTab,
+    onSelectNext: () -> Unit
+) {
+    val nextInteraction = remember { MutableInteractionSource() }
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.background,
+        tonalElevation = 0.dp, modifier = Modifier.width(142.dp).height(48.dp)) {
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
+            // Geometry is fixed; this highlight never participates in motion.
+            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.padding(4.dp).fillMaxHeight().fillMaxWidth(0.5f)) {}
+            // One AnimatedContent owns the complete two-label strip. Each slot
+            // clips its own text, so the active label cannot leak past its
+            // highlighted segment while the strip travels as one unit.
+            AnimatedContent(targetState = selected, transitionSpec = {
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
+                    slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
+            }, label = "categoryTextStrip") { category ->
+                val following = when (category) {
+                    LibraryTab.SONGS -> LibraryTab.ARTISTS
+                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+                    LibraryTab.ALBUMS -> LibraryTab.SONGS
+                }
+                Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f).fillMaxHeight().clipToBounds(), contentAlignment = Alignment.Center) {
+                        Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight().clipToBounds().clickable(
+                        interactionSource = nextInteraction, indication = null, onClick = onSelectNext
+                    ), contentAlignment = Alignment.Center) {
+                        Text(following.label, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal), maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** Fixed width for the complete Songs/Artists/Albums selector pill so
  *  switching labels never changes the control’s footprint. */
 private val SelectorPillWidth = 142.dp
@@ -1045,6 +1057,8 @@ private fun SortMenu(
     onDismiss: () -> Unit,
     onSelect: (SongSortOrder) -> Unit
 ) {
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     if (!expanded) return
     var selectedField by remember(selected) { mutableStateOf(sortFieldOf(selected)) }
     var ascending by remember(selected) {
@@ -1076,10 +1090,12 @@ private fun SortMenu(
                     ascending = ascending,
                     onAscending = {
                         ascending = true
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                         onSelect(sortOrderOf(selectedField, true))
                     },
                     onDescending = {
                         ascending = false
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                         onSelect(sortOrderOf(selectedField, false))
                     }
                 )
@@ -1091,6 +1107,7 @@ private fun SortMenu(
                             .clip(RoundedCornerShape(16.dp))
                             .clickable {
                                 selectedField = field
+                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                 onSelect(sortOrderOf(field, ascending))
                             },
                         shape = RoundedCornerShape(16.dp),
@@ -1118,7 +1135,8 @@ private fun SortMenu(
                                 selected = selectedFieldRow,
                                 onClick = {
                                     selectedField = field
-                                    onSelect(sortOrderOf(field, ascending))
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                onSelect(sortOrderOf(field, ascending))
                                 }
                             )
                         }
@@ -1298,7 +1316,7 @@ private fun EmptyLibraryState() {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "No songs found on this device yet.",
+            text = "No tracks found on this device yet.",
             style = MaterialTheme.typography.titleMedium
         )
     }

@@ -27,6 +27,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:enableOnBackInvokedCallback="true"
             android:theme="@style/Theme.MiniMusic.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

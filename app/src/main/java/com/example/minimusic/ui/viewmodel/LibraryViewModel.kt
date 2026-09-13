@@ -1,7 +1,10 @@
 package com.example.minimusic.ui.viewmodel
 
 import android.app.Application
+import android.database.ContentObserver
 import android.content.IntentSender
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.minimusic.MainApplication
@@ -84,33 +87,49 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
+    private var loadJob: Job? = null
+    private var reloadJob: Job? = null
+    private val mediaObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            scheduleLibraryReload()
+        }
+    }
+
     private val _events = MutableSharedFlow<LibraryEvent>()
     val events: SharedFlow<LibraryEvent> = _events.asSharedFlow()
 
+    init {
+        // MediaStore broadcasts changes for imported, deleted, and edited audio.
+        // Debouncing prevents a batch copy or tag edit from restarting the query
+        // once per row while keeping the library fresh without a manual rescan.
+        getApplication<Application>().contentResolver.registerContentObserver(
+            android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            true,
+            mediaObserver
+        )
+    }
+
+    private fun scheduleLibraryReload() {
+        reloadJob?.cancel()
+        reloadJob = viewModelScope.launch {
+            delay(350L)
+            loadLibrary()
+        }
+    }
+
     /** Call once the READ_MEDIA_AUDIO / READ_EXTERNAL_STORAGE permission has been granted. */
     fun loadLibrary() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, loadError = null)
             try {
                 val minDuration = settingsRepository.settings.first().minDurationSeconds
                 val songs = repository.loadSongs(minDuration)
                 val currentState = _uiState.value
 
-                // The repository query already returns title-sorted Song objects with
-                // title/artist/album metadata populated. Publish that first frame as
-                // soon as the local query completes so the home list becomes
-                // interactive immediately instead of waiting for derived tabs and a
-                // synthetic loading delay.
-                _uiState.value = currentState.copy(
-                    isLoading = false,
-                    loadError = null,
-                    allSongs = songs,
-                    filteredSongs = songs
-                )
-
-                // Albums, artists, and non-default filtering are secondary work. Keep
-                // them off the UI thread and update only if this load still owns the
-                // current song list, so they cannot stall first-render scrolling.
+                // Derive the first published list with the active query and sort
+                // order already applied. This avoids a visible flash of the raw
+                // MediaStore order during a rescan.
                 val (albums, artists, filteredSongs) = withContext(Dispatchers.Default) {
                     Triple(
                         repository.deriveAlbums(songs),
@@ -118,13 +137,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         filterAndSortSongs(songs, currentState.searchQuery, currentState.sortOrder)
                     )
                 }
-                if (_uiState.value.allSongs == songs) {
-                    _uiState.value = _uiState.value.copy(
-                        albums = albums,
-                        artists = artists,
-                        filteredSongs = filteredSongs
-                    )
-                }
+                _uiState.value = currentState.copy(
+                    isLoading = false,
+                    loadError = null,
+                    allSongs = songs,
+                    albums = albums,
+                    artists = artists,
+                    filteredSongs = filteredSongs
+                )
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 _uiState.value = _uiState.value.copy(
@@ -220,5 +240,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     _events.emit(LibraryEvent.DeleteFailed(result.message))
             }
         }
+    }
+
+    override fun onCleared() {
+        getApplication<Application>().contentResolver.unregisterContentObserver(mediaObserver)
+        reloadJob?.cancel()
+        loadJob?.cancel()
+        searchJob?.cancel()
+        super.onCleared()
     }
 }

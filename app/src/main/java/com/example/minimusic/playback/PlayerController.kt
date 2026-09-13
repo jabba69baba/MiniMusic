@@ -32,6 +32,13 @@ class PlayerController(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
     private var connecting = false
+    private var pendingRestoreSongs: List<Song>? = null
+    private var pendingRestoreOnLaunch = false
+    private var restoredSession = false
+    private var lastPersistedAtMs = 0L
+    private val playbackPrefs by lazy {
+        context.getSharedPreferences("minimusic_playback_state", Context.MODE_PRIVATE)
+    }
     private var connectionGeneration = 0L
     private var currentQueue: List<Song> = emptyList()
     private var currentQueueEntries: List<QueueEntry> = emptyList()
@@ -75,6 +82,11 @@ class PlayerController(private val context: Context) {
                     controller = future.get().also { it.addListener(playerListener) }
                     startPositionTicker()
                     connecting = false
+                    pendingRestoreSongs?.let { songs ->
+                        val shouldPlay = pendingRestoreOnLaunch
+                        pendingRestoreSongs = null
+                        restoreLastSession(songs, shouldPlay)
+                    }
                 } catch (_: Exception) {
                     connecting = false
                     scope.launch {
@@ -94,6 +106,55 @@ class PlayerController(private val context: Context) {
         controller?.removeListener(playerListener)
         controller?.release()
         controller = null
+    }
+
+    /**
+     * Restores the last queue after the library becomes available. The queue is
+     * persisted by MediaStore IDs, so removed files are ignored safely. This
+     * does not alter the player UI; it only repopulates the existing controller.
+     */
+    fun restoreLastSession(songs: List<Song>, playOnLaunch: Boolean): Boolean {
+        if (restoredSession || currentQueue.isNotEmpty() || songs.isEmpty()) return false
+        val savedIds = playbackPrefs.getString("queue_ids", null)
+            ?.split(',')
+            ?.mapNotNull { it.toLongOrNull() }
+            .orEmpty()
+        if (savedIds.isEmpty()) {
+            restoredSession = true
+            return false
+        }
+        val byId = songs.associateBy { it.id }
+        val restoredSongs = savedIds.mapNotNull(byId::get)
+        if (restoredSongs.isEmpty()) {
+            restoredSession = true
+            return false
+        }
+        val c = controller
+        if (c == null) {
+            pendingRestoreSongs = songs
+            pendingRestoreOnLaunch = playOnLaunch
+            return false
+        }
+        val index = playbackPrefs.getInt("current_index", 0)
+            .coerceIn(0, restoredSongs.lastIndex)
+        currentQueueEntries = restoredSongs.map { QueueEntry(nextQueueEntryId++, it) }
+        currentQueue = currentQueueEntries.map { it.song }
+        manualQueueOrderEntryIds = null
+        shuffleActive = playbackPrefs.getBoolean("shuffle", false)
+        val repeatMode = playbackPrefs.getInt("repeat_mode", Player.REPEAT_MODE_OFF)
+        val position = playbackPrefs.getLong("position_ms", 0L).coerceAtLeast(0L)
+        c.setMediaItems(
+            currentQueueEntries.map { it.song.toMediaItem(it.entryId.toString()) },
+            index,
+            position
+        )
+        c.shuffleModeEnabled = shuffleActive
+        c.repeatMode = repeatMode
+        c.prepare()
+        if (playOnLaunch && playbackPrefs.getBoolean("was_playing", false)) c.play() else c.pause()
+        restoredSession = true
+        refreshCurrentItem()
+        return true
     }
 
     /** Loads [songs] as the new queue and starts playback at [startIndex]. */
@@ -563,6 +624,21 @@ class PlayerController(private val context: Context) {
             },
             durationMs = c.duration.coerceAtLeast(0L)
         )
+        persistPlaybackState(c)
+    }
+
+    private fun persistPlaybackState(c: Player) {
+        val now = System.currentTimeMillis()
+        if (now - lastPersistedAtMs < 750L && c.playbackState != Player.STATE_ENDED) return
+        lastPersistedAtMs = now
+        playbackPrefs.edit()
+            .putString("queue_ids", currentQueueEntries.joinToString(",") { it.song.id.toString() })
+            .putInt("current_index", currentQueueEntries.indexOf(resolveCurrentEntry(c)).coerceAtLeast(0))
+            .putLong("position_ms", c.currentPosition.coerceAtLeast(0L))
+            .putBoolean("was_playing", c.isPlaying)
+            .putBoolean("shuffle", c.shuffleModeEnabled)
+            .putInt("repeat_mode", c.repeatMode)
+            .apply()
     }
 
     private fun nativePlaybackOrder(c: Player): List<QueueEntry> {
@@ -643,6 +719,7 @@ class PlayerController(private val context: Context) {
                         positionMs = displayPosition,
                         durationMs = c.duration.coerceAtLeast(0L)
                     )
+                    persistPlaybackState(c)
                 }
                 // Keep lyric highlighting responsive while avoiding a busy loop when paused.
                 delay(if (c?.isPlaying == true) 50L else 250L)
