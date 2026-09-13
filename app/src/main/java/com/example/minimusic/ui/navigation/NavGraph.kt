@@ -145,6 +145,7 @@ fun MiniMusicNavGraph(
         val sheetState = rememberPlayerSheetMotionState(scope)
         var queueDrawerOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         val fullHeightPx = with(density) { maxHeight.toPx() }
+        val fullWidthPx = with(density) { maxWidth.toPx() }
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
         val isLandscape = maxWidth > maxHeight && maxHeight >= 320.dp
