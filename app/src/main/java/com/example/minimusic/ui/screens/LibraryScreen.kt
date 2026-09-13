@@ -861,60 +861,54 @@ private fun SlidingCategoryControl(
     selected: LibraryTab,
     onSelectNext: () -> Unit
 ) {
-    val next = when (selected) {
-        LibraryTab.SONGS -> LibraryTab.ARTISTS
-        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-        LibraryTab.ALBUMS -> LibraryTab.SONGS
-    }
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         tonalElevation = 2.dp,
         modifier = Modifier.width(142.dp).height(48.dp)
     ) {
-        Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            // The selected half is deliberately not clickable. Only the next
-            // reel position advances the selector, so a tap cannot re-trigger
-            // the already highlighted category.
-            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                AnimatedContent(
-                    targetState = selected,
-                    transitionSpec = {
-                        (slideInHorizontally(animationSpec = tween(360)) + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360)) + fadeOut(tween(220)))
-                    },
-                    label = "activeLibraryCategory"
-                ) { category ->
-                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        // The whole two-label reel travels as one connected strip. This avoids
+        // the selected and preview halves entering from opposite directions.
+        Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
+            AnimatedContent(
+                targetState = selected,
+                transitionSpec = {
+                    slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
+                        slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
+                },
+                label = "libraryCategoryReel"
+            ) { category ->
+                val following = when (category) {
+                    LibraryTab.SONGS -> LibraryTab.ARTISTS
+                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+                    LibraryTab.ALBUMS -> LibraryTab.SONGS
+                }
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(category.label,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
-                }
-            }
-            Box(
-                modifier = Modifier.weight(1f).fillMaxHeight().clickable(onClick = onSelectNext),
-                contentAlignment = Alignment.Center
-            ) {
-                AnimatedContent(
-                    targetState = next,
-                    transitionSpec = {
-                        (slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360)) + fadeOut(tween(220)))
-                    },
-                    label = "nextLibraryCategory"
-                ) { category ->
-                    Text(
-                        category.label,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Normal,
-                        maxLines = 1
-                    )
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight().clickable(onClick = onSelectNext),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(following.label,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1)
+                    }
                 }
             }
         }

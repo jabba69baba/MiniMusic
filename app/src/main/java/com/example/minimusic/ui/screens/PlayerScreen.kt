@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -64,7 +65,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -74,9 +74,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -112,6 +109,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
@@ -476,20 +474,17 @@ private fun SleepTimerDialog(
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = artColors.surface,
-        titleContentColor = artColors.onSurface,
-        textContentColor = artColors.onSurfaceVariant,
-        title = {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Sleep timer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = artColors.onSurface)
-                Text(if (endOfCurrentSong) "End of current song" else "$selectedMinutes minutes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = artColors.onSurface)
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.widthIn(min = 280.dp, max = 560.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = artColors.surface
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sleep timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = artColors.onSurface)
+                    Text(if (endOfCurrentSong) "End of current song" else "$selectedMinutes minutes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = artColors.onSurface)
+                }
                 Slider(
                     modifier = Modifier.height(32.dp),
                     value = selectedIndex.toFloat(),
@@ -502,12 +497,7 @@ private fun SleepTimerDialog(
                     steps = SleepTimerPresetsMinutes.size - 2,
                     enabled = !endOfCurrentSong,
                     thumb = {
-                        Box(
-                            modifier = Modifier
-                                .width(8.dp)
-                                .height(28.dp)
-                                .background(artColors.primary, RoundedCornerShape(50))
-                        )
+                        Box(Modifier.width(8.dp).height(28.dp).background(artColors.primary, RoundedCornerShape(50)))
                     },
                     colors = androidx.compose.material3.SliderDefaults.colors(
                         thumbColor = artColors.primary,
@@ -518,52 +508,49 @@ private fun SleepTimerDialog(
                     )
                 )
                 SleepTimerSwitchRow(
-                    label = "End of current song",
-                    checked = endOfCurrentSong,
-                    onCheckedChange = { enabled ->
-                        endOfCurrentSong = enabled
-                        if (enabled) waitUntilSongEnd = false
-                    },
-                    artColors = artColors
+                    label = "End of current song", checked = endOfCurrentSong,
+                    onCheckedChange = { enabled -> endOfCurrentSong = enabled; if (enabled) waitUntilSongEnd = false }, artColors = artColors
                 )
                 SleepTimerSwitchRow(
-                    label = "Wait for song to end",
-                    checked = waitUntilSongEnd,
-                    onCheckedChange = { enabled ->
-                        waitUntilSongEnd = enabled
-                        if (enabled) endOfCurrentSong = false
-                    },
-                    artColors = artColors
+                    label = "Wait for song to end", checked = waitUntilSongEnd,
+                    onCheckedChange = { enabled -> waitUntilSongEnd = enabled; if (enabled) endOfCurrentSong = false }, artColors = artColors
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = false,
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onDismiss() },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                        label = { Text("Dismiss") }
-                    )
-                    SegmentedButton(
-                        selected = false,
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onCancel() },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                        enabled = true,
-                        label = { Text("Stop") }
-                    )
-                    SegmentedButton(
-                        selected = false,
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                            if (endOfCurrentSong) onStart(0L, true)
-                            else onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                        label = { Text("Set") }
-                    )
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    SleepTimerAction("Dismiss", Modifier.weight(1f), RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp), artColors) {
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onDismiss()
+                    }
+                    SleepTimerAction("Stop", Modifier.weight(1f), RoundedCornerShape(0.dp), artColors) {
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onCancel()
+                    }
+                    SleepTimerAction("Set", Modifier.weight(1f), RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp), artColors) {
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                        if (endOfCurrentSong) onStart(0L, true) else onStart(selectedMinutes * 60_000L, waitUntilSongEnd)
+                    }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {}
-    )
+        }
+    }
+}
+
+@Composable
+private fun SleepTimerAction(
+    label: String,
+    modifier: Modifier,
+    shape: androidx.compose.ui.graphics.Shape,
+    artColors: ArtColorRoles,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = shape,
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, artColors.onSurfaceVariant)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, color = artColors.onSurface)
+        }
+    }
 }
 
 @Composable
