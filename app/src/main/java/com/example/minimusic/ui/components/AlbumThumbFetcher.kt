@@ -11,6 +11,7 @@ import coil.decode.DataSource
 import coil.fetch.DrawableResult
 import coil.fetch.FetchResult
 import coil.fetch.Fetcher
+import coil.memory.MemoryCache
 import coil.request.Options
 import coil.size.Dimension
 
@@ -92,6 +93,11 @@ object MiniMusicImageLoader {
         return instance ?: synchronized(this) {
             instance ?: ImageLoader.Builder(appContext)
                 .components { add(AlbumThumbFetcher.Factory()) }
+                .memoryCache {
+                    // Artwork-heavy app: hold more thumbnails than Coil's
+                    // default so the app-open warmup survives deep scrolls.
+                    MemoryCache.Builder(appContext).maxSizePercent(0.25).build()
+                }
                 .crossfade(false)
                 .allowHardware(true)
                 .build()
