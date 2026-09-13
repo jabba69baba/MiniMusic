@@ -4,10 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import com.example.minimusic.R
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,9 +83,10 @@ fun AlbumArtImage(
 
 @Composable
 private fun MissingAlbumArtIcon(size: Dp) {
-    Image(
-        painter = painterResource(id = R.drawable.ic_launcher_exact),
+    Icon(
+        imageVector = Icons.Filled.MusicNote,
         contentDescription = null,
+        tint = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier = Modifier.size(size)
     )
 }

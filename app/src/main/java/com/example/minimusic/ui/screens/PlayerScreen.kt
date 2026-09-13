@@ -795,13 +795,13 @@ private fun NowPlayingPanel(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    // PixelPlayer keeps the metadata slot stable and switches
-                    // the song/artist as a soft vertical reveal, rather than
-                    // throwing text sideways across the player.
+                    // Next enters bottom-to-top; Previous reverses the same
+                    // choreography so the metadata follows transport intent.
+                    val direction = transitionDirection
                     (fadeIn(tween(180)) + slideInVertically(
-                        initialOffsetY = { it / 3 }, animationSpec = tween(220)
+                        initialOffsetY = { direction * (it / 3) }, animationSpec = tween(220)
                     )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
-                        targetOffsetY = { -it / 4 }, animationSpec = tween(120)
+                        targetOffsetY = { -direction * (it / 4) }, animationSpec = tween(120)
                     )) using SizeTransform(clip = true)
                 },
                 modifier = Modifier

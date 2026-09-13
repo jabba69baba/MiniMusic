@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.GraphicEq
@@ -36,7 +35,6 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -82,7 +80,7 @@ fun DetailsScreen(
     Dialog(onDismissRequest = onBack) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
+                .fillMaxWidth(0.96f)
                 .fillMaxHeight(0.6f),
             shape = RoundedCornerShape(28.dp),
             color = artColors.background
@@ -97,17 +95,13 @@ fun DetailsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(48.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = artColors.onBackground)
-            }
             Text(
                 text = "Details",
-                style = MaterialTheme.typography.headlineSmall,
-                color = artColors.onBackground,
-                modifier = Modifier.padding(start = 8.dp)
+                style = MaterialTheme.typography.titleLarge,
+                color = artColors.onBackground
             )
         }
 
@@ -174,7 +168,7 @@ fun DetailsScreen(
                 )
                 Text(
                     text = song.artist,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = artColors.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -254,7 +248,7 @@ private fun DetailCard(
         ) {
             Icon(icon, contentDescription = null, tint = artColors.onSurfaceVariant, modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleMedium, color = artColors.onSurface)
+                Text(label, style = MaterialTheme.typography.titleSmall, color = artColors.onSurface)
                 Text(
                     value,
                     style = MaterialTheme.typography.bodyMedium,

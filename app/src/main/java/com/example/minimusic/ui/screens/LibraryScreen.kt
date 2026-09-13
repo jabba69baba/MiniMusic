@@ -129,7 +129,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    SONGS("Songs", Icons.Filled.MusicNote),
+    SONGS("Tracks", Icons.Filled.MusicNote),
     ARTISTS("Artists", Icons.Filled.Person),
     ALBUMS("Albums", Icons.Filled.Album)
 }
@@ -381,7 +381,7 @@ fun LibraryScreen(
                                 ) {
                                     Icon(
                                         Icons.Filled.Sort,
-                                        contentDescription = "Sort songs",
+                                        contentDescription = "Sort tracks",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
@@ -861,54 +861,66 @@ private fun SlidingCategoryControl(
     selected: LibraryTab,
     onSelectNext: () -> Unit
 ) {
+    val next = when (selected) {
+        LibraryTab.SONGS -> LibraryTab.ARTISTS
+        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+        LibraryTab.ALBUMS -> LibraryTab.SONGS
+    }
+    val nextInteraction = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         tonalElevation = 2.dp,
         modifier = Modifier.width(142.dp).height(48.dp)
     ) {
-        // The whole two-label reel travels as one connected strip. This avoids
-        // the selected and preview halves entering from opposite directions.
-        Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
-            AnimatedContent(
-                targetState = selected,
-                transitionSpec = {
-                    slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
-                        slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
-                },
-                label = "libraryCategoryReel"
-            ) { category ->
-                val following = when (category) {
-                    LibraryTab.SONGS -> LibraryTab.ARTISTS
-                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-                    LibraryTab.ALBUMS -> LibraryTab.SONGS
+        Row(
+            modifier = Modifier.fillMaxSize().padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Both the outer pill and the selected segment stay fixed. Only
+            // the text inside each slot travels through the reel.
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    AnimatedContent(
+                        targetState = selected,
+                        transitionSpec = {
+                            slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
+                                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
+                        },
+                        label = "selectedCategoryText"
+                    ) { category ->
+                        Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        modifier = Modifier.weight(1f).fillMaxHeight()
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(category.label,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight().clickable(onClick = onSelectNext),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(following.label,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Normal,
-                            maxLines = 1)
-                    }
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f).fillMaxHeight()
+                    .clickable(
+                        interactionSource = nextInteraction,
+                        indication = null,
+                        onClick = onSelectNext
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedContent(
+                    targetState = next,
+                    transitionSpec = {
+                        slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
+                            slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
+                    },
+                    label = "previewCategoryText"
+                ) { category ->
+                    Text(category.label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Normal,
+                        maxLines = 1)
                 }
             }
         }
@@ -1332,7 +1344,7 @@ private fun EmptyLibraryState() {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "No songs found on this device yet.",
+            text = "No tracks found on this device yet.",
             style = MaterialTheme.typography.titleMedium
         )
     }
