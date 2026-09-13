@@ -375,7 +375,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
             if (isOpen) 0f else closedOffset.value,
             animationSpec = MiniMusicMotion.defaultSpatial()
         )
-        if (isOpen) openRequest++
     }
 
     Box(
@@ -540,7 +539,6 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     LaunchedEffect(isOpen, fullHeightPx) {
         val target = if (isOpen) openOffsetPx else closedOffsetPx
         offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
-        if (isOpen) openRequest++
     }
 
     Box(

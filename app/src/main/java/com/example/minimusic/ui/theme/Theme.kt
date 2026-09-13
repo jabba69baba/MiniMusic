@@ -13,57 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val LightColors = lightColorScheme(
-    primary = AmberPrimaryLight,
-    onPrimary = AmberOnPrimaryLight,
-    primaryContainer = AmberPrimaryContainerLight,
-    onPrimaryContainer = AmberOnPrimaryContainerLight,
-    secondary = AmberSecondaryLight,
-    onSecondary = AmberOnSecondaryLight,
-    secondaryContainer = AmberSecondaryContainerLight,
-    onSecondaryContainer = AmberOnSecondaryContainerLight,
-    tertiary = AmberTertiaryLight,
-    onTertiary = AmberOnTertiaryLight,
-    tertiaryContainer = AmberTertiaryContainerLight,
-    onTertiaryContainer = AmberOnTertiaryContainerLight,
-    background = AmberBackgroundLight,
-    onBackground = AmberOnBackgroundLight,
-    surface = AmberSurfaceLight,
-    onSurface = AmberOnSurfaceLight,
-    surfaceVariant = AmberSurfaceVariantLight,
-    onSurfaceVariant = AmberOnSurfaceVariantLight,
-    outline = AmberOutlineLight,
-    outlineVariant = AmberOutlineVariantLight,
-    inverseSurface = AmberInverseSurfaceLight,
-    inverseOnSurface = AmberInverseOnSurfaceLight,
-    inversePrimary = AmberInversePrimaryLight
-)
-
-private val DarkColors = darkColorScheme(
-    primary = AmberPrimaryDark,
-    onPrimary = AmberOnPrimaryDark,
-    primaryContainer = AmberPrimaryContainerDark,
-    onPrimaryContainer = AmberOnPrimaryContainerDark,
-    secondary = AmberSecondaryDark,
-    onSecondary = AmberOnSecondaryDark,
-    secondaryContainer = AmberSecondaryContainerDark,
-    onSecondaryContainer = AmberOnSecondaryContainerDark,
-    tertiary = AmberTertiaryDark,
-    onTertiary = AmberOnTertiaryDark,
-    tertiaryContainer = AmberTertiaryContainerDark,
-    onTertiaryContainer = AmberOnTertiaryContainerDark,
-    background = AmberBackgroundDark,
-    onBackground = AmberOnBackgroundDark,
-    surface = AmberSurfaceDark,
-    onSurface = AmberOnSurfaceDark,
-    surfaceVariant = AmberSurfaceVariantDark,
-    onSurfaceVariant = AmberOnSurfaceVariantDark,
-    outline = AmberOutlineDark,
-    outlineVariant = AmberOutlineVariantDark,
-    inverseSurface = AmberInverseSurfaceDark,
-    inverseOnSurface = AmberInverseOnSurfaceDark,
-    inversePrimary = AmberInversePrimaryDark
-)
+// Material baseline schemes are the non-dynamic fallback. On Android 12+
+// the system Monet scheme supplies the same semantic roles from wallpaper
+// colors; no app-specific amber palette overrides those roles.
+private val LightColors = lightColorScheme()
+private val DarkColors = darkColorScheme()
 
 /**
  * App-wide Material 3 Expressive theme. Android 12+ uses wallpaper-derived

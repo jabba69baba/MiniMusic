@@ -875,30 +875,29 @@ private fun SlidingCategoryControl(
     val nextInteraction = remember { MutableInteractionSource() }
     val density = LocalDensity.current
     val slotWidth = 67.dp
-    var displayedStart by remember { mutableStateOf(selected) }
-    val stripOffset = remember { androidx.compose.animation.core.Animatable(0f) }
+    val slotWidthPx = with(density) { slotWidth.toPx() }
+    var previousSelected by remember { mutableStateOf(selected) }
+    val stripOffset = remember {
+        androidx.compose.animation.core.Animatable(-slotWidthPx)
+    }
 
-    // This is one physical strip, not AnimatedContent. Keeping the three
-    // possible labels in one Row prevents outgoing and incoming compositions
-    // from being drawn on top of each other (the source of the duplicate
-    // Artists/A labels seen during a switch).
+    // The target labels are installed immediately. Only their single physical
+    // strip moves, so there is no loading gap and no duplicate AnimatedContent
+    // tree waiting for an exit animation to finish.
     LaunchedEffect(selected) {
-        if (selected != displayedStart) {
-            stripOffset.animateTo(
-                targetValue = -with(density) { slotWidth.toPx() },
-                animationSpec = tween(360)
-            )
-            displayedStart = selected
+        if (selected != previousSelected) {
             stripOffset.snapTo(0f)
+            stripOffset.animateTo(-slotWidthPx, animationSpec = tween(260))
+            previousSelected = selected
         }
     }
 
-    val second = when (displayedStart) {
-        LibraryTab.SONGS -> LibraryTab.ARTISTS
-        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-        LibraryTab.ALBUMS -> LibraryTab.SONGS
+    fun previous(category: LibraryTab) = when (category) {
+        LibraryTab.SONGS -> LibraryTab.ALBUMS
+        LibraryTab.ARTISTS -> LibraryTab.SONGS
+        LibraryTab.ALBUMS -> LibraryTab.ARTISTS
     }
-    val third = when (second) {
+    fun following(category: LibraryTab) = when (category) {
         LibraryTab.SONGS -> LibraryTab.ARTISTS
         LibraryTab.ARTISTS -> LibraryTab.ALBUMS
         LibraryTab.ALBUMS -> LibraryTab.SONGS
@@ -916,29 +915,38 @@ private fun SlidingCategoryControl(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
             ) {}
-            Box(Modifier.fillMaxSize().clipToBounds()) {
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .fillMaxSize()
+                    .clipToBounds()
+            ) {
                 Row(
-                    modifier = Modifier
-                        .offset { IntOffset(stripOffset.value.roundToInt(), 0) }
-                        .padding(4.dp),
+                    modifier = Modifier.offset {
+                        IntOffset(stripOffset.value.roundToInt(), 0)
+                    },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf(displayedStart, second, third).forEachIndexed { index, category ->
+                    listOf(previous(selected), selected, following(selected)).forEachIndexed { index, category ->
                         Box(
-                            modifier = Modifier.width(slotWidth).height(40.dp).clipToBounds()
-                                .then(if (index == 1) Modifier.clickable(
-                                    interactionSource = nextInteraction,
-                                    indication = null,
-                                    onClick = onSelectNext
-                                ) else Modifier),
+                            modifier = Modifier
+                                .width(slotWidth)
+                                .height(40.dp)
+                                .clipToBounds(),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = category.label,
-                                color = if (index == 0) MaterialTheme.colorScheme.onSecondaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (index < 2) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                },
                                 style = MaterialTheme.typography.labelLarge.copy(
-                                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal
+                                    // During travel both labels that occupy
+                                    // the highlighted boundary are bold; the
+                                    // final inactive label is always regular.
+                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal
                                 ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip
@@ -946,6 +954,19 @@ private fun SlidingCategoryControl(
                         }
                     }
                 }
+                // The inactive slot is a fixed hit target. It never moves with
+                // the text strip, so taps remain reliable during the animation.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(slotWidth)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = nextInteraction,
+                            indication = null,
+                            onClick = onSelectNext
+                        )
+                )
             }
         }
     }
