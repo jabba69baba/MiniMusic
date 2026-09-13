@@ -1233,43 +1233,26 @@ private fun PlayPauseButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.matchParentSize(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedContent(
-                targetState = isPlaying,
-                transitionSpec = {
-                    // Scale-only morph, no fade: incoming scales up over the
-                    // static outgoing icon. Small-component spatial motion.
-                    androidx.compose.animation.scaleIn(
-                        initialScale = 0.72f,
-                        animationSpec = MiniMusicMotion.selectionEffects()
-                    ) togetherWith androidx.compose.animation.scaleOut(
-                        targetScale = 1f,
-                        animationSpec = MiniMusicMotion.fastEffects()
-                    )
-                },
-                label = "playPauseMorph"
-            ) { playing ->
-                // Icon-only morph: the Play/Pause glyphs scale over each
-                // other. The text label below swaps instantly outside the
-                // transition — overlapping "Play"+"Pause" glyphs mid-morph is
-                // what read as mixed-up text on rapid toggles.
+        AnimatedContent(
+            targetState = isPlaying,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(tween(130)) + androidx.compose.animation.scaleIn(
+                    initialScale = 0.82f, animationSpec = MiniMusicMotion.selectionEffects()
+                )) togetherWith (androidx.compose.animation.fadeOut(tween(90)) + androidx.compose.animation.scaleOut(
+                    targetScale = 0.92f, animationSpec = MiniMusicMotion.fastEffects()
+                ))
+            },
+            label = "playPauseMorph"
+        ) { playing ->
+            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (playing) "Pause" else "Play",
-                    tint = contentColor,
-                    modifier = Modifier.size(28.dp)
+                    tint = contentColor, modifier = Modifier.size(28.dp)
                 )
+                Text(text = if (playing) "Pause" else "Play", style = MaterialTheme.typography.titleMedium,
+                    color = contentColor, modifier = Modifier.padding(start = 8.dp))
             }
-            Text(
-                text = if (isPlaying) "Pause" else "Play",
-                style = MaterialTheme.typography.titleMedium,
-                color = contentColor,
-                modifier = Modifier.padding(start = 8.dp)
-            )
         }
         Box(
             modifier = Modifier
@@ -1297,12 +1280,12 @@ private fun CapsuleSegment(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (active) artColors.primaryContainer else Color.Transparent,
+        targetValue = if (active) artColors.primary else Color.Transparent,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabBackground"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (active) artColors.onPrimaryContainer else artColors.onSurfaceVariant,
+        targetValue = if (active) artColors.onPrimary else artColors.onSurfaceVariant,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabContent"
     )

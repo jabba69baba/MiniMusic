@@ -862,57 +862,36 @@ private fun SlidingCategoryControl(
     selected: LibraryTab,
     onSelectNext: () -> Unit
 ) {
+    val next = when (selected) {
+        LibraryTab.SONGS -> LibraryTab.ARTISTS
+        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
+        LibraryTab.ALBUMS -> LibraryTab.SONGS
+    }
     val nextInteraction = remember { MutableInteractionSource() }
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        tonalElevation = 2.dp,
-        modifier = Modifier.width(142.dp).height(48.dp)
-    ) {
-        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
-            // The geometry never moves: this is the fixed selected segment.
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier
-                    .padding(4.dp)
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.5f)
-            ) {}
-            // One text strip owns the complete transition. Its two fixed-width
-            // slots travel together, so labels can never enter from opposing
-            // sides or make the pill look like two pieces joining.
-            AnimatedContent(
-                targetState = selected,
-                transitionSpec = {
-                    slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
-                        slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
-                },
-                label = "libraryCategoryTextStrip"
-            ) { category ->
-                val following = when (category) {
-                    LibraryTab.SONGS -> LibraryTab.ARTISTS
-                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-                    LibraryTab.ALBUMS -> LibraryTab.SONGS
-                }
-                Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        tonalElevation = 2.dp, modifier = Modifier.width(142.dp).height(48.dp)) {
+        Row(Modifier.fillMaxSize().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.weight(1f).fillMaxHeight()) {
+                Box(Modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
+                    // Only the active label moves, and the slot clips it at the
+                    // highlighted segment boundary. The inactive segment is static.
+                    AnimatedContent(targetState = selected, transitionSpec = {
+                        slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(360)) togetherWith
+                            slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(360))
+                    }, label = "selectedCategoryText") { category ->
                         Text(category.label, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                    }
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        Text(following.label, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
-                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, maxLines = 1)
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
+                            maxLines = 1)
                     }
                 }
             }
-            // Only the right slot is interactive, and it deliberately has no
-            // indication so the text strip remains visually uninterrupted.
-            Box(
-                Modifier.fillMaxWidth(0.5f).fillMaxHeight().align(Alignment.CenterEnd).clickable(
-                    interactionSource = nextInteraction, indication = null, onClick = onSelectNext
-                )
-            )
+            Box(Modifier.weight(1f).fillMaxHeight().clickable(
+                interactionSource = nextInteraction, indication = null, onClick = onSelectNext
+            ), contentAlignment = Alignment.Center) {
+                Text(next.label, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, maxLines = 1)
+            }
         }
     }
 }
