@@ -562,7 +562,7 @@ private fun SleepTimerSwitchRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = artColors.surfaceVariant
+        color = if (checked) artColors.primaryContainer else artColors.surfaceVariant
     ) {
         Row(
             modifier = Modifier
@@ -574,7 +574,7 @@ private fun SleepTimerSwitchRow(
         ) {
             Text(
                 text = label,
-                color = artColors.onSurface,
+                color = if (checked) artColors.onPrimaryContainer else artColors.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -582,10 +582,12 @@ private fun SleepTimerSwitchRow(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 colors = androidx.compose.material3.SwitchDefaults.colors(
-                    checkedThumbColor = artColors.onPrimaryContainer,
+                    checkedThumbColor = artColors.onPrimary,
                     checkedTrackColor = artColors.primary,
+                    checkedBorderColor = artColors.primary,
                     uncheckedThumbColor = artColors.onSurfaceVariant,
-                    uncheckedTrackColor = artColors.surface
+                    uncheckedTrackColor = artColors.surfaceVariant,
+                    uncheckedBorderColor = artColors.onSurfaceVariant
                 )
             )
         }
