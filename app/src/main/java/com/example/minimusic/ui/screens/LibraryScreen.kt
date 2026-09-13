@@ -873,36 +873,17 @@ private fun SlidingCategoryControl(
     onSelectNext: () -> Unit
 ) {
     val nextInteraction = remember { MutableInteractionSource() }
-    val density = LocalDensity.current
-    val slotWidth = 67.dp
-    val slotWidthPx = with(density) { slotWidth.toPx() }
-    var previousSelected by remember { mutableStateOf(selected) }
-    val stripOffset = remember {
-        androidx.compose.animation.core.Animatable(-slotWidthPx)
-    }
-
-    // The target labels are installed immediately. Only their single physical
-    // strip moves, so there is no loading gap and no duplicate AnimatedContent
-    // tree waiting for an exit animation to finish.
-    LaunchedEffect(selected) {
-        if (selected != previousSelected) {
-            stripOffset.snapTo(0f)
-            stripOffset.animateTo(-slotWidthPx, animationSpec = tween(260))
-            previousSelected = selected
-        }
-    }
-
-    fun previous(category: LibraryTab) = when (category) {
-        LibraryTab.SONGS -> LibraryTab.ALBUMS
-        LibraryTab.ARTISTS -> LibraryTab.SONGS
-        LibraryTab.ALBUMS -> LibraryTab.ARTISTS
-    }
-    fun following(category: LibraryTab) = when (category) {
+    val following = when (selected) {
         LibraryTab.SONGS -> LibraryTab.ARTISTS
         LibraryTab.ARTISTS -> LibraryTab.ALBUMS
         LibraryTab.ALBUMS -> LibraryTab.SONGS
     }
+    val slotWidth = 67.dp
 
+    // Keep the two labels mounted in their fixed slots. The previous moving
+    // three-item strip could translate the inactive label outside the viewport,
+    // leaving the slot empty. This is deliberately a single Row/text strip:
+    // there are no duplicate animated compositions and no loading interval.
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.background,
@@ -915,58 +896,46 @@ private fun SlidingCategoryControl(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
             ) {}
-            Box(
-                modifier = Modifier
-                    .padding(4.dp)
-                    .fillMaxSize()
-                    .clipToBounds()
+            Row(
+                modifier = Modifier.padding(4.dp).fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.offset {
-                        IntOffset(stripOffset.value.roundToInt(), 0)
-                    },
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.width(slotWidth).fillMaxHeight().clipToBounds(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    listOf(previous(selected), selected, following(selected)).forEachIndexed { index, category ->
-                        Box(
-                            modifier = Modifier
-                                .width(slotWidth)
-                                .height(40.dp)
-                                .clipToBounds(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = category.label,
-                                color = if (index < 2) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                                },
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    // During travel both labels that occupy
-                                    // the highlighted boundary are bold; the
-                                    // final inactive label is always regular.
-                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip
-                            )
-                        }
-                    }
+                    Text(
+                        text = selected.label,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
                 }
-                // The inactive slot is a fixed hit target. It never moves with
-                // the text strip, so taps remain reliable during the animation.
                 Box(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
                         .width(slotWidth)
                         .fillMaxHeight()
+                        .clipToBounds()
                         .clickable(
                             interactionSource = nextInteraction,
                             indication = null,
                             onClick = onSelectNext
-                        )
-                )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = following.label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Normal
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                }
             }
         }
     }

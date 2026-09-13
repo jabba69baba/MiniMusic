@@ -1187,7 +1187,7 @@ private fun TransportButton(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White.copy(alpha = pressOverlayAlpha))
+                .background(contentColor.copy(alpha = pressOverlayAlpha))
         )
         Icon(
             imageVector = icon,
@@ -1263,7 +1263,7 @@ private fun PlayPauseButton(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(Color.White.copy(alpha = pressOverlayAlpha))
+                .background(contentColor.copy(alpha = pressOverlayAlpha))
         )
     }
 }
@@ -1286,12 +1286,12 @@ private fun CapsuleSegment(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (active) artColors.primary else artColors.secondaryContainer,
+        targetValue = artColors.secondaryContainer,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabBackground"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (active) artColors.onPrimary else artColors.onSecondaryContainer,
+        targetValue = artColors.onSecondaryContainer,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabContent"
     )
@@ -1356,7 +1356,7 @@ private fun CapsuleSegment(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(Color.White.copy(alpha = pressOverlayAlpha))
+                .background(contentColor.copy(alpha = pressOverlayAlpha))
         )
         Icon(
             imageVector = icon,
