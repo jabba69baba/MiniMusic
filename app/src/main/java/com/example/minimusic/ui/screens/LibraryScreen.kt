@@ -873,17 +873,36 @@ private fun SlidingCategoryControl(
     onSelectNext: () -> Unit
 ) {
     val nextInteraction = remember { MutableInteractionSource() }
-    val following = when (selected) {
+    val density = LocalDensity.current
+    val slotWidth = 67.dp
+    val slotWidthPx = with(density) { slotWidth.toPx() }
+    val progress = remember { androidx.compose.animation.core.Animatable(1f) }
+    var initialized by remember { mutableStateOf(false) }
+
+    fun previous(category: LibraryTab) = when (category) {
+        LibraryTab.SONGS -> LibraryTab.ALBUMS
+        LibraryTab.ARTISTS -> LibraryTab.SONGS
+        LibraryTab.ALBUMS -> LibraryTab.ARTISTS
+    }
+    fun following(category: LibraryTab) = when (category) {
         LibraryTab.SONGS -> LibraryTab.ARTISTS
         LibraryTab.ARTISTS -> LibraryTab.ALBUMS
         LibraryTab.ALBUMS -> LibraryTab.SONGS
     }
-    val slotWidth = 67.dp
 
-    // Keep the two labels mounted in their fixed slots. The previous moving
-    // three-item strip could translate the inactive label outside the viewport,
-    // leaving the slot empty. This is deliberately a single Row/text strip:
-    // there are no duplicate animated compositions and no loading interval.
+    // The target row is installed synchronously. At progress 0 it contains
+    // previous/target/next; at progress 1 it shows target/next. One physical
+    // Row moves, without AnimatedContent duplicates or a loading gap.
+    LaunchedEffect(selected) {
+        if (!initialized) {
+            initialized = true
+            progress.snapTo(1f)
+        } else {
+            progress.snapTo(0f)
+            progress.animateTo(1f, animationSpec = tween(300))
+        }
+    }
+
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.background,
@@ -896,46 +915,51 @@ private fun SlidingCategoryControl(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
             ) {}
-            Row(
-                modifier = Modifier.padding(4.dp).fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .fillMaxSize()
+                    .clipToBounds()
             ) {
-                Box(
-                    modifier = Modifier.width(slotWidth).fillMaxHeight().clipToBounds(),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.offset {
+                        IntOffset((-slotWidthPx * progress.value).roundToInt(), 0)
+                    },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = selected.label,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.ExtraBold
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
+                    listOf(previous(selected), selected, following(selected)).forEachIndexed { index, category ->
+                        Box(
+                            modifier = Modifier.width(slotWidth).height(40.dp).clipToBounds(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = category.label,
+                                color = if (index < 2) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                },
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
+                    }
                 }
                 Box(
                     modifier = Modifier
+                        .align(Alignment.CenterEnd)
                         .width(slotWidth)
                         .fillMaxHeight()
-                        .clipToBounds()
                         .clickable(
                             interactionSource = nextInteraction,
                             indication = null,
                             onClick = onSelectNext
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = following.label,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Normal
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
-                }
+                        )
+                )
             }
         }
     }
