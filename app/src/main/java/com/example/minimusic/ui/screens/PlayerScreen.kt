@@ -548,14 +548,14 @@ private fun SleepTimerDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onDismiss() }, colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = artColors.onSurfaceVariant), border = androidx.compose.foundation.BorderStroke(1.dp, artColors.outline)) {
+                    OutlinedButton(onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onDismiss() }, colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = artColors.onSurfaceVariant), border = androidx.compose.foundation.BorderStroke(1.dp, artColors.onSurfaceVariant)) {
                         Text("Dismiss")
                     }
                     OutlinedButton(
                         onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onCancel() },
                         enabled = activeTimer != null,
                         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = artColors.primary),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, artColors.outline)
+                        border = androidx.compose.foundation.BorderStroke(1.dp, artColors.onSurfaceVariant)
                     ) {
                         Text("Cancel timer")
                     }
