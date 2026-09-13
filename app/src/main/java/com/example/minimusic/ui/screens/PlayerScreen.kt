@@ -1361,7 +1361,13 @@ private fun CapsuleSegment(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = contentColor
+            tint = contentColor,
+            modifier = Modifier
+                .size(if (active) 28.dp else 24.dp)
+                .graphicsLayer {
+                    scaleX = if (active) 1.08f else 1f
+                    scaleY = if (active) 1.08f else 1f
+                }
         )
     }
 }

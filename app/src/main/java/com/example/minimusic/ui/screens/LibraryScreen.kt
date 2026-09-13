@@ -873,36 +873,16 @@ private fun SlidingCategoryControl(
     onSelectNext: () -> Unit
 ) {
     val nextInteraction = remember { MutableInteractionSource() }
-    val density = LocalDensity.current
-    val slotWidth = 67.dp
-    val slotWidthPx = with(density) { slotWidth.toPx() }
-    val progress = remember { androidx.compose.animation.core.Animatable(1f) }
-    var initialized by remember { mutableStateOf(false) }
-
-    fun previous(category: LibraryTab) = when (category) {
-        LibraryTab.SONGS -> LibraryTab.ALBUMS
-        LibraryTab.ARTISTS -> LibraryTab.SONGS
-        LibraryTab.ALBUMS -> LibraryTab.ARTISTS
-    }
-    fun following(category: LibraryTab) = when (category) {
+    val following = when (selected) {
         LibraryTab.SONGS -> LibraryTab.ARTISTS
         LibraryTab.ARTISTS -> LibraryTab.ALBUMS
         LibraryTab.ALBUMS -> LibraryTab.SONGS
     }
+    val slotWidth = 67.dp
 
-    // The target row is installed synchronously. At progress 0 it contains
-    // previous/target/next; at progress 1 it shows target/next. One physical
-    // Row moves, without AnimatedContent duplicates or a loading gap.
-    LaunchedEffect(selected) {
-        if (!initialized) {
-            initialized = true
-            progress.snapTo(1f)
-        } else {
-            progress.snapTo(0f)
-            progress.animateTo(1f, animationSpec = tween(300))
-        }
-    }
-
+    // Keep both semantic labels in explicitly sized, fixed slots. The former
+    // translated Row was measured at the viewport width, so its second label
+    // could be laid out outside the clip and disappear completely.
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.background,
@@ -915,51 +895,51 @@ private fun SlidingCategoryControl(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
             ) {}
-            Box(
+            Row(
                 modifier = Modifier
                     .padding(4.dp)
-                    .fillMaxSize()
-                    .clipToBounds()
+                    .width(slotWidth * 2)
+                    .height(40.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.offset {
-                        IntOffset((-slotWidthPx * progress.value).roundToInt(), 0)
-                    },
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.width(slotWidth).fillMaxHeight().clipToBounds(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    listOf(previous(selected), selected, following(selected)).forEachIndexed { index, category ->
-                        Box(
-                            modifier = Modifier.width(slotWidth).height(40.dp).clipToBounds(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = category.label,
-                                color = if (index < 2) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                                },
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip
-                            )
-                        }
-                    }
+                    Text(
+                        text = selected.label,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
                 }
                 Box(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
                         .width(slotWidth)
                         .fillMaxHeight()
+                        .clipToBounds()
                         .clickable(
                             interactionSource = nextInteraction,
                             indication = null,
                             onClick = onSelectNext
-                        )
-                )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = following.label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                }
             }
         }
     }
