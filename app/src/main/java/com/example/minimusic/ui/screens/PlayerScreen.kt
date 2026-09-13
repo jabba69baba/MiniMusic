@@ -238,6 +238,7 @@ fun PlayerScreen(
     val navigationBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val queueSlotVisible = playbackState.queue.size > 1 || playbackState.repeatMode == RepeatMode.ONE
     val view = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
 
     val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
     // Window attributes are system calls: only re-apply when the resolved
@@ -300,7 +301,7 @@ fun PlayerScreen(
             fun PlayerHeader(modifier: Modifier) {
                 Box(modifier = modifier.fillMaxWidth()) {
                     IconButton(onClick = {
-                        if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic()
+                        if (hapticsEnabled) view.performMiniMusicHaptic()
                         onBack()
                     }, modifier = Modifier
                             .align(Alignment.CenterStart)
@@ -648,6 +649,7 @@ private fun NowPlayingPanel(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
     var badgeReady by remember(song.id) { mutableStateOf(false) }
     // Badge appear is a scale, not a fade: grows 0.8 -> 1 over the static row.
@@ -998,7 +1000,7 @@ private fun NowPlayingPanel(
                         icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
-                        onClick = { if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic(); onCycleRepeat() },
+                        onClick = { if (hapticsEnabled) view.performMiniMusicHaptic(); onCycleRepeat() },
                         isFirst = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -1007,7 +1009,7 @@ private fun NowPlayingPanel(
                         icon = Icons.Filled.Shuffle,
                         active = playbackState.isShuffled,
                         contentDescription = "Shuffle",
-                        onClick = { if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic(); onToggleShuffle() },
+                        onClick = { if (hapticsEnabled) view.performMiniMusicHaptic(); onToggleShuffle() },
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
@@ -1015,7 +1017,7 @@ private fun NowPlayingPanel(
                         icon = Icons.Filled.Subtitles,
                         active = false,
                         contentDescription = "Lyrics",
-                        onClick = { if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic(); onOpenLyrics() },
+                        onClick = { if (hapticsEnabled) view.performMiniMusicHaptic(); onOpenLyrics() },
                         isLast = true,
                         modifier = Modifier.weight(1f)
                     )

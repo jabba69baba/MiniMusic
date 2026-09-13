@@ -411,6 +411,8 @@ private fun SettingsSliderRow(
     enabled: Boolean,
     onValueChange: (Float) -> Unit
 ) {
+    val hapticsEnabled = LocalMiniMusicHaptics.current
+    val hapticView = LocalView.current
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -418,7 +420,7 @@ private fun SettingsSliderRow(
             modifier = Modifier.height(32.dp),
             value = value,
             onValueChange = {
-                if (LocalMiniMusicHaptics.current) LocalView.current.performMiniMusicHaptic()
+                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                 onValueChange(it)
             },
             valueRange = valueRange,
