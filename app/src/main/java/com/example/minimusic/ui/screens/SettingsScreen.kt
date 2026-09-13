@@ -1,5 +1,7 @@
 package com.example.minimusic.ui.screens
 
+import kotlin.math.roundToInt
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -500,4 +502,3 @@ private fun formatTotalDuration(durationMs: Long): String {
     return if (hours > 0L) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
-import kotlin.math.roundToInt
