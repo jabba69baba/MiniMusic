@@ -84,7 +84,7 @@ fun AlbumArtImage(
 @Composable
 private fun MissingAlbumArtIcon(size: Dp) {
     Image(
-        painter = painterResource(id = R.mipmap.ic_launcher),
+        painter = painterResource(id = R.drawable.ic_launcher_exact),
         contentDescription = null,
         modifier = Modifier.size(size)
     )
