@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.screens
 
 import android.app.Activity
+import android.view.HapticFeedbackConstants
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import android.content.Context
@@ -11,9 +12,15 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -87,6 +94,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -114,6 +122,8 @@ import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.playback.RepeatMode
 import com.example.minimusic.ui.components.AlbumArtImage
+import com.example.minimusic.ui.components.LocalMiniMusicHaptics
+import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.LandscapeQueueContent
 import com.example.minimusic.ui.components.MiniMusicImageLoader
@@ -289,7 +299,12 @@ fun PlayerScreen(
             @Composable
             fun PlayerHeader(modifier: Modifier) {
                 Box(modifier = modifier.fillMaxWidth()) {
-                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                    IconButton(onClick = {
+                        if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic()
+                        onBack()
+                    }, modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .background(artColors.primaryContainer, CircleShape)) {
                         Icon(
                             Icons.Filled.KeyboardArrowDown,
                             contentDescription = "Collapse",
@@ -307,7 +322,9 @@ fun PlayerScreen(
                         onStart = onStartSleepTimer,
                         onCancel = onCancelSleepTimer,
                         artColors = artColors,
-                        modifier = Modifier.align(Alignment.CenterEnd)
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .background(artColors.primaryContainer, CircleShape)
                     )
                 }
             }
@@ -379,13 +396,15 @@ private fun SleepTimerButton(
     modifier: Modifier = Modifier
 ) {
     var dialogOpen by remember { mutableStateOf(false) }
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
 
     Box(modifier = modifier) {
         if (sleepTimerState != null) {
             Surface(
                 shape = RoundedCornerShape(50),
                 color = artColors.primaryContainer,
-                modifier = Modifier.clickable { dialogOpen = true }
+                modifier = Modifier.clickable { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); dialogOpen = true }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -406,7 +425,7 @@ private fun SleepTimerButton(
                 }
             }
         } else {
-            IconButton(onClick = { dialogOpen = true }) {
+            IconButton(onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); dialogOpen = true }) {
                 Icon(
                     Icons.Filled.Timer,
                     contentDescription = "Sleep timer",
@@ -628,6 +647,7 @@ private fun NowPlayingPanel(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
     var formatInfo by remember(song.id) { mutableStateOf<AudioFormatInfo?>(null) }
     var badgeReady by remember(song.id) { mutableStateOf(false) }
     // Badge appear is a scale, not a fade: grows 0.8 -> 1 over the static row.
@@ -654,7 +674,10 @@ private fun NowPlayingPanel(
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
-        tapDirectionOverride = null
+        // Keep an explicit previous/next direction alive for the full carousel
+        // transition. Clearing it before AnimatedContent starts made the art
+        // fall back to queue-index geography, which is wrong for shuffle and
+        // wraparound transitions.
         // Snapshot the outgoing art before replacing the id below. It was on
         // screen a frame ago, so it resolves from the memory cache instantly.
         stackArtUri = lastSongId?.let { prevId ->
@@ -684,6 +707,8 @@ private fun NowPlayingPanel(
                 animationSpec = MiniMusicMotion.fastSpatial()
             )
         }
+        kotlinx.coroutines.delay(420L)
+        tapDirectionOverride = null
     }
 
     LaunchedEffect(playbackState.queue, playbackState.currentIndex) {
@@ -782,23 +807,19 @@ private fun NowPlayingPanel(
             AnimatedContent(
                 targetState = song,
                 transitionSpec = {
-                    // Title overlap, no fade: the incoming title slides a
-                    // quarter-width over the outgoing one, direction aware
-                    // (next/previous symmetric). The outgoing clears fast so
-                    // rapid switches never stack three titles deep. No-bounce
-                    // token throughout, so text never wobbles.
-                    val direction = transitionDirection
-                    slideInHorizontally(
-                        initialOffsetX = { width -> direction * (width / 4) },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
-                    ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { width -> -direction * (width / 4) },
-                        animationSpec = tween(
-                            durationMillis = 150,
-                            easing = MiniMusicMotion.navExitEasing
-                        )
-                    )
+                    // PixelPlayer keeps the metadata slot stable and switches
+                    // the song/artist as a soft vertical reveal, rather than
+                    // throwing text sideways across the player.
+                    (fadeIn(tween(180)) + slideInVertically(
+                        initialOffsetY = { it / 3 }, animationSpec = tween(220)
+                    )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
+                        targetOffsetY = { -it / 4 }, animationSpec = tween(120)
+                    )) using SizeTransform(clip = true)
                 },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isLandscape) 48.dp else 72.dp)
+                    .clipToBounds(),
                 contentKey = { it.id },
                 label = "songMetadataTransition"
             ) { displayedSong ->
@@ -813,8 +834,15 @@ private fun NowPlayingPanel(
                         color = artColors.onBackground,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                repeatDelayMillis = 900,
+                                initialDelayMillis = 700,
+                                velocity = 19.dp
+                            )
                     )
 
                     Text(
@@ -911,6 +939,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     tapDirectionOverride = -1
                     onSkipPrevious()
                 },
@@ -920,7 +949,10 @@ private fun NowPlayingPanel(
                 isPlaying = playbackState.isPlaying,
                 containerColor = artColors.primary,
                 contentColor = artColors.onPrimary,
-                onClick = onTogglePlayPause,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    onTogglePlayPause()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .requiredHeight(landscapeTransportButtonSize)
@@ -932,6 +964,7 @@ private fun NowPlayingPanel(
                 containerColor = artColors.secondaryContainer,
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     tapDirectionOverride = 1
                     onSkipNext()
                 },
@@ -965,7 +998,7 @@ private fun NowPlayingPanel(
                         icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
-                        onClick = onCycleRepeat,
+                        onClick = { if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic(); onCycleRepeat() },
                         isFirst = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -974,7 +1007,7 @@ private fun NowPlayingPanel(
                         icon = Icons.Filled.Shuffle,
                         active = playbackState.isShuffled,
                         contentDescription = "Shuffle",
-                        onClick = onToggleShuffle,
+                        onClick = { if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic(); onToggleShuffle() },
                         modifier = Modifier.weight(1f)
                     )
                     CapsuleSegment(
@@ -982,7 +1015,7 @@ private fun NowPlayingPanel(
                         icon = Icons.Filled.Subtitles,
                         active = false,
                         contentDescription = "Lyrics",
-                        onClick = onOpenLyrics,
+                        onClick = { if (LocalMiniMusicHaptics.current) view.performMiniMusicHaptic(); onOpenLyrics() },
                         isLast = true,
                         modifier = Modifier.weight(1f)
                     )

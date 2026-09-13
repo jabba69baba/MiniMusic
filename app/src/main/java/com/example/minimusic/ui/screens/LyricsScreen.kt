@@ -167,11 +167,13 @@ fun LyricsScreen(
         BackHandler(enabled = !isExiting) {
             isExiting = true
             exitScope.launch {
+                // Close mirrors open (same duration, same decelerate curve,
+                // reversed direction) so neither feels faster.
                 cardOffsetY.animateTo(
                     targetValue = fullHeightPx,
                     animationSpec = tween(
                         MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navExitEasing
+                        easing = MiniMusicMotion.navEnterEasing
                     )
                 )
                 onBack()
@@ -316,8 +318,9 @@ fun LyricsScreen(
                                         color = activeColor,
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = FontWeight.SemiBold,
+                                            fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 38.sp
+                                            lineHeight = 28.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -346,8 +349,9 @@ fun LyricsScreen(
                                         color = color,
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                            fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 38.sp
+                                            lineHeight = 28.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()

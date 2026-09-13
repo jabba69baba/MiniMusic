@@ -24,8 +24,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -55,6 +55,9 @@ import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.provider.OpenableColumns
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import com.example.minimusic.ui.components.LocalMiniMusicHaptics
+import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.data.AppSettings
 import com.example.minimusic.data.ThemeMode
 import com.example.minimusic.data.model.Song
@@ -118,7 +121,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsChoiceRow(
                         title = "App theme",
-                        subtitle = "Dark, Light, or Auto (system)",
+                        subtitle = "Choose Light, Dark, or Auto",
                         options = listOf(
                             ThemeMode.DARK to "Dark",
                             ThemeMode.LIGHT to "Light",
@@ -130,7 +133,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "AMOLED black mode",
-                        subtitle = "Use true-black surfaces when dark theme is active",
+                        subtitle = "Use pure-black surfaces in Dark mode",
                         checked = settings.amoledBlackMode,
                         onCheckedChange = onAmoledBlackModeChange
                     )
@@ -142,14 +145,14 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Audio quality badge",
-                        subtitle = "Show sample rate, bitrate, and format on the player",
+                        subtitle = "Show format, bitrate, and sample rate",
                         checked = settings.showAudioQualityBadge,
                         onCheckedChange = onShowAudioQualityBadgeChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Centered title",
-                        subtitle = "Center the current song title and artist in the player",
+                        subtitle = "Center the player title and artist",
                         checked = settings.centeredTitle,
                         onCheckedChange = onCenteredTitleChange
                     )
@@ -161,21 +164,21 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Resume on launch",
-                        subtitle = "Retain queue order on launch; queue restoration is not active yet",
+                        subtitle = "Restore the last queue and position on launch",
                         checked = settings.resumeOnLaunch,
                         onCheckedChange = onResumeOnLaunchChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Stop on dismiss",
-                        subtitle = "Pause playback when the app is cleared from Recents; service hook pending",
+                        subtitle = "Pause playback when the app is dismissed",
                         checked = settings.stopOnDismiss,
                         onCheckedChange = onStopOnDismissChange
                     )
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Haptic feedback",
-                        subtitle = "Vibrate on touches and drags; interaction hooks pending",
+                        subtitle = "Use haptics for key interactions",
                         checked = settings.hapticFeedback,
                         onCheckedChange = onHapticFeedbackChange
                     )
@@ -183,11 +186,11 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsSectionHeader("Audio", Icons.Filled.Audiotrack)
+                SettingsSectionHeader("Audio", Icons.Filled.GraphicEq)
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Crossfade",
-                        subtitle = "Preference saved; Media3 crossfade is not active in the current player service",
+                        subtitle = "Blend adjacent tracks · not active yet",
                         checked = settings.crossfadeEnabled,
                         onCheckedChange = onCrossfadeEnabledChange
                     )
@@ -204,7 +207,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsSwitchRow(
                         title = "Mono Audio",
-                        subtitle = "Preference saved; channel mixing will be wired into playback next",
+                        subtitle = "Mix left and right channels to mono",
                         checked = settings.monoAudio,
                         onCheckedChange = onMonoAudioChange
                     )
@@ -226,7 +229,6 @@ fun SettingsScreen(
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Rescan library") },
-                        supportingContent = { Text("Clear the current library view and reload local MediaStore files") },
                         trailingContent = {
                             if (libraryState.isLoading) {
                                 CircularProgressIndicator(modifier = Modifier.padding(8.dp))
@@ -323,10 +325,14 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val view = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = { Text(subtitle) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = {
+            if (hapticsEnabled) view.performMiniMusicHaptic()
+            onCheckedChange(it)
+        }) },
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -340,15 +346,19 @@ private fun <T> SettingsChoiceRow(
     onSelect: (T) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val view = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     val selectedLabel = options.firstOrNull { it.first == selected }?.second.orEmpty()
 
     Box(modifier = Modifier.fillMaxWidth()) {
         ListItem(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = true },
+                .clickable {
+                    if (hapticsEnabled) view.performMiniMusicHaptic()
+                    expanded = true
+                },
             headlineContent = { Text(title) },
-            supportingContent = { Text(subtitle) },
             trailingContent = {
                 Text(
                     text = selectedLabel,
@@ -376,6 +386,7 @@ private fun <T> SettingsChoiceRow(
                     },
                     onClick = {
                         expanded = false
+                        if (hapticsEnabled) view.performMiniMusicHaptic()
                         onSelect(value)
                     },
                     modifier = if (isSelected) {
@@ -406,7 +417,10 @@ private fun SettingsSliderRow(
         Slider(
             modifier = Modifier.height(32.dp),
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = {
+                if (LocalMiniMusicHaptics.current) LocalView.current.performMiniMusicHaptic()
+                onValueChange(it)
+            },
             valueRange = valueRange,
             steps = steps,
             enabled = enabled,
