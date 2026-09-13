@@ -42,6 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import com.example.minimusic.ui.components.LocalMiniMusicHaptics
+import com.example.minimusic.ui.components.performMiniMusicHaptic
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -105,6 +108,8 @@ fun LyricsScreen(
     onSeekTo: (Long) -> Unit,
     onBack: () -> Unit
 ) {
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     // Collected here so the position ticker recomposes only this screen.
     val playbackState by playbackFlow.collectAsState()
     var isExiting by remember { mutableStateOf(false) }
@@ -167,11 +172,13 @@ fun LyricsScreen(
         BackHandler(enabled = !isExiting) {
             isExiting = true
             exitScope.launch {
+                // Close mirrors open (same duration, same decelerate curve,
+                // reversed direction) so neither feels faster.
                 cardOffsetY.animateTo(
                     targetValue = fullHeightPx,
                     animationSpec = tween(
                         MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navExitEasing
+                        easing = MiniMusicMotion.navEnterEasing
                     )
                 )
                 onBack()
@@ -316,8 +323,9 @@ fun LyricsScreen(
                                         color = activeColor,
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = FontWeight.SemiBold,
+                                            fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 38.sp
+                                            lineHeight = 28.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -346,8 +354,9 @@ fun LyricsScreen(
                                         color = color,
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                            fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 38.sp
+                                            lineHeight = 28.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -357,7 +366,10 @@ fun LyricsScreen(
                                                 interactionSource = remember { MutableInteractionSource() },
                                                 indication = null
                                             ) {
-                                                line.startMs?.let(onSeekTo)
+                                                line.startMs?.let { startMs ->
+                                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                                    onSeekTo(startMs)
+                                                }
                                             }
                                             .graphicsLayer {
                                                 scaleX = lineScale

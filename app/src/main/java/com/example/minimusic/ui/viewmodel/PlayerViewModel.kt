@@ -46,6 +46,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _sleepTimerState = MutableStateFlow<SleepTimerState?>(null)
     val sleepTimerState: StateFlow<SleepTimerState?> = _sleepTimerState.asStateFlow()
     private var sleepTimerJob: Job? = null
+    private var lyricsJob: Job? = null
     private var sleepTimerWaitForSongEnd = false
 
     init {
@@ -59,18 +60,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun loadLyricsFor(song: Song?) {
+        lyricsJob?.cancel()
         if (song == null) {
             _lyricsState.value = LyricsState.Idle
             return
         }
         _lyricsState.value = LyricsState.Loading
-        viewModelScope.launch {
+        lyricsJob = viewModelScope.launch {
             val lyrics = lyricsReader.readLyrics(song)
+            // readLyrics runs off the main thread. Cancellation prevents a slower
+            // previous track from replacing the result for the newly playing song.
             _lyricsState.value = if (lyrics != null) LyricsState.Found(lyrics) else LyricsState.NotFound
         }
     }
 
     fun connect() = controller.connect()
+    fun restoreLastSession(songs: List<Song>, playOnLaunch: Boolean) =
+        controller.restoreLastSession(songs, playOnLaunch)
     fun playQueue(songs: List<Song>, startIndex: Int) = controller.playQueue(songs, startIndex)
     fun startShufflePlayback(songs: List<Song>, startIndex: Int) =
         controller.startShufflePlayback(songs, startIndex)

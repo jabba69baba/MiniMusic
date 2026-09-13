@@ -1,6 +1,7 @@
 package com.example.minimusic.data
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,19 +33,45 @@ private val InstrumentalPlaceholderRegex = Regex(
  * Reads lyrics straight out of a song's own embedded ID3v2 tag (the "USLT" frame —
  * standard unsynchronized lyrics), so nothing is ever fetched from the network.
  *
- * Current scope: ID3v2.3 / v2.4 tags on MP3-family files (the overwhelming majority
- * of locally-tagged lyrics in the wild). ID3v2.2 (3-char frame IDs) and container
- * formats that store lyrics differently (FLAC "LYRICS" comment, M4A "©lyr" atom)
- * aren't read yet.
+ * ID3v2 USLT is parsed directly for MP3-family files. For containers such as FLAC
+ * and M4A, the platform metadata retriever is used as a lightweight fallback for
+ * embedded lyric fields. Network lyrics and sidecar files remain intentionally out
+ * of scope for the offline player.
  */
 class LyricsReader(private val context: Context) {
 
     suspend fun readLyrics(song: Song): String? = withContext(Dispatchers.IO) {
         runCatching {
-            context.contentResolver.openInputStream(song.contentUri)?.use { input ->
+            val id3Lyrics = context.contentResolver.openInputStream(song.contentUri)?.use { input ->
                 parseId3Lyrics(input)
             }
+            id3Lyrics ?: readContainerLyrics(song)
         }.getOrNull()
+    }
+
+    /**
+     * MediaMetadataRetriever exposes common container-level lyric metadata for
+     * formats such as FLAC and M4A, where lyrics are not stored in an ID3 USLT
+     * frame. This keeps the reader offline and avoids adding a large tag library.
+     */
+    private fun readContainerLyrics(song: Song): String? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, song.contentUri)
+            // The lyrics metadata key is not exposed consistently across Android
+            // SDK stubs. Resolve it reflectively so older compile SDKs still build.
+            val lyricsKey = runCatching {
+                MediaMetadataRetriever::class.java
+                    .getField("METADATA_KEY_LYRICS")
+                    .getInt(null)
+            }.getOrNull()
+            lyricsKey?.let { retriever.extractMetadata(it) }
+                ?.let(::cleanLyricsText)
+        } catch (_: RuntimeException) {
+            null
+        } finally {
+            retriever.release()
+        }
     }
 
     private fun parseId3Lyrics(input: InputStream): String? {
