@@ -1,6 +1,5 @@
 package com.example.minimusic.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleIn
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -36,6 +33,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +62,6 @@ import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.theme.MiniMusicMotion
-import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import java.util.Locale
 
@@ -73,7 +70,6 @@ fun DetailsScreen(
     song: Song,
     onBack: () -> Unit
 ) {
-    BackHandler(onBack = onBack)
     val context = androidx.compose.ui.platform.LocalContext.current
     val artColors = rememberArtColorRoles(song.albumArtUri)
     var details by remember(song.id) { mutableStateOf<SongDetails?>(null) }
@@ -82,15 +78,21 @@ fun DetailsScreen(
         details = readSongDetails(context, song)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(artColors.background)
-            .windowInsetsPadding(WindowInsets.systemBars)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(bottom = MiniPlayerReservedHeight + 12.dp)
-    ) {
+    Dialog(onDismissRequest = onBack) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.6f),
+            shape = RoundedCornerShape(28.dp),
+            color = artColors.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 20.dp)
+            ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -223,6 +225,8 @@ fun DetailsScreen(
                     DetailCard(Icons.Filled.Storage, "Size", formatFileSize(resolved.sizeBytes), artColors)
                     DetailCard(Icons.Filled.Storage, "Path", resolved.path ?: song.contentUri.toString(), artColors)
                 }
+            }
+        }
             }
         }
     }

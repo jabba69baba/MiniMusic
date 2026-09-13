@@ -10,6 +10,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
+import kotlinx.coroutines.CancellationException
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -105,6 +108,28 @@ fun MiniMusicNavGraph(
     }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    val predictiveBackRoute = currentRoute == Routes.SETTINGS ||
+        currentRoute == Routes.DETAILS || currentRoute == Routes.ALBUM || currentRoute == Routes.ARTIST
+    val predictiveBackProgress = remember { Animatable(0f) }
+
+    PredictiveBackHandler(enabled = predictiveBackRoute) { progress ->
+        var completed = false
+        try {
+            progress.collect { event ->
+                predictiveBackProgress.snapTo(event.progress)
+            }
+            completed = true
+        } catch (_: CancellationException) {
+            // A cancelled edge gesture returns the current destination to rest.
+        } finally {
+            if (completed) {
+                navController.popBackStack()
+                predictiveBackProgress.snapTo(0f)
+            } else {
+                predictiveBackProgress.animateTo(0f, animationSpec = tween(180))
+            }
+        }
+    }
 
     fun openPlayer() {
         if (navController.currentDestination?.route != Routes.PLAYER) {
@@ -226,6 +251,14 @@ fun MiniMusicNavGraph(
                     androidx.compose.ui.Modifier
                 }
             )
+            .graphicsLayer {
+                // Keep the previous Library layer visible underneath while
+                // an approved destination follows the predictive-back edge.
+                val progress = predictiveBackProgress.value
+                translationX = progress * fullWidthPx * 0.18f
+                scaleX = 1f - progress * 0.04f
+                scaleY = 1f - progress * 0.04f
+            }
             .zIndex(3f),
         enterTransition = {
             // Shared-axis push, no fade: the entering screen slides in
