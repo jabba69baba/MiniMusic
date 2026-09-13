@@ -373,7 +373,7 @@ private fun <T> SettingsChoiceRow(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.align(Alignment.End).width(180.dp)
+            modifier = Modifier.align(Alignment.TopEnd).width(180.dp)
         ) {
             options.forEach { (value, label) ->
                 val isSelected = selected == value
@@ -499,3 +499,5 @@ private fun formatTotalDuration(durationMs: Long): String {
     val minutes = totalMinutes % 60L
     return if (hours > 0L) "${hours}h ${minutes}m" else "${minutes}m"
 }
+
+import kotlin.math.roundToInt
