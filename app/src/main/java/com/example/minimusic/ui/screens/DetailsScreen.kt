@@ -168,14 +168,6 @@ fun DetailsScreen(
                     overflow = TextOverflow.Clip,
                     modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 18.dp)
                 )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = artColors.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
             }
         }
 
