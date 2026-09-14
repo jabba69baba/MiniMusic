@@ -148,8 +148,8 @@ private fun artScheme(seed: Color, isDark: Boolean): DynamicScheme {
 private fun normalizeArtworkSeed(color: Color): Color {
     val hsl = FloatArray(3)
     CoreColorUtils.colorToHSL(color.toArgb(), hsl)
-    hsl[1] = (hsl[1] * 0.78f).coerceAtMost(0.70f)
-    hsl[2] = hsl[2].coerceIn(0.24f, 0.74f)
+    hsl[1] = (hsl[1] * 0.95f).coerceAtMost(0.92f)
+    hsl[2] = hsl[2].coerceIn(0.20f, 0.80f)
     return Color(CoreColorUtils.HSLToColor(hsl))
 }
 

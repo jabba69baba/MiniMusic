@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -76,11 +77,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.ColorUtils
+import com.example.minimusic.ui.components.LocalMiniMusicHaptics
+import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.R
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -144,6 +148,8 @@ fun QueueScreen(
 ) {
     BackHandler(onBack = onBack)
     var locateRequest by remember { mutableStateOf(0) }
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
 
     Surface(
         modifier = Modifier
@@ -176,7 +182,7 @@ fun QueueScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     androidx.compose.material3.IconButton(
-                        onClick = onClearQueue,
+                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
@@ -203,7 +209,7 @@ fun QueueScreen(
                     }
                     Spacer(modifier = Modifier.size(28.dp))
                     androidx.compose.material3.IconButton(
-                        onClick = { locateRequest++ },
+                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
@@ -359,6 +365,8 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     val offsetY = remember(panelHeight) { Animatable(closedOffset.value) }
     val scope = rememberCoroutineScope()
     var locateRequest by remember { mutableStateOf(0) }
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     var queueTopRequest by remember { mutableStateOf(0) }
     var openRequest by remember { mutableStateOf(0) }
 
@@ -367,7 +375,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
             if (isOpen) 0f else closedOffset.value,
             animationSpec = MiniMusicMotion.defaultSpatial()
         )
-        if (isOpen) openRequest++
     }
 
     Box(
@@ -437,6 +444,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .clickable {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                     if (isOpen) queueTopRequest++ else onOpenChange(true)
                                 }
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
@@ -469,7 +477,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             label = "Clear",
                             contentDescription = "Clear queue",
                             artColors = artColors,
-                            onClick = onClearQueue,
+                            onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
                             modifier = Modifier.weight(1f)
                         )
                         QueueActionPill(
@@ -477,7 +485,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             label = "Locate",
                             contentDescription = "Locate current song",
                             artColors = artColors,
-                            onClick = { locateRequest++ },
+                            onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -522,6 +530,8 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
     val offsetY = remember { Animatable(closedOffsetPx) }
     var locateRequest by remember { mutableStateOf(0) }
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     var queueTopRequest by remember { mutableStateOf(0) }
     var openRequest by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -529,7 +539,6 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     LaunchedEffect(isOpen, fullHeightPx) {
         val target = if (isOpen) openOffsetPx else closedOffsetPx
         offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
-        if (isOpen) openRequest++
     }
 
     Box(
@@ -596,7 +605,10 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .clickable { queueTopRequest++ }
+                                    .clickable {
+                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                        queueTopRequest++
+                                    }
                                     .padding(horizontal = 12.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -628,7 +640,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 label = "Clear",
                                 contentDescription = "Clear queue",
                                 artColors = artColors,
-                                onClick = onClearQueue,
+                                onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
                                 modifier = Modifier.weight(1f)
                             )
                             QueueActionPill(
@@ -636,7 +648,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 label = "Locate",
                                 contentDescription = "Locate current song",
                                 artColors = artColors,
-                                onClick = { locateRequest++ },
+                                onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -780,22 +792,9 @@ private fun ColumnScope.QueueDrawerList(
         },
         update = { recyclerView ->
             adapter.submitSnapshot(snapshot)
-            if (snapshot.currentEntryId != previousCurrentEntryId) {
-                previousCurrentEntryId = snapshot.currentEntryId
-                // A current-item change can accompany removal, especially in
-                // shuffled playback. Let DiffUtil/ItemAnimator finish its fade
-                // and row movement before repositioning, otherwise the list
-                // visibly snaps while the removed card is animating.
-                recyclerView.postDelayed({
-                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@postDelayed
-                    val currentPosition = snapshot.resolvedVisiblePosition
-                    if (currentPosition < 0) return@postDelayed
-                    val lastVisible = layout.findLastVisibleItemPosition()
-                    if (currentPosition > 0 && currentPosition >= lastVisible) {
-                        layout.scrollToPositionWithOffset(currentPosition, 0)
-                    }
-                }, 240L)
-            }
+            // Do not reposition on ordinary snapshot updates or while the
+            // user is scrolling. The queue is located explicitly on open or
+            // through the Locate action only.
             if (openRequest != previousOpenRequest) {
                 previousOpenRequest = openRequest
                 recyclerView.stopScroll()
@@ -816,7 +815,7 @@ private fun ColumnScope.QueueDrawerList(
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
-                        layout.scrollToPositionWithOffset(currentPosition, 0)
+                        animateQueueScroll(recyclerView, currentPosition)
                     }
                 }
             }
@@ -827,12 +826,33 @@ private fun ColumnScope.QueueDrawerList(
                     recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     if (adapter.itemCount > 0) {
-                        layout.scrollToPositionWithOffset(0, 0)
+                        animateQueueScroll(recyclerView, 0)
                     }
                 }
             }
         }
     )
+}
+
+/** Matches the library locate motion: stage long jumps, then glide the final tail. */
+private fun animateQueueScroll(recyclerView: RecyclerView, targetPosition: Int) {
+    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
+    val first = layout.findFirstVisibleItemPosition()
+    fun glideToStart() {
+        val scroller = object : LinearSmoothScroller(recyclerView.context) {
+            override fun getVerticalSnapPreference(): Int = SNAP_TO_START
+        }
+        scroller.targetPosition = targetPosition
+        layout.startSmoothScroll(scroller)
+    }
+    if (first < 0 || abs(targetPosition - first) <= 10) {
+        glideToStart()
+        return
+    }
+    val staged = (targetPosition + if (targetPosition > first) -6 else 6)
+        .coerceIn(0, (recyclerView.adapter?.itemCount ?: 1) - 1)
+    layout.scrollToPositionWithOffset(staged, 0)
+    recyclerView.post { glideToStart() }
 }
 
 private class QueueRecyclerView(
