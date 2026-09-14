@@ -945,8 +945,11 @@ private fun SlidingCategoryControl(
                                 },
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 13.sp
                                 ),
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip
                             )
@@ -961,6 +964,7 @@ private fun SlidingCategoryControl(
                         .clickable(
                             interactionSource = nextInteraction,
                             indication = null,
+                            enabled = reelProgress.value >= 0.999f,
                             onClick = onSelectNext
                         )
                 )

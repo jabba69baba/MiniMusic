@@ -1,12 +1,13 @@
 package com.example.minimusic.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.CachePolicy
@@ -162,11 +164,17 @@ fun DetailsScreen(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = when {
+                            song.title.length > 34 -> 16.sp
+                            song.title.length > 24 -> 18.sp
+                            else -> MaterialTheme.typography.headlineSmall.fontSize
+                        }
+                    ),
                     color = artColors.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Clip,
-                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 18.dp)
+                    modifier = Modifier
                 )
             }
         }
@@ -177,11 +185,7 @@ fun DetailsScreen(
         AnimatedContent(
             targetState = loaded != null,
             transitionSpec = {
-                // Scale-only appear, no fade: content grows 0.96 -> 1 over
-                // the static loading indicator it replaces.
-                (scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects()) togetherWith
-                    scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects()))
-                    .using(SizeTransform(clip = true))
+                EnterTransition.None togetherWith ExitTransition.None
             },
             label = "detailsContentTransition"
         ) { hasDetails ->
