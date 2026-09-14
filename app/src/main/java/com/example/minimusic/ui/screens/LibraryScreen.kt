@@ -895,7 +895,10 @@ private fun SlidingCategoryControl(
             Surface(
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
+                modifier = Modifier
+                    .padding(4.dp)
+                    .width(slotWidth - 8.dp)
+                    .fillMaxHeight()
             ) {}
 
             Box(
