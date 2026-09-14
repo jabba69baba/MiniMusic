@@ -899,7 +899,7 @@ private fun SlidingCategoryControl(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier
                     .padding(4.dp)
-                    .width(slotWidth - 8.dp)
+                    .width(slotWidth)
                     .fillMaxHeight()
             ) {}
 
@@ -909,14 +909,13 @@ private fun SlidingCategoryControl(
                 AnimatedContent(
                     targetState = selected,
                     transitionSpec = {
-                        (slideInHorizontally(
+                        slideInHorizontally(
                             initialOffsetX = { it },
                             animationSpec = MiniMusicMotion.fastSpatial()
-                        ) + fadeIn(animationSpec = MiniMusicMotion.fastEffects())) togetherWith
-                            (slideOutHorizontally(
-                                targetOffsetX = { -it },
-                                animationSpec = MiniMusicMotion.fastSpatial()
-                            ) + fadeOut(animationSpec = MiniMusicMotion.fastEffects()))
+                        ) togetherWith slideOutHorizontally(
+                            targetOffsetX = { -it },
+                            animationSpec = MiniMusicMotion.fastSpatial()
+                        )
                     },
                     label = "categoryReel"
                 ) { activeCategory ->
