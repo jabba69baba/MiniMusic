@@ -22,7 +22,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -43,7 +42,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -105,7 +103,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
@@ -119,7 +116,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.platform.LocalDensity
 import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.data.model.Album
@@ -879,36 +875,12 @@ private fun SlidingCategoryControl(
     selected: LibraryTab,
     onSelectNext: () -> Unit
 ) {
-    val nextInteraction = remember { MutableInteractionSource() }
-    val density = LocalDensity.current
     val slotWidth = 67.dp
-    val slotWidthPx = with(density) { slotWidth.toPx() }
-    val reelProgress = remember { androidx.compose.animation.core.Animatable(1f) }
-    var initialized by remember { mutableStateOf(false) }
 
-    fun previous(category: LibraryTab) = when (category) {
-        LibraryTab.SONGS -> LibraryTab.ALBUMS
-        LibraryTab.ARTISTS -> LibraryTab.SONGS
-        LibraryTab.ALBUMS -> LibraryTab.ARTISTS
-    }
     fun following(category: LibraryTab) = when (category) {
         LibraryTab.SONGS -> LibraryTab.ARTISTS
         LibraryTab.ARTISTS -> LibraryTab.ALBUMS
         LibraryTab.ALBUMS -> LibraryTab.SONGS
-    }
-
-    // The target pair is represented by one explicit three-slot strip:
-    // previous | target | next. At rest the strip is offset by one slot, so
-    // target and next are visible. On a forward change it moves left exactly
-    // one slot; no label is independently replaced or unloaded.
-    LaunchedEffect(selected) {
-        if (!initialized) {
-            initialized = true
-            reelProgress.snapTo(1f)
-        } else {
-            reelProgress.snapTo(0f)
-            reelProgress.animateTo(1f, animationSpec = tween(300))
-        }
     }
 
     Surface(
@@ -918,36 +890,65 @@ private fun SlidingCategoryControl(
         modifier = Modifier.width(142.dp).height(48.dp)
     ) {
         Box(Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
+            // The highlight stays anchored to the active left slot. Only the
+            // labels move, so the control remains a stable two-slot pill.
             Surface(
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.padding(4.dp).width(slotWidth).fillMaxHeight()
             ) {}
+
             Box(
                 modifier = Modifier.padding(4.dp).fillMaxSize().clipToBounds()
             ) {
-                Row(
-                    modifier = Modifier
-                        .requiredWidth(slotWidth * 3)
-                        .height(40.dp)
-                        .graphicsLayer { translationX = -slotWidthPx * reelProgress.value },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf(previous(selected), selected, following(selected)).forEachIndexed { index, category ->
+                AnimatedContent(
+                    targetState = selected,
+                    transitionSpec = {
+                        (slideInHorizontally(
+                            initialOffsetX = { it },
+                            animationSpec = MiniMusicMotion.fastSpatial()
+                        ) + fadeIn(animationSpec = MiniMusicMotion.fastEffects())) togetherWith
+                            (slideOutHorizontally(
+                                targetOffsetX = { -it },
+                                animationSpec = MiniMusicMotion.fastSpatial()
+                            ) + fadeOut(animationSpec = MiniMusicMotion.fastEffects()))
+                    },
+                    label = "categoryReel"
+                ) { activeCategory ->
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = activeCategory.label,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            ),
+                            modifier = Modifier.width(slotWidth),
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip
+                        )
+
                         Box(
-                            modifier = Modifier.width(slotWidth).fillMaxHeight().clipToBounds(),
+                            modifier = Modifier
+                                .width(slotWidth)
+                                .fillMaxHeight()
+                                .clickable(
+                                    indication = null,
+                                    onClick = onSelectNext
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = category.label,
-                                color = if (index < 2) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                                text = following(activeCategory).label,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                    fontWeight = if (index < 2) FontWeight.Bold else FontWeight.Normal,
+                                    fontWeight = FontWeight.Normal,
                                     fontSize = 13.sp
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
@@ -958,18 +959,6 @@ private fun SlidingCategoryControl(
                         }
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(slotWidth)
-                        .fillMaxHeight()
-                        .clickable(
-                            interactionSource = nextInteraction,
-                            indication = null,
-                            enabled = reelProgress.value >= 0.999f,
-                            onClick = onSelectNext
-                        )
-                )
             }
         }
     }
