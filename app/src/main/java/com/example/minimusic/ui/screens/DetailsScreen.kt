@@ -1,31 +1,30 @@
 package com.example.minimusic.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.GraphicEq
@@ -35,8 +34,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,7 +62,6 @@ import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.theme.MiniMusicMotion
-import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import java.util.Locale
 
@@ -72,7 +70,6 @@ fun DetailsScreen(
     song: Song,
     onBack: () -> Unit
 ) {
-    BackHandler(onBack = onBack)
     val context = androidx.compose.ui.platform.LocalContext.current
     val artColors = rememberArtColorRoles(song.albumArtUri)
     var details by remember(song.id) { mutableStateOf<SongDetails?>(null) }
@@ -81,29 +78,31 @@ fun DetailsScreen(
         details = readSongDetails(context, song)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(artColors.background)
-            .windowInsetsPadding(WindowInsets.systemBars)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(bottom = MiniPlayerReservedHeight + 12.dp)
-    ) {
+    Dialog(onDismissRequest = onBack) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.6f),
+            shape = RoundedCornerShape(28.dp),
+            color = artColors.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 20.dp)
+            ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(48.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = artColors.onBackground)
-            }
             Text(
                 text = "Details",
-                style = MaterialTheme.typography.headlineSmall,
-                color = artColors.onBackground,
-                modifier = Modifier.padding(start = 8.dp)
+                style = MaterialTheme.typography.titleLarge,
+                color = artColors.onBackground
             )
         }
 
@@ -165,12 +164,13 @@ fun DetailsScreen(
                     text = song.title,
                     style = MaterialTheme.typography.headlineSmall,
                     color = artColors.onBackground,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 18.dp)
                 )
                 Text(
                     text = song.artist,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = artColors.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -187,8 +187,9 @@ fun DetailsScreen(
             transitionSpec = {
                 // Scale-only appear, no fade: content grows 0.96 -> 1 over
                 // the static loading indicator it replaces.
-                scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects()) togetherWith
-                    scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
+                (scaleIn(initialScale = 0.96f, animationSpec = MiniMusicMotion.selectionEffects()) togetherWith
+                    scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects()))
+                    .using(SizeTransform(clip = true))
             },
             label = "detailsContentTransition"
         ) { hasDetails ->
@@ -223,6 +224,8 @@ fun DetailsScreen(
                 }
             }
         }
+            }
+        }
     }
 }
 
@@ -247,7 +250,7 @@ private fun DetailCard(
         ) {
             Icon(icon, contentDescription = null, tint = artColors.onSurfaceVariant, modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleMedium, color = artColors.onSurface)
+                Text(label, style = MaterialTheme.typography.titleSmall, color = artColors.onSurface)
                 Text(
                     value,
                     style = MaterialTheme.typography.bodyMedium,
