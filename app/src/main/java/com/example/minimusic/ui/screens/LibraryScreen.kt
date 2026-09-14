@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -367,7 +368,9 @@ fun LibraryScreen(
                                 PillButton(
                                     onClick = {
                                         if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                        stopSongScrollRequest++
+                                        // Shuffle changes playback only. Do not
+                                        // cancel an active LazyColumn fling or
+                                        // user drag when the control is tapped.
                                         if (filteredSongs.isNotEmpty()) {
                                             val startSong = filteredSongs.random()
                                             onShufflePlayFrom(startSong, filteredSongs)
@@ -923,7 +926,7 @@ private fun SlidingCategoryControl(
             ) {
                 Row(
                     modifier = Modifier
-                        .width(slotWidth * 3)
+                        .requiredWidth(slotWidth * 3)
                         .height(40.dp)
                         .graphicsLayer { translationX = -slotWidthPx * reelProgress.value },
                     verticalAlignment = Alignment.CenterVertically
