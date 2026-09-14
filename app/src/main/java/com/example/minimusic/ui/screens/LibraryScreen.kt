@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -876,6 +877,7 @@ private fun SlidingCategoryControl(
     onSelectNext: () -> Unit
 ) {
     val slotWidth = 67.dp
+    val nextInteraction = remember { MutableInteractionSource() }
 
     fun following(category: LibraryTab) = when (category) {
         LibraryTab.SONGS -> LibraryTab.ARTISTS
@@ -941,6 +943,7 @@ private fun SlidingCategoryControl(
                                 .width(slotWidth)
                                 .fillMaxHeight()
                                 .clickable(
+                                    interactionSource = nextInteraction,
                                     indication = null,
                                     onClick = onSelectNext
                                 ),
