@@ -89,6 +89,14 @@ object MiniMusicMotion {
     fun <T> carouselSpatial(): FiniteAnimationSpec<T> =
         spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f)
 
+    /**
+     * Single-layer track handoffs use two sequential legs. This faster
+     * critically-damped token keeps their total travel close to the existing
+     * seekbar rewind without changing the seekbar's shared carousel clock.
+     */
+    fun <T> trackHandoffSpatial(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 1200f)
+
     // Screen transitions use emphasized *tweens*, not springs: M3 container
     // motion is easing-based while springs stay reserved for components.
     // Cubic values are the M3 motion spec's emphasized curves, cross-checked

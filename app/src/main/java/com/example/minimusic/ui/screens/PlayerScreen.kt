@@ -635,13 +635,13 @@ private fun <T> SingleLayerDirectionalHandoff(
         if (renderedState.value == targetState) return@LaunchedEffect
         offset.animateTo(
             targetValue = -direction.toFloat(),
-            animationSpec = MiniMusicMotion.carouselSpatial()
+            animationSpec = MiniMusicMotion.trackHandoffSpatial()
         )
         renderedState.value = targetState
         offset.snapTo(direction.toFloat())
         offset.animateTo(
             targetValue = 0f,
-            animationSpec = MiniMusicMotion.carouselSpatial()
+            animationSpec = MiniMusicMotion.trackHandoffSpatial()
         )
     }
 

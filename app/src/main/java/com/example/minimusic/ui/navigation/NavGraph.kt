@@ -242,8 +242,7 @@ fun MiniMusicNavGraph(
         modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
             .then(
-                if (currentRoute == Routes.SETTINGS ||
-                    currentRoute == Routes.ALBUM ||
+                if (currentRoute == Routes.ALBUM ||
                     currentRoute == Routes.ARTIST
                 ) {
                     androidx.compose.ui.Modifier.background(MaterialTheme.colorScheme.background)
@@ -347,7 +346,45 @@ fun MiniMusicNavGraph(
             Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
         }
 
-        composable(Routes.SETTINGS) {
+        composable(
+            route = Routes.SETTINGS,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = tween(
+                        MiniMusicMotion.navTransitionDurationMillis,
+                        easing = MiniMusicMotion.navEnterEasing
+                    )
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(
+                        MiniMusicMotion.navTransitionDurationMillis,
+                        easing = MiniMusicMotion.navExitEasing
+                    )
+                )
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { -it },
+                    animationSpec = tween(
+                        MiniMusicMotion.navTransitionDurationMillis,
+                        easing = MiniMusicMotion.navEnterEasing
+                    )
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(
+                        MiniMusicMotion.navTransitionDurationMillis,
+                        easing = MiniMusicMotion.navExitEasing
+                    )
+                )
+            }
+        ) {
             CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
             SettingsScreen(
                 settings = appSettings,
