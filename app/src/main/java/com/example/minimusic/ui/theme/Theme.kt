@@ -13,57 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val LightColors = lightColorScheme(
-    primary = AmberPrimaryLight,
-    onPrimary = AmberOnPrimaryLight,
-    primaryContainer = AmberPrimaryContainerLight,
-    onPrimaryContainer = AmberOnPrimaryContainerLight,
-    secondary = AmberSecondaryLight,
-    onSecondary = AmberOnSecondaryLight,
-    secondaryContainer = AmberSecondaryContainerLight,
-    onSecondaryContainer = AmberOnSecondaryContainerLight,
-    tertiary = AmberTertiaryLight,
-    onTertiary = AmberOnTertiaryLight,
-    tertiaryContainer = AmberTertiaryContainerLight,
-    onTertiaryContainer = AmberOnTertiaryContainerLight,
-    background = AmberBackgroundLight,
-    onBackground = AmberOnBackgroundLight,
-    surface = AmberSurfaceLight,
-    onSurface = AmberOnSurfaceLight,
-    surfaceVariant = AmberSurfaceVariantLight,
-    onSurfaceVariant = AmberOnSurfaceVariantLight,
-    outline = AmberOutlineLight,
-    outlineVariant = AmberOutlineVariantLight,
-    inverseSurface = AmberInverseSurfaceLight,
-    inverseOnSurface = AmberInverseOnSurfaceLight,
-    inversePrimary = AmberInversePrimaryLight
-)
-
-private val DarkColors = darkColorScheme(
-    primary = AmberPrimaryDark,
-    onPrimary = AmberOnPrimaryDark,
-    primaryContainer = AmberPrimaryContainerDark,
-    onPrimaryContainer = AmberOnPrimaryContainerDark,
-    secondary = AmberSecondaryDark,
-    onSecondary = AmberOnSecondaryDark,
-    secondaryContainer = AmberSecondaryContainerDark,
-    onSecondaryContainer = AmberOnSecondaryContainerDark,
-    tertiary = AmberTertiaryDark,
-    onTertiary = AmberOnTertiaryDark,
-    tertiaryContainer = AmberTertiaryContainerDark,
-    onTertiaryContainer = AmberOnTertiaryContainerDark,
-    background = AmberBackgroundDark,
-    onBackground = AmberOnBackgroundDark,
-    surface = AmberSurfaceDark,
-    onSurface = AmberOnSurfaceDark,
-    surfaceVariant = AmberSurfaceVariantDark,
-    onSurfaceVariant = AmberOnSurfaceVariantDark,
-    outline = AmberOutlineDark,
-    outlineVariant = AmberOutlineVariantDark,
-    inverseSurface = AmberInverseSurfaceDark,
-    inverseOnSurface = AmberInverseOnSurfaceDark,
-    inversePrimary = AmberInversePrimaryDark
-)
+// Material baseline schemes are the non-dynamic fallback. On Android 12+
+// the system Monet scheme supplies the same semantic roles from wallpaper
+// colors; no app-specific amber palette overrides those roles.
+private val LightColors = lightColorScheme()
+private val DarkColors = darkColorScheme()
 
 /**
  * App-wide Material 3 Expressive theme. Android 12+ uses wallpaper-derived
@@ -91,20 +45,22 @@ fun MiniMusicTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    // AMOLED is a dark-theme surface policy only. Override every Material 3 surface
-    // container so individual screens cannot fall back to warm/dynamic surfaces.
+    // AMOLED keeps only the deepest app surfaces black. Container roles remain
+    // visibly separated so cards, dividers, switches, queue rows, and the mini
+    // player do not disappear into one indistinguishable black plane.
     val colorScheme = if (darkTheme && amoledBlack) {
         baseColorScheme.copy(
             background = Color.Black,
             surface = Color.Black,
-            surfaceVariant = Color.Black,
+            surfaceVariant = Color(0xFF1D1B1E),
             surfaceDim = Color.Black,
-            surfaceBright = Color.Black,
+            surfaceBright = Color(0xFF252326),
             surfaceContainerLowest = Color.Black,
-            surfaceContainerLow = Color.Black,
-            surfaceContainer = Color.Black,
-            surfaceContainerHigh = Color.Black,
-            surfaceContainerHighest = Color.Black
+            surfaceContainerLow = Color(0xFF0D0C0E),
+            surfaceContainer = Color(0xFF121013),
+            surfaceContainerHigh = Color(0xFF1A181B),
+            surfaceContainerHighest = Color(0xFF242125),
+            outlineVariant = Color(0xFF3A363B)
         )
     } else {
         baseColorScheme
