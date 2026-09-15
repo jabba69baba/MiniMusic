@@ -1,12 +1,18 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.EnterTransition
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
+import kotlinx.coroutines.CancellationException
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -49,8 +55,10 @@ import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
+import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
+import kotlinx.coroutines.launch
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -89,8 +97,39 @@ fun MiniMusicNavGraph(
     val lyricsState by playerViewModel.lyricsState.collectAsState()
     val appSettings by settingsViewModel.settings.collectAsState()
     val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
+
+    LaunchedEffect(libraryState.allSongs, appSettings.resumeOnLaunch) {
+        if (libraryState.allSongs.isNotEmpty()) {
+            playerViewModel.restoreLastSession(
+                libraryState.allSongs,
+                playOnLaunch = appSettings.resumeOnLaunch
+            )
+        }
+    }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    val predictiveBackRoute = currentRoute == Routes.SETTINGS ||
+        currentRoute == Routes.DETAILS || currentRoute == Routes.ALBUM || currentRoute == Routes.ARTIST
+    val predictiveBackProgress = remember { Animatable(0f) }
+
+    PredictiveBackHandler(enabled = predictiveBackRoute) { progress ->
+        var completed = false
+        try {
+            progress.collect { event ->
+                predictiveBackProgress.snapTo(event.progress)
+            }
+            completed = true
+        } catch (_: CancellationException) {
+            // A cancelled edge gesture returns the current destination to rest.
+        } finally {
+            if (completed) {
+                navController.popBackStack()
+                predictiveBackProgress.snapTo(0f)
+            } else {
+                predictiveBackProgress.animateTo(0f, animationSpec = tween(180))
+            }
+        }
+    }
 
     fun openPlayer() {
         if (navController.currentDestination?.route != Routes.PLAYER) {
@@ -106,6 +145,7 @@ fun MiniMusicNavGraph(
         val sheetState = rememberPlayerSheetMotionState(scope)
         var queueDrawerOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         val fullHeightPx = with(density) { maxHeight.toPx() }
+        val fullWidthPx = with(density) { maxWidth.toPx() }
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
         val isLandscape = maxWidth > maxHeight && maxHeight >= 320.dp
@@ -167,6 +207,7 @@ fun MiniMusicNavGraph(
         // Keep Home composed as a stable base layer for every destination.
         // Overlay destinations can then enter/exit over the already-rendered
         // library instead of exposing a stale frame while the back stack changes.
+        CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
         LibraryScreen(
             uiState = libraryState,
             currentSongId = currentSong?.id,
@@ -193,6 +234,7 @@ fun MiniMusicNavGraph(
             onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             onRetryLoad = libraryViewModel::loadLibrary
         )
+        }
 
         NavHost(
             navController = navController,
@@ -201,7 +243,6 @@ fun MiniMusicNavGraph(
             .fillMaxSize()
             .then(
                 if (currentRoute == Routes.SETTINGS ||
-                    currentRoute == Routes.DETAILS ||
                     currentRoute == Routes.ALBUM ||
                     currentRoute == Routes.ARTIST
                 ) {
@@ -210,6 +251,14 @@ fun MiniMusicNavGraph(
                     androidx.compose.ui.Modifier
                 }
             )
+            .graphicsLayer {
+                // Keep the previous Library layer visible underneath while
+                // an approved destination follows the predictive-back edge.
+                val progress = predictiveBackProgress.value
+                translationX = progress * fullWidthPx * 0.18f
+                scaleX = 1f - progress * 0.04f
+                scaleY = 1f - progress * 0.04f
+            }
             .zIndex(3f),
         enterTransition = {
             // Shared-axis push, no fade: the entering screen slides in
@@ -242,7 +291,17 @@ fun MiniMusicNavGraph(
             )
         },
         popEnterTransition = {
-            slideInHorizontally(
+            if (initialState.destination.route == Routes.SETTINGS) {
+                // Returning from Settings reveals the underlying screen from
+                // left to right; no fade or scale overlap.
+                slideInHorizontally(
+                    initialOffsetX = { -it },
+                    animationSpec = tween(MiniMusicMotion.navTransitionDurationMillis, easing = MiniMusicMotion.navEnterEasing)
+                )
+            } else if (initialState.destination.route?.startsWith("details/") == true) {
+                fadeIn(tween(220, easing = MiniMusicMotion.navEnterEasing)) +
+                    slideInHorizontally(initialOffsetX = { -(it * 0.08f).toInt() }, animationSpec = tween(220))
+            } else slideInHorizontally(
                 initialOffsetX = { -(it * 0.25f).toInt() },
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
@@ -258,18 +317,27 @@ fun MiniMusicNavGraph(
             )
         },
         popExitTransition = {
-            slideOutHorizontally(
+            if (initialState.destination.route == Routes.SETTINGS) {
+                // Settings itself leaves toward the right as a card.
+                slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(MiniMusicMotion.navTransitionDurationMillis, easing = MiniMusicMotion.navExitEasing)
+                )
+            } else if (initialState.destination.route?.startsWith("details/") == true) {
+                fadeOut(tween(180, easing = MiniMusicMotion.navExitEasing)) +
+                    slideOutHorizontally(targetOffsetX = { (it * 0.08f).toInt() }, animationSpec = tween(180))
+            } else slideOutHorizontally(
                 targetOffsetX = { (it * 0.5f).toInt() },
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navExitEasing
+                    easing = MiniMusicMotion.navEnterEasing
                 )
             ) + scaleOut(
                 targetScale = 0.92f,
                 transformOrigin = TransformOrigin(0.5f, 0.5f),
                 animationSpec = tween(
                     MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navExitEasing
+                    easing = MiniMusicMotion.navEnterEasing
                 )
             )
         }
@@ -280,6 +348,7 @@ fun MiniMusicNavGraph(
         }
 
         composable(Routes.SETTINGS) {
+            CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
             SettingsScreen(
                 settings = appSettings,
                 libraryState = libraryState,
@@ -299,6 +368,7 @@ fun MiniMusicNavGraph(
                 onMinDurationChange = settingsViewModel::setMinDurationSeconds,
                 onRescanLibrary = { libraryViewModel.rescanLibrary() }
             )
+            }
         }
 
         composable(
@@ -369,7 +439,20 @@ fun MiniMusicNavGraph(
                         playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
                         onSeekTo = playerViewModel::seekTo,
-                        onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
+                        // Back always lands on the player card: pop to PLAYER
+                        // when it's in the stack (tap/drag-open path), else
+                        // rebuild it above Home (drag-open path has no PLAYER
+                        // entry, and a failed pop would strand the back press).
+                        onBack = {
+                            val popped =
+                                navController.popBackStack(Routes.PLAYER, inclusive = false)
+                            if (!popped) {
+                                navController.navigate(Routes.PLAYER) {
+                                    popUpTo(Routes.LIBRARY)
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
                     )
                 }
             } else {
@@ -377,7 +460,16 @@ fun MiniMusicNavGraph(
                     playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
                     onSeekTo = playerViewModel::seekTo,
-                    onBack = { navController.popBackStack(Routes.PLAYER, inclusive = false) }
+                    onBack = {
+                        val popped =
+                            navController.popBackStack(Routes.PLAYER, inclusive = false)
+                        if (!popped) {
+                            navController.navigate(Routes.PLAYER) {
+                                popUpTo(Routes.LIBRARY)
+                                launchSingleTop = true
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -406,6 +498,24 @@ fun MiniMusicNavGraph(
                     (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
             }
         }
+        // Back at Home with the sheet dragged up collapses the sheet instead
+        // of exiting the app: every back press must close the current layer
+        // and reveal the previous one (lyrics -> player -> home -> exit).
+        val sheetExpandedAtHome by remember(sheetState, currentRoute) {
+            derivedStateOf {
+                currentRoute == Routes.LIBRARY && sheetState.progress > 0.5f
+            }
+        }
+        androidx.activity.compose.BackHandler(enabled = sheetExpandedAtHome) {
+            scope.launch {
+                sheetState.settle(
+                    velocityPxPerSecond = 0f,
+                    targetProgressOverride = 0f,
+                    onExpanded = {},
+                    onCollapsed = {}
+                )
+            }
+        }
 
         if (playerSheetVisible) {
             Box(
@@ -427,6 +537,7 @@ fun MiniMusicNavGraph(
                         }
                     )
             ) {
+                CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
                 PlayerScreen(
                     playbackFlow = playerViewModel.uiState,
                     queueSnapshot = queueSnapshot,
@@ -454,6 +565,7 @@ fun MiniMusicNavGraph(
                     onCancelSleepTimer = playerViewModel::cancelSleepTimer,
                     onQueueOpenChange = { queueDrawerOpen = it }
                 )
+                }
             }
         }
 
@@ -472,6 +584,7 @@ fun MiniMusicNavGraph(
                     .zIndex(1f)
                     .then(if (hasActiveSong && !queueDrawerOpen) sheetDragModifier else androidx.compose.ui.Modifier)
             ) {
+                CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
                 MiniPlayer(
                     playbackFlow = playerViewModel.uiState,
                     onTogglePlayPause = playerViewModel::togglePlayPause,
@@ -479,6 +592,7 @@ fun MiniMusicNavGraph(
                     onClick = ::openPlayerWithSheetTransition,
                     onSwipeToPlayer = {}
                 )
+                }
             }
         }
     }

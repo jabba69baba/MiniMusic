@@ -1,14 +1,17 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -29,11 +32,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,9 +45,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,8 +95,17 @@ fun MiniPlayer(
     // Collected here so the position ticker recomposes only this bar — never
     // the library list it floats above.
     val playbackState by playbackFlow.collectAsState()
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
     val song = playbackState.currentSong
     val isPlaying = playbackState.isPlaying
+    var lastDirectionIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
+    // MiniPlayer only exposes Next, so it always uses the forward vertical
+    // handoff. Previous-direction logic belongs exclusively to PlayerScreen.
+    val trackTransitionDirection = 1
+    androidx.compose.runtime.SideEffect {
+        lastDirectionIndex = playbackState.currentIndex
+    }
     val positionMs = playbackState.positionMs
     val durationMs = playbackState.durationMs
     val progress by remember(positionMs, durationMs) {
@@ -100,13 +114,7 @@ fun MiniPlayer(
         }
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri)
-    // Title overlap direction follows real queue movement, derived
-    // synchronously like the player carousel: effect-updated direction
-    // arrives after the transition starts, which jittered rapid switches.
-    var lastMiniIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
-    val titleDirection = if (playbackState.currentIndex >= lastMiniIndex) 1 else -1
-    SideEffect { lastMiniIndex = playbackState.currentIndex }
-    val miniPlayerColor = artColors.surfaceVariant
+    val miniPlayerColor = artColors.primaryContainer
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val progressRingColor = readableProgressColor(
         accent = artColors.primary,
@@ -129,52 +137,46 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AnimatedContent(
-                targetState = song,
-                transitionSpec = {
-                    // Title overlap, no fade: incoming slides a quarter-width
-                    // over the outgoing row, direction aware. Outgoing clears
-                    // fast so rapid switches never stack. No-bounce token so
-                    // text never wobbles.
-                    val direction = titleDirection
-                    slideInHorizontally(
-                        initialOffsetX = { width -> direction * (width / 4) },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
-                    ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { width -> -direction * (width / 4) },
-                        animationSpec = tween(
-                            durationMillis = 150,
-                            easing = MiniMusicMotion.navExitEasing
-                        )
-                    )
-                },
-                modifier = Modifier.weight(1f),
-                contentKey = { it?.id ?: -1L },
-                label = "miniPlayerTrackContent"
-            ) { displayedSong ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MiniPlayerArt(artUri = displayedSong?.albumArtUri)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = displayedSong?.title ?: "What's the vibe?",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Normal,
-                            color = artColors.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = displayedSong?.artist ?: "Tap a song to listen",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = artColors.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+            // One shared transition keeps artwork and metadata on the same
+            // motion clock. It uses the main player carousel token, but with
+            // no independent fades or competing animations that can thud when
+            // tracks change quickly.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Keyed so a new bitmap never cross-dissolves over the old
+                // tile: the art swaps the instant its request resolves.
+                AnimatedContent(
+                    targetState = song,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + slideInVertically(
+                            initialOffsetY = { trackTransitionDirection * it }, animationSpec = tween(360)
+                        )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
+                            targetOffsetY = { -trackTransitionDirection * it }, animationSpec = tween(260)
+                        ))
+                    },
+                    contentKey = { it?.id },
+                    label = "miniPlayerTrackSwitch",
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) { displayedSong ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MiniPlayerArt(artUri = displayedSong?.albumArtUri)
+                        Column(Modifier.weight(1f).clipToBounds()) {
+                            Text(
+                                text = displayedSong?.title ?: "What's the vibe?",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Normal,
+                                color = artColors.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
+                            )
+                            Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -194,7 +196,10 @@ fun MiniPlayer(
                 isPlaying = isPlaying,
                 progressColor = progressRingColor,
                 controlTint = controlTint,
-                onClick = onTogglePlayPause
+                onClick = {
+                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                    onTogglePlayPause()
+                }
             )
             // Skip next: plain icon, no background, right-aligned next to play/pause.
             Box(
@@ -204,7 +209,10 @@ fun MiniPlayer(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         enabled = song != null,
-                        onClick = onSkipNext
+                        onClick = {
+                            if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                            onSkipNext()
+                        }
                     ),
                 contentAlignment = Alignment.Center
             ) {
