@@ -114,7 +114,7 @@ fun MiniPlayer(
         }
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri)
-    val miniPlayerColor = artColors.surfaceVariant
+    val miniPlayerColor = artColors.primaryContainer
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val progressRingColor = readableProgressColor(
         accent = artColors.primary,

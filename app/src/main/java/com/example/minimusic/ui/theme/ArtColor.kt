@@ -165,8 +165,12 @@ fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
     val artSecondaryContainer = Color(scheme.getSecondaryContainer())
     val artTertiary = Color(scheme.getTertiary())
     val artTertiaryContainer = Color(scheme.getTertiaryContainer())
-    val artBackground = Color(scheme.getBackground())
-    val artOnBackground = Color(scheme.getOnBackground())
+    // PixelPlayer uses the artwork primary-container as the player-area
+    // canvas rather than the nearly-neutral Material background role. This
+    // preserves the generated tonal palette while making the artwork identity
+    // visible across the complete player surface in both light and dark mode.
+    val artBackground = artPrimaryContainer
+    val artOnBackground = Color(scheme.getOnPrimaryContainer())
     val artSurface = Color(scheme.getSurface())
     val artOnSurface = Color(scheme.getOnSurface())
     val artSurfaceVariant = Color(scheme.getSurfaceVariant())
