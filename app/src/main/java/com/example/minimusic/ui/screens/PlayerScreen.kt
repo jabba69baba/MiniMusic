@@ -93,6 +93,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
@@ -610,6 +612,60 @@ private fun preloadAlbumArt(context: Context, song: Song) {
     MiniMusicImageLoader.get(context).enqueue(request)
 }
 
+/**
+ * A non-overlapping song-change handoff. Only one item is composed at a time:
+ * the current item exits, the target is swapped while offscreen, and the target
+ * enters from the opposite edge. A new target cancels the old handoff without
+ * clearing the currently rendered item, which prevents stale blank frames.
+ */
+@Composable
+private fun <T> SingleLayerDirectionalHandoff(
+    targetState: T,
+    targetKey: Any?,
+    direction: Int,
+    horizontal: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable (T) -> Unit
+) {
+    val renderedState = remember { mutableStateOf(targetState) }
+    val offset = remember { Animatable(0f) }
+    var viewportSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+
+    LaunchedEffect(targetKey, direction) {
+        if (renderedState.value == targetState) return@LaunchedEffect
+        offset.animateTo(
+            targetValue = -direction.toFloat(),
+            animationSpec = MiniMusicMotion.carouselSpatial()
+        )
+        renderedState.value = targetState
+        offset.snapTo(direction.toFloat())
+        offset.animateTo(
+            targetValue = 0f,
+            animationSpec = MiniMusicMotion.carouselSpatial()
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .onSizeChanged { viewportSize = it }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    if (horizontal) {
+                        translationX = offset.value * viewportSize.width
+                    } else {
+                        translationY = offset.value * viewportSize.height
+                    }
+                }
+        ) {
+            content(renderedState.value)
+        }
+    }
+}
+
 @Composable
 private fun NowPlayingPanel(
     song: Song,
@@ -716,30 +772,12 @@ private fun NowPlayingPanel(
                 .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            AnimatedContent(
-                modifier = Modifier.fillMaxSize(),
+            SingleLayerDirectionalHandoff(
                 targetState = song,
-                transitionSpec = {
-                    val direction = transitionDirection
-                    // Card overlap, no fade: the incoming frame slides over the
-                    // outgoing one on the no-bounce carousel token. The
-                    // outgoing clears fast (180ms exit on the emphasized
-                    // accelerate curve) instead of holding still — under rapid
-                    // skips a static outgoing stacked 3-deep and read as
-                    // mixed-up mush; a fast exit keeps at most two layers.
-                    slideInHorizontally(
-                        initialOffsetX = { fullWidth -> direction * fullWidth },
-                        animationSpec = MiniMusicMotion.carouselSpatial()
-                    ) togetherWith slideOutHorizontally(
-                        targetOffsetX = { fullWidth -> -direction * fullWidth },
-                        animationSpec = tween(
-                            durationMillis = 180,
-                            easing = MiniMusicMotion.navExitEasing
-                        )
-                    )
-                },
-                contentKey = { it.id },
-                label = "albumArtCarouselTransition"
+                targetKey = song.id,
+                direction = transitionDirection,
+                horizontal = true,
+                modifier = Modifier.fillMaxSize()
             ) { displayedSong ->
                 if (displayedSong.albumArtUri == null) {
                     Icon(
@@ -749,10 +787,6 @@ private fun NowPlayingPanel(
                         tint = artColors.onPrimaryContainer
                     )
                 } else {
-                    // No bitmap fade: the bitmap swaps the instant it decodes
-                    // and the slide itself is the motion. The previous art
-                    // sits behind (memory-cached, instant), so the incoming
-                    // frame always travels over artwork, never an empty slot.
                     val artLoadRequest = remember(displayedSong.albumArtUri) {
                         ImageRequest.Builder(context)
                             .data(displayedSong.albumArtUri)
@@ -760,16 +794,14 @@ private fun NowPlayingPanel(
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build()
                     }
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        AsyncImage(
-                            model = artLoadRequest,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(ArtCornerShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    AsyncImage(
+                        model = artLoadRequest,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(ArtCornerShape),
+                        contentScale = ContentScale.Crop
+                    )
                 }
             }
         }
@@ -777,24 +809,14 @@ private fun NowPlayingPanel(
 
     val metadataAndSeekBlock: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier = modifier) {
-            AnimatedContent(
+            SingleLayerDirectionalHandoff(
                 targetState = song,
-                transitionSpec = {
-                    // Next enters bottom-to-top; Previous reverses the same
-                    // choreography so the metadata follows transport intent.
-                    val direction = transitionDirection
-                    (fadeIn(tween(180, delayMillis = 180)) + slideInVertically(
-                        initialOffsetY = { direction * it }, animationSpec = tween(220, delayMillis = 180)
-                    )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
-                        targetOffsetY = { -direction * it }, animationSpec = tween(180)
-                    )) using SizeTransform(clip = true)
-                },
+                targetKey = song.id,
+                direction = transitionDirection,
+                horizontal = false,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isLandscape) 48.dp else 72.dp)
-                    .clipToBounds(),
-                contentKey = { it.id },
-                label = "songMetadataTransition"
             ) { displayedSong ->
                 Column(
                     modifier = Modifier
