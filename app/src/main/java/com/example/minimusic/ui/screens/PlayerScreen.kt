@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -109,6 +110,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -138,6 +140,7 @@ import com.example.minimusic.ui.theme.lerpTo
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.StateFlow
 
@@ -613,55 +616,176 @@ private fun preloadAlbumArt(context: Context, song: Song) {
 }
 
 /**
- * A non-overlapping song-change handoff. Only one item is composed at a time:
- * the current item exits, the target is swapped while offscreen, and the target
- * enters from the opposite edge. A new target cancels the old handoff without
- * clearing the currently rendered item, which prevents stale blank frames.
+ * Guard before the playback state is expected to confirm a predicted skip
+ * (mirrors PixelPlayer's skip-reconciliation window).
+ */
+private const val CarouselReconcileGuardMs = 900L
+
+/**
+ * M3E film-strip carousel for the album art (horizontal).
+ *
+ * Every queue occurrence keeps a stable position in the strip — item [k]
+ * always sits `(k - progress)` viewports away — and a track change animates
+ * the shared [progress] spring onto the new index
+ * ([MiniMusicMotion.carouselSpatial], critically damped, the same token as
+ * the seekbar rewind, so bar and art settle as one choreography). Adjacent
+ * covers always tile the viewport: while one leaves, the next is already
+ * sliding in, so a rapid skip burst never exposes a blank slot. Each
+ * occurrence is composed exactly once — there is no cached artwork layer
+ * behind the strip to duplicate a cover — and the single shared [progress]
+ * is the sole owner of the motion, so no frame is ever double-driven.
+ *
+ * Only the focused item and its two neighbors are composed; the window is
+ * recomposed only when [focusedIndex] crosses a boundary, while per-frame
+ * progress updates stay in the graphicsLayer draw phase.
  */
 @Composable
-private fun <T> SingleLayerDirectionalHandoff(
-    targetState: T,
-    targetKey: Any?,
-    direction: Int,
-    horizontal: Boolean,
-    modifier: Modifier = Modifier,
-    content: @Composable (T) -> Unit
+private fun QueueArtStrip(
+    progress: Animatable<Float, AnimationScope>,
+    queue: List<Song>,
+    focusedIndex: Int,
+    artColors: ArtColorRoles,
+    modifier: Modifier = Modifier
 ) {
-    val renderedState = remember { mutableStateOf(targetState) }
-    val offset = remember { Animatable(0f) }
-    var viewportSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
-
-    LaunchedEffect(targetKey, direction) {
-        if (renderedState.value == targetState) return@LaunchedEffect
-        offset.animateTo(
-            targetValue = -direction.toFloat(),
-            animationSpec = MiniMusicMotion.trackHandoffSpatial()
-        )
-        renderedState.value = targetState
-        offset.snapTo(direction.toFloat())
-        offset.animateTo(
-            targetValue = 0f,
-            animationSpec = MiniMusicMotion.trackHandoffSpatial()
-        )
+    val context = LocalContext.current
+    var viewportWidthPx by remember { mutableIntStateOf(0) }
+    val window = remember(focusedIndex, queue.size) {
+        if (queue.isEmpty()) {
+            IntArray(0)
+        } else {
+            val lo = (focusedIndex - 1).coerceAtLeast(0)
+            val hi = (focusedIndex + 1).coerceAtMost(queue.size - 1)
+            IntArray(hi - lo + 1) { lo + it }
+        }
     }
 
     Box(
         modifier = modifier
             .clipToBounds()
-            .onSizeChanged { viewportSize = it }
+            .onSizeChanged { viewportWidthPx = it.width }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    if (horizontal) {
-                        translationX = offset.value * viewportSize.width
+        // Wait for the first measured width so the three window items don't
+        // all draw at x=0 (stacked) for a frame.
+        if (viewportWidthPx > 0) {
+            for (index in window) {
+                val song = queue[index]
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = (index - progress.value) * viewportWidthPx
+                        }
+                ) {
+                    if (song.albumArtUri == null) {
+                        Icon(
+                            imageVector = Icons.Filled.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(0.3f),
+                            tint = artColors.onPrimaryContainer
+                        )
                     } else {
-                        translationY = offset.value * viewportSize.height
+                        val artLoadRequest = remember(song.id, song.albumArtUri) {
+                            ImageRequest.Builder(context)
+                                .data(song.albumArtUri)
+                                .crossfade(false)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .build()
+                        }
+                        AsyncImage(
+                            model = artLoadRequest,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
                     }
                 }
-        ) {
-            content(renderedState.value)
+            }
+        }
+    }
+}
+
+/**
+ * M3E film strip for the track title/artist block (vertical) — the same
+ * contract as [QueueArtStrip], rotated: each queue occurrence is one block
+ * exactly the window height, so the band always shows the outgoing block's
+ * bottom and the incoming block's top. The title is never fully gone during a
+ * handoff, and the direction stays vertical. Programmatic only: the strip
+ * consumes no pointer input, so the sheet's vertical drag is unaffected. The
+ * infinite marquee runs on the focused item only.
+ */
+@Composable
+private fun VerticalMetadataStrip(
+    progress: Animatable<Float, AnimationScope>,
+    queue: List<Song>,
+    focusedIndex: Int,
+    centeredTitle: Boolean,
+    artColors: ArtColorRoles,
+    windowHeight: Dp,
+    topPadding: Dp,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val windowHeightPx = with(density) { windowHeight.toPx() }
+    val window = remember(focusedIndex, queue.size) {
+        if (queue.isEmpty()) {
+            IntArray(0)
+        } else {
+            val lo = (focusedIndex - 1).coerceAtLeast(0)
+            val hi = (focusedIndex + 1).coerceAtMost(queue.size - 1)
+            IntArray(hi - lo + 1) { lo + it }
+        }
+    }
+
+    Box(modifier = modifier.clipToBounds()) {
+        for (index in window) {
+            val song = queue[index]
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationY = (index - progress.value) * windowHeightPx
+                    }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp)
+                        .padding(top = topPadding)
+                ) {
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = artColors.onBackground,
+                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (index == focusedIndex) {
+                                    Modifier.basicMarquee(
+                                        iterations = Int.MAX_VALUE,
+                                        repeatDelayMillis = 900,
+                                        initialDelayMillis = 700,
+                                        velocity = 19.dp
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            )
+                    )
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = artColors.onSurfaceVariant,
+                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 }
@@ -695,39 +819,134 @@ private fun NowPlayingPanel(
     var badgeReady by remember(song.id) { mutableStateOf(false) }
     // Badge appear is a scale, not a fade: grows 0.8 -> 1 over the static row.
     val badgeScale = remember { Animatable(0.8f) }
-    // Carousel direction is derived SYNCHRONOUSLY during composition from the
-    // queue index — never in an effect. Updating it in LaunchedEffect(song.id)
-    // arrived after the transition's first frames, so rapid skips started
-    // sliding the wrong way and overlapping text mixed directions mid-burst.
-    // The SideEffect commit converges after one frame with no loop (same value
-    // writes settle silently).
-    var lastDirectionIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
-    // Manual taps override the derivation for the next change (a tap's intent
-    // beats queue geography); the song-change effect below consumes it.
-    var tapDirectionOverride by remember { mutableStateOf<Int?>(null) }
-    // Capture the direction once for each song. The previous implementation
-    // read the mutable override directly from transitionSpec; clearing it
-    // during the first recomposition could change a running transition from
-    // Previous to Next (or vice versa).
-    val transitionDirection = remember(song.id) {
-        tapDirectionOverride
-            ?: if (playbackState.currentIndex >= lastDirectionIndex) 1 else -1
+    // ---- Track-change carousel (M3E film strip) ---------------------------
+    // One shared spring — [MiniMusicMotion.carouselSpatial], the same token as
+    // the seekbar rewind — drives BOTH the art strip (horizontal) and the
+    // title/artist strip (vertical) as a film strip over the playback queue.
+    // Every queue occurrence keeps a stable position in its strip, so
+    // adjacent covers/titles always tile the viewport: a rapid skip retargets
+    // the in-flight spring from its current value instead of exiting to a
+    // blank slot (the old two-leg single-layer handoff). Each occurrence is
+    // composed exactly once — no cached artwork layer to duplicate a cover —
+    // and this one Animatable is the sole owner of the motion, so no frame is
+    // ever double-driven.
+    val carouselProgress = remember { Animatable(0f) }
+    // Optimistic index from a skip tap: the strip starts moving before the
+    // MediaController round-trip lands (PixelPlayer's pendingCarouselIndex);
+    // the reconciliation effect below lets the real state confirm or override.
+    var pendingCarouselIndex by remember { mutableStateOf<Int?>(null) }
+    val queue = playbackState.queue
+    val safeLastIndex = (queue.size - 1).coerceAtLeast(0)
+    val targetIndex = (pendingCarouselIndex ?: playbackState.currentIndex).coerceIn(0, safeLastIndex)
+    // The composed item window only changes when the focused index crosses a
+    // strip boundary; per-frame progress stays in the graphicsLayer draw
+    // phase and must never recompose the strips.
+    var focusedIndex by remember(queue) {
+        mutableIntStateOf(playbackState.currentIndex.coerceIn(0, safeLastIndex))
     }
-    SideEffect { lastDirectionIndex = playbackState.currentIndex }
-    // Art rendered behind the incoming frame during the carousel slide, so the
-    // travel never exposes an empty slot while the new bitmap decodes. Resolved
-    // from the previously-playing song; null when unknown or identical.
+    LaunchedEffect(carouselProgress, queue) {
+        snapshotFlow { carouselProgress.value.roundToInt() }
+            .distinctUntilChanged()
+            .collect { focusedIndex = it.coerceIn(0, safeLastIndex) }
+    }
+
+    // The queue display list is rebuilt in place whenever its geometry
+    // changes (shuffle toggle, reorder, edit): the same song can sit at a new
+    // display index. Track the previous (queue, target) pair so the driver can
+    // tell "same song, new geometry" (refocus instantly) from a real song
+    // change (slide).
+    var lastQueue by remember { mutableStateOf<List<Song>?>(null) }
+    var lastTargetIndex by remember { mutableIntStateOf(-1) }
+
+    LaunchedEffect(targetIndex, queue) {
+        if (queue.isEmpty() || targetIndex !in queue.indices) return@LaunchedEffect
+        val target = targetIndex.toFloat()
+        val distance = abs(carouselProgress.value - target)
+        val landingSong = queue[targetIndex]
+        val queueChanged = lastQueue !== queue
+        val prevLandingSong = lastQueue?.getOrNull(lastTargetIndex)
+        val sameSongNewGeometry = queueChanged &&
+            prevLandingSong != null &&
+            prevLandingSong.id == landingSong.id
+        when {
+            // Same cover at a (possibly shifted) index: a confirmed optimistic
+            // prediction, or the queue was reordered/edited. A tiny residual
+            // settles on the spring (a mid-flight confirmation reads as a
+            // continuation, not a hop); a real displacement refocuses
+            // instantly — sliding across a reordered queue would show covers
+            // that no longer follow each other.
+            sameSongNewGeometry -> {
+                if (distance <= 0.3f) {
+                    carouselProgress.animateTo(target, MiniMusicMotion.carouselSpatial())
+                } else {
+                    carouselProgress.snapTo(target)
+                }
+            }
+            // Adjacent travels ride the shared carousel spring; long jumps
+            // (shuffle landing far away, wrap, queue reorders) snap instead
+            // of flying across the queue.
+            distance > 1.5f -> carouselProgress.snapTo(target)
+            else -> carouselProgress.animateTo(target, MiniMusicMotion.carouselSpatial())
+        }
+        lastQueue = queue
+        lastTargetIndex = targetIndex
+    }
+
+    // Reconcile the optimistic index with the real playback state. A
+    // confirming state matches the prediction and simply keeps it; a
+    // diverged one (repeat edges, a skip the controller declined) drops the
+    // prediction after a short guard so the real index drives the strip.
+    LaunchedEffect(pendingCarouselIndex, playbackState.currentIndex, queue) {
+        val pending = pendingCarouselIndex ?: return@LaunchedEffect
+        delay(CarouselReconcileGuardMs)
+        if (pendingCarouselIndex == pending && playbackState.currentIndex != pending) {
+            pendingCarouselIndex = null
+        }
+    }
+
+    /**
+     * Predicts the queue index a skip tap lands on, matching
+     * PlayerController's exact rules so the strip can start moving before the
+     * playback state confirms. The displayed queue is already in native
+     * playback order while shuffling, so index ± 1 is the predicted pick
+     * there. Null when the outcome can't be resolved in display geometry
+     * (the queue edge under shuffle) or nothing moves (repeat-one restart,
+     * previous beyond the 3s restart threshold, repeat-off at the end).
+     */
+    fun predictSkipIndex(direction: Int): Int? {
+        if (queue.isEmpty()) return null
+        // Chain from the pending prediction when one is in flight (PixelPlayer
+        // predicts from pendingCarouselIndex too): a rapid next-next burst
+        // targets index+2 in one continuous spring instead of pausing at
+        // index+1. A wrong chain is corrected by the reconciliation effect.
+        val index = (pendingCarouselIndex ?: playbackState.currentIndex)
+            .coerceIn(0, queue.lastIndex)
+        return if (direction > 0) {
+            when {
+                playbackState.repeatMode == RepeatMode.ONE -> index
+                index < queue.lastIndex -> index + 1
+                playbackState.isShuffled -> null
+                playbackState.repeatMode == RepeatMode.ALL -> 0
+                else -> null
+            }
+        } else {
+            // skipToPrevious restarts the current song when >3s in.
+            if (playbackState.positionMs > 3000L) index
+            else when {
+                index > 0 -> index - 1
+                playbackState.isShuffled -> null
+                playbackState.repeatMode == RepeatMode.ALL -> queue.lastIndex
+                else -> index
+            }
+        }
+    }
+    // Latest composed song, read by the song-change effect below (which must
+    // not restart just because the effect's captured `song` went stale).
     val latestSong by rememberUpdatedState(song)
 
     LaunchedEffect(song.id) {
-        // Consume the tap direction for this exact song transition. Keeping
-        // it alive for a timed window made a later rapid switch inherit the
-        // wrong direction.
-        tapDirectionOverride = null
-        // AnimatedContent owns the outgoing frame. Do not add a second cached
-        // artwork layer behind it: that produced duplicate/repeated covers
-        // during rapid skips.
-        // Warm the shared memory cache without blocking; the bitmap swaps in.
+        // Warm the shared memory cache without blocking; the bitmap swaps in
+        // on the strip's next frame.
         song.albumArtUri?.let { uri ->
             MiniMusicImageLoader.get(context).enqueue(
                 ImageRequest.Builder(context)
@@ -772,85 +991,30 @@ private fun NowPlayingPanel(
                 .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            SingleLayerDirectionalHandoff(
-                targetState = song,
-                targetKey = song.id,
-                direction = transitionDirection,
-                horizontal = true,
+            QueueArtStrip(
+                progress = carouselProgress,
+                queue = queue,
+                focusedIndex = focusedIndex,
+                artColors = artColors,
                 modifier = Modifier.fillMaxSize()
-            ) { displayedSong ->
-                if (displayedSong.albumArtUri == null) {
-                    Icon(
-                        imageVector = Icons.Filled.MusicNote,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(0.3f),
-                        tint = artColors.onPrimaryContainer
-                    )
-                } else {
-                    val artLoadRequest = remember(displayedSong.albumArtUri) {
-                        ImageRequest.Builder(context)
-                            .data(displayedSong.albumArtUri)
-                            .crossfade(false)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .build()
-                    }
-                    AsyncImage(
-                        model = artLoadRequest,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(ArtCornerShape),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
+            )
         }
     }
 
     val metadataAndSeekBlock: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier = modifier) {
-            SingleLayerDirectionalHandoff(
-                targetState = song,
-                targetKey = song.id,
-                direction = transitionDirection,
-                horizontal = false,
+            VerticalMetadataStrip(
+                progress = carouselProgress,
+                queue = queue,
+                focusedIndex = focusedIndex,
+                centeredTitle = centeredTitle,
+                artColors = artColors,
+                windowHeight = if (isLandscape) 48.dp else 72.dp,
+                topPadding = if (isLandscape) 0.dp else ContentSectionGap,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isLandscape) 48.dp else 72.dp)
-            ) { displayedSong ->
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = 2.dp)
-                        .padding(top = if (isLandscape) 0.dp else ContentSectionGap)
-                ) {
-                    Text(
-                        text = displayedSong.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = artColors.onBackground,
-                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .basicMarquee(
-                                iterations = Int.MAX_VALUE,
-                                repeatDelayMillis = 900,
-                                initialDelayMillis = 700,
-                                velocity = 19.dp
-                            )
-                    )
-
-                    Text(
-                        text = displayedSong.artist,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = artColors.onSurfaceVariant,
-                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+            )
 
             Column(
                 modifier = Modifier
@@ -935,7 +1099,7 @@ private fun NowPlayingPanel(
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
                     if (hapticsEnabled) view.performMiniMusicHaptic()
-                    tapDirectionOverride = -1
+                    pendingCarouselIndex = predictSkipIndex(-1)
                     onSkipPrevious()
                 },
                 modifier = Modifier.requiredSize(landscapeTransportCircleSize)
@@ -960,7 +1124,7 @@ private fun NowPlayingPanel(
                 contentColor = artColors.onSecondaryContainer,
                 onClick = {
                     if (hapticsEnabled) view.performMiniMusicHaptic()
-                    tapDirectionOverride = 1
+                    pendingCarouselIndex = predictSkipIndex(1)
                     onSkipNext()
                 },
                 modifier = Modifier.requiredSize(landscapeTransportCircleSize)
