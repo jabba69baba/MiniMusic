@@ -22,7 +22,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.shadow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
@@ -376,6 +375,8 @@ fun PlayerScreen(
                         )
                     },
                     isLandscape = isLandscape,
+                    artworkShadowEnabled = artworkShadowEnabled,
+                    artworkShadowDp = artworkShadowDp,
                     modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier
                 )
             }
@@ -818,6 +819,8 @@ private fun NowPlayingPanel(
     onSwipeToMiniplayer: () -> Unit,
     landscapeQueueContent: @Composable (Boolean, Modifier) -> Unit = { _, _ -> },
     isLandscape: Boolean = false,
+    artworkShadowEnabled: Boolean = true,
+    artworkShadowDp: Int = 6,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -989,18 +992,12 @@ private fun NowPlayingPanel(
         // canvas (a busy, art-tinted background — exactly the case the M3
         // elevation guidance assigns to visible shadows). Static on the block
         // itself; the film-strip animations inside are untouched.
-        Box(
-            modifier = modifier
-                .then(
-                    if (artworkShadowEnabled) {
-                        Modifier.shadow(artworkShadowDp.dp, shape = ArtCornerShape)
-                    } else {
-                        Modifier
-                    }
-                )
-                .clip(ArtCornerShape)
-                .background(artColors.primaryContainer),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = modifier,
+            shape = ArtCornerShape,
+            color = artColors.primaryContainer,
+            tonalElevation = 0.dp,
+            shadowElevation = if (artworkShadowEnabled) artworkShadowDp.dp else 0.dp
         ) {
             QueueArtStrip(
                 progress = carouselProgress,
