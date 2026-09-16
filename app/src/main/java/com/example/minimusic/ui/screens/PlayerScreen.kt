@@ -7,7 +7,6 @@ import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.AnimationScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -142,7 +141,9 @@ import com.example.minimusic.ui.viewmodel.SleepTimerState
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Large rounded-square corner radius used for the album art frame. */
 private val ArtCornerShape = RoundedCornerShape(10.dp)
@@ -641,7 +642,7 @@ private const val CarouselReconcileGuardMs = 900L
  */
 @Composable
 private fun QueueArtStrip(
-    progress: Animatable<Float, AnimationScope>,
+    progress: Animatable<Float, *>,
     queue: List<Song>,
     focusedIndex: Int,
     artColors: ArtColorRoles,
@@ -715,7 +716,7 @@ private fun QueueArtStrip(
  */
 @Composable
 private fun VerticalMetadataStrip(
-    progress: Animatable<Float, AnimationScope>,
+    progress: Animatable<Float, *>,
     queue: List<Song>,
     focusedIndex: Int,
     centeredTitle: Boolean,
