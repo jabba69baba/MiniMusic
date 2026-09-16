@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shadow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
@@ -203,6 +204,8 @@ fun PlayerScreen(
     showAudioQualityBadge: Boolean = true,
     centeredTitle: Boolean = false,
     albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
+    artworkShadowEnabled: Boolean = true,
+    artworkShadowDp: Int = 6,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
     onSwipeToMiniplayer: () -> Unit = onBack,
@@ -982,8 +985,19 @@ private fun NowPlayingPanel(
     val landscapeFunctionSectionGap = if (isLandscape) 16.dp else FunctionSectionGap
 
     val artworkBlock: @Composable (Modifier) -> Unit = { modifier ->
+        // M3E elevation: a soft drop shadow lifts the artwork off the player
+        // canvas (a busy, art-tinted background — exactly the case the M3
+        // elevation guidance assigns to visible shadows). Static on the block
+        // itself; the film-strip animations inside are untouched.
         Box(
             modifier = modifier
+                .then(
+                    if (artworkShadowEnabled) {
+                        Modifier.shadow(artworkShadowDp.dp, shape = ArtCornerShape)
+                    } else {
+                        Modifier
+                    }
+                )
                 .clip(ArtCornerShape)
                 .background(artColors.primaryContainer),
             contentAlignment = Alignment.Center

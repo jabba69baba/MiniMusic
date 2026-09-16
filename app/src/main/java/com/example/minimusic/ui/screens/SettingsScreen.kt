@@ -83,6 +83,8 @@ fun SettingsScreen(
     onAmoledBlackModeChange: (Boolean) -> Unit,
     onShowAudioQualityBadgeChange: (Boolean) -> Unit,
     onCenteredTitleChange: (Boolean) -> Unit,
+    onPlayerArtworkShadowEnabledChange: (Boolean) -> Unit,
+    onPlayerArtworkShadowDpChange: (Int) -> Unit,
     onResumeOnLaunchChange: (Boolean) -> Unit,
     onStopOnDismissChange: (Boolean) -> Unit,
     onHapticFeedbackChange: (Boolean) -> Unit,
@@ -175,6 +177,23 @@ fun SettingsScreen(
                         subtitle = "Center the player title and artist",
                         checked = settings.centeredTitle,
                         onCheckedChange = onCenteredTitleChange
+                    )
+                    SettingsDivider()
+                    SettingsSwitchRow(
+                        title = "Player Artwork Shadow",
+                        subtitle = "Elevate the player artwork with a soft shadow",
+                        checked = settings.playerArtworkShadowEnabled,
+                        onCheckedChange = onPlayerArtworkShadowEnabledChange
+                    )
+                    SettingsDivider()
+                    SettingsSliderRow(
+                        title = "Shadow strength",
+                        subtitle = "${settings.playerArtworkShadowDp} dp",
+                        value = settings.playerArtworkShadowDp.toFloat(),
+                        valueRange = 2f..10f,
+                        steps = 3,
+                        enabled = settings.playerArtworkShadowEnabled,
+                        onValueChange = { onPlayerArtworkShadowDpChange(it.toInt()) }
                     )
                 }
             }

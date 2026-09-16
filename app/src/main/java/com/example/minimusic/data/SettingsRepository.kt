@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.map
 
 private val AllowedMinimumDurations = listOf(0, 15, 30, 45, 60)
 
+/** The shadow slider offers these discrete elevations (dp). */
+private val AllowedPlayerArtworkShadowDps = listOf(2, 4, 6, 8, 10)
+
+private fun nearestPlayerArtworkShadowDp(value: Int): Int =
+    AllowedPlayerArtworkShadowDps.minByOrNull { kotlin.math.abs(it - value) } ?: 6
+
 private fun nearestMinimumDuration(seconds: Int): Int =
     AllowedMinimumDurations.minByOrNull { kotlin.math.abs(it - seconds) } ?: 15
 
@@ -23,6 +29,8 @@ data class AppSettings(
     val amoledBlackMode: Boolean = false,
     val showAudioQualityBadge: Boolean = true,
     val centeredTitle: Boolean = false,
+    val playerArtworkShadowEnabled: Boolean = true,
+    val playerArtworkShadowDp: Int = 6,
     val resumeOnLaunch: Boolean = true,
     val stopOnDismiss: Boolean = false,
     val hapticFeedback: Boolean = true,
@@ -48,6 +56,8 @@ class SettingsRepository(private val context: Context) {
         val AMOLED_BLACK_MODE = booleanPreferencesKey("amoled_black_mode")
         val SHOW_AUDIO_QUALITY_BADGE = booleanPreferencesKey("show_audio_quality_badge")
         val CENTERED_TITLE = booleanPreferencesKey("centered_title")
+        val PLAYER_ARTWORK_SHADOW_ENABLED = booleanPreferencesKey("player_artwork_shadow_enabled")
+        val PLAYER_ARTWORK_SHADOW_DP = intPreferencesKey("player_artwork_shadow_dp")
         val RESUME_ON_LAUNCH = booleanPreferencesKey("resume_on_launch")
         val STOP_ON_DISMISS = booleanPreferencesKey("stop_on_dismiss")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
@@ -68,6 +78,10 @@ class SettingsRepository(private val context: Context) {
             amoledBlackMode = prefs[Keys.AMOLED_BLACK_MODE] ?: false,
             showAudioQualityBadge = prefs[Keys.SHOW_AUDIO_QUALITY_BADGE] ?: true,
             centeredTitle = prefs[Keys.CENTERED_TITLE] ?: false,
+            playerArtworkShadowEnabled = prefs[Keys.PLAYER_ARTWORK_SHADOW_ENABLED] ?: true,
+            playerArtworkShadowDp = nearestPlayerArtworkShadowDp(
+                prefs[Keys.PLAYER_ARTWORK_SHADOW_DP] ?: 6
+            ),
             resumeOnLaunch = prefs[Keys.RESUME_ON_LAUNCH] ?: true,
             stopOnDismiss = prefs[Keys.STOP_ON_DISMISS] ?: false,
             hapticFeedback = prefs[Keys.HAPTIC_FEEDBACK] ?: true,
@@ -101,6 +115,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setCenteredTitle(enabled: Boolean) {
         context.dataStore.edit { it[Keys.CENTERED_TITLE] = enabled }
+    }
+
+    suspend fun setPlayerArtworkShadowEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.PLAYER_ARTWORK_SHADOW_ENABLED] = enabled }
+    }
+
+    suspend fun setPlayerArtworkShadowDp(dp: Int) {
+        context.dataStore.edit { it[Keys.PLAYER_ARTWORK_SHADOW_DP] = nearestPlayerArtworkShadowDp(dp) }
     }
 
     suspend fun setResumeOnLaunch(enabled: Boolean) {

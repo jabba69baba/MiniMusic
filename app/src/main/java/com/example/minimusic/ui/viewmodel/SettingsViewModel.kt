@@ -57,6 +57,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         repository.setCenteredTitle(enabled)
     }
 
+    fun setPlayerArtworkShadowEnabled(enabled: Boolean) = viewModelScope.launch {
+        repository.setPlayerArtworkShadowEnabled(enabled)
+    }
+
+    fun setPlayerArtworkShadowDp(dp: Int) = viewModelScope.launch {
+        repository.setPlayerArtworkShadowDp(dp)
+    }
+
     fun setStopOnDismiss(enabled: Boolean) = viewModelScope.launch {
         repository.setStopOnDismiss(enabled)
     }
