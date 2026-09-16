@@ -117,7 +117,14 @@ fun MiniPlayer(
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri, albumArtPaletteStyle)
     val miniPlayerColor = artColors.primaryContainer
-    val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
+    // The bar canvas is the primaryContainer, so text and controls use the
+    // onPrimaryContainer family (PixelPlayer's canvas-text rule) instead of
+    // neutral surface tones.
+    val controlTint = if (song != null) {
+        artColors.onPrimaryContainer
+    } else {
+        artColors.onPrimaryContainer.copy(alpha = 0.42f)
+    }
     val progressRingColor = readableProgressColor(
         accent = artColors.primary,
         background = miniPlayerColor,
@@ -172,12 +179,12 @@ fun MiniPlayer(
                                 text = displayedSong?.title ?: "What's the vibe?",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Normal,
-                                color = artColors.onSurface,
+                                color = artColors.onPrimaryContainer,
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip,
                                 modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
                             )
-                            Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onPrimaryContainer.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
