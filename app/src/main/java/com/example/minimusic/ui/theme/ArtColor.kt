@@ -3,10 +3,6 @@ package com.example.minimusic.ui.theme
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SchemeExpressive
-import androidx.compose.material3.SchemeFruitSalad
-import androidx.compose.material3.SchemeTonalSpot
-import androidx.compose.material3.SchemeVibrant
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -23,6 +19,10 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.minimusic.data.PaletteStyle
 import com.google.android.material.color.utilities.DynamicScheme
+import com.google.android.material.color.utilities.SchemeExpressive
+import com.google.android.material.color.utilities.SchemeFruitSalad
+import com.google.android.material.color.utilities.SchemeTonalSpot
+import com.google.android.material.color.utilities.SchemeVibrant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.google.android.material.color.utilities.Hct
