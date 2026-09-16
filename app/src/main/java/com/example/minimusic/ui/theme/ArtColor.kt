@@ -3,6 +3,10 @@ package com.example.minimusic.ui.theme
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SchemeExpressive
+import androidx.compose.material3.SchemeFruitSalad
+import androidx.compose.material3.SchemeTonalSpot
+import androidx.compose.material3.SchemeVibrant
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -17,11 +21,11 @@ import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import com.example.minimusic.data.PaletteStyle
 import com.google.android.material.color.utilities.DynamicScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.google.android.material.color.utilities.Hct
-import com.google.android.material.color.utilities.SchemeTonalSpot
 import kotlin.math.abs
 import kotlin.math.ln
 
@@ -44,7 +48,23 @@ data class ArtColorRoles(
     val surface: Color,
     val onSurface: Color,
     val surfaceVariant: Color,
-    val onSurfaceVariant: Color
+    val onSurfaceVariant: Color,
+    // Expressive "fixed" tones (Material 3): vivid, contrast-guaranteed
+    // container/on pairs used for the transport controls — the same roles
+    // PixelPlayer maps its buttons to.
+    val primaryFixed: Color,
+    val onPrimaryFixed: Color,
+    val secondaryFixed: Color,
+    val onSecondaryFixed: Color,
+    val secondaryFixedDim: Color,
+    val tertiaryFixed: Color,
+    val onTertiaryFixed: Color,
+    val tertiaryFixedDim: Color,
+    val surfaceContainerLowest: Color,
+    val surfaceContainer: Color,
+    val surfaceContainerHigh: Color,
+    val errorContainer: Color,
+    val onErrorContainer: Color
 )
 
 private val artworkSeedCache = LinkedHashMap<Uri, Color>()
@@ -59,8 +79,9 @@ private const val ARTWORK_SEED_CACHE_MAX_SIZE = 64
 private var lastResolvedSeed: Color? = null
 
 /**
- * Extracts one local album-art seed. The seed is only an input to Material's
- * Tonal Spot scheme; no raw vibrant swatch is ever painted directly into UI.
+ * Extracts one local album-art seed. The seed is only an input to the
+ * Material dynamic scheme (see [artScheme]); no raw swatch is ever painted
+ * directly into UI.
  */
 @Composable
 private fun rememberArtworkSeedColor(albumArtUri: Uri?): Color {
@@ -135,9 +156,19 @@ private fun artworkSwatchScore(swatch: Palette.Swatch): Double {
         chromaScore.coerceAtLeast(0.0) * 0.50
 }
 
-private fun artScheme(seed: Color, isDark: Boolean): DynamicScheme {
+private fun artScheme(seed: Color, isDark: Boolean, style: PaletteStyle): DynamicScheme {
     val hct = Hct.fromInt(seed.toArgb())
-    return SchemeTonalSpot(hct, isDark, 0.0)
+    // M3 dynamic color from in-app content: the seed (album art) generates an
+    // accessible scheme; role mappings in the UI stay constant across styles.
+    // Vibrant/Expressive/Fruit Salad spread the secondary and tertiary hues
+    // around the source hue, giving each transport control a distinct vivid
+    // tone (PixelPlayer's reference look).
+    return when (style) {
+        PaletteStyle.TONAL_SPOT -> SchemeTonalSpot(hct, isDark, 0.0)
+        PaletteStyle.VIBRANT -> SchemeVibrant(hct, isDark, 0.0)
+        PaletteStyle.EXPRESSIVE -> SchemeExpressive(hct, isDark, 0.0)
+        PaletteStyle.FRUIT_SALAD -> SchemeFruitSalad(hct, isDark, 0.0)
+    }
 }
 /**
  * Normalize a palette seed before it reaches Material scheme generation.
@@ -154,11 +185,14 @@ private fun normalizeArtworkSeed(color: Color): Color {
 }
 
 @Composable
-fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
+fun rememberArtColorRoles(
+    albumArtUri: Uri?,
+    style: PaletteStyle = PaletteStyle.VIBRANT
+): ArtColorRoles {
     val seed = rememberArtworkSeedColor(albumArtUri)
     val appScheme = MaterialTheme.colorScheme
     val isDark = appScheme.background.luminance() < 0.5f
-    val scheme = remember(seed, isDark) { artScheme(seed, isDark) }
+    val scheme = remember(seed, isDark, style) { artScheme(seed, isDark, style) }
     val artPrimary = Color(scheme.getPrimary())
     val artPrimaryContainer = Color(scheme.getPrimaryContainer())
     val artSecondary = Color(scheme.getSecondary())
@@ -194,7 +228,20 @@ fun rememberArtColorRoles(albumArtUri: Uri?): ArtColorRoles {
         surface = artSurface,
         onSurface = artOnSurface,
         surfaceVariant = artSurfaceVariant,
-        onSurfaceVariant = artOnSurfaceVariant
+        onSurfaceVariant = artOnSurfaceVariant,
+        primaryFixed = Color(scheme.getPrimaryFixed()),
+        onPrimaryFixed = Color(scheme.getOnPrimaryFixed()),
+        secondaryFixed = Color(scheme.getSecondaryFixed()),
+        onSecondaryFixed = Color(scheme.getOnSecondaryFixed()),
+        secondaryFixedDim = Color(scheme.getSecondaryFixedDim()),
+        tertiaryFixed = Color(scheme.getTertiaryFixed()),
+        onTertiaryFixed = Color(scheme.getOnTertiaryFixed()),
+        tertiaryFixedDim = Color(scheme.getTertiaryFixedDim()),
+        surfaceContainerLowest = Color(scheme.getSurfaceContainerLowest()),
+        surfaceContainer = Color(scheme.getSurfaceContainer()),
+        surfaceContainerHigh = Color(scheme.getSurfaceContainerHigh()),
+        errorContainer = Color(scheme.getErrorContainer()),
+        onErrorContainer = Color(scheme.getOnErrorContainer())
     )
 }
 
@@ -221,7 +268,20 @@ fun ArtColorRoles.lerpTo(target: ArtColorRoles, fraction: Float): ArtColorRoles 
         surface = blend(surface, target.surface),
         onSurface = blend(onSurface, target.onSurface),
         surfaceVariant = blend(surfaceVariant, target.surfaceVariant),
-        onSurfaceVariant = blend(onSurfaceVariant, target.onSurfaceVariant)
+        onSurfaceVariant = blend(onSurfaceVariant, target.onSurfaceVariant),
+        primaryFixed = blend(primaryFixed, target.primaryFixed),
+        onPrimaryFixed = blend(onPrimaryFixed, target.onPrimaryFixed),
+        secondaryFixed = blend(secondaryFixed, target.secondaryFixed),
+        onSecondaryFixed = blend(onSecondaryFixed, target.onSecondaryFixed),
+        secondaryFixedDim = blend(secondaryFixedDim, target.secondaryFixedDim),
+        tertiaryFixed = blend(tertiaryFixed, target.tertiaryFixed),
+        onTertiaryFixed = blend(onTertiaryFixed, target.onTertiaryFixed),
+        tertiaryFixedDim = blend(tertiaryFixedDim, target.tertiaryFixedDim),
+        surfaceContainerLowest = blend(surfaceContainerLowest, target.surfaceContainerLowest),
+        surfaceContainer = blend(surfaceContainer, target.surfaceContainer),
+        surfaceContainerHigh = blend(surfaceContainerHigh, target.surfaceContainerHigh),
+        errorContainer = blend(errorContainer, target.errorContainer),
+        onErrorContainer = blend(onErrorContainer, target.onErrorContainer)
     )
 }
 

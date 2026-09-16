@@ -49,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,8 +62,6 @@ import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
-import com.example.minimusic.ui.theme.MiniMusicMotion
-import com.example.minimusic.ui.theme.rememberArtColorRoles
 import java.util.Locale
 
 @Composable
@@ -73,7 +70,9 @@ fun DetailsScreen(
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val artColors = rememberArtColorRoles(song.albumArtUri)
+    // The details dialog intentionally does NOT tint from album art: it follows
+    // the app's default Monet color scheme (user preference).
+    val scheme = MaterialTheme.colorScheme
     var details by remember(song.id) { mutableStateOf<SongDetails?>(null) }
 
     LaunchedEffect(song.id) {
@@ -86,7 +85,7 @@ fun DetailsScreen(
                 .fillMaxWidth(0.96f)
                 .fillMaxHeight(0.6f),
             shape = RoundedCornerShape(28.dp),
-            color = artColors.background
+            color = scheme.surfaceContainerHigh
         ) {
             Column(
                 modifier = Modifier
@@ -104,7 +103,7 @@ fun DetailsScreen(
             Text(
                 text = "Details",
                 style = MaterialTheme.typography.titleLarge,
-                color = artColors.onBackground
+                color = scheme.onSurface
             )
         }
 
@@ -119,14 +118,14 @@ fun DetailsScreen(
                 modifier = Modifier
                     .size(112.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(artColors.primaryContainer),
+                    .background(scheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (song.albumArtUri == null) {
                     Icon(
                         Icons.Filled.MusicNote,
                         contentDescription = null,
-                        tint = artColors.onPrimaryContainer,
+                        tint = scheme.onSurfaceVariant,
                         modifier = Modifier.size(42.dp)
                     )
                 } else {
@@ -144,7 +143,7 @@ fun DetailsScreen(
                         Icon(
                             Icons.Filled.MusicNote,
                             contentDescription = null,
-                            tint = artColors.onPrimaryContainer,
+                            tint = scheme.onSurfaceVariant,
                             modifier = Modifier.size(42.dp)
                         )
                     } else {
@@ -171,7 +170,7 @@ fun DetailsScreen(
                             else -> MaterialTheme.typography.headlineSmall.fontSize
                         }
                     ),
-                    color = artColors.onBackground,
+                    color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Clip,
                     modifier = Modifier
@@ -196,17 +195,17 @@ fun DetailsScreen(
                         .height(180.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = artColors.primary)
+                    CircularProgressIndicator(color = scheme.primary)
                 }
             } else {
                 val resolved = loaded ?: return@AnimatedContent
                 Column {
-                    DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs), artColors)
-                    DetailCard(Icons.Filled.GraphicEq, "Genre", resolved.genre ?: "Unknown", artColors)
-                    DetailCard(Icons.Filled.Album, "Album", song.album, artColors)
-                    DetailCard(Icons.Filled.Person, "Artist", song.artist, artColors)
-                    DetailCard(Icons.Filled.Badge, "Album artist", resolved.albumArtist ?: song.artist, artColors)
-                    DetailCard(Icons.Filled.Info, "Year", resolved.year ?: "Unknown", artColors)
+                    DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs))
+                    DetailCard(Icons.Filled.GraphicEq, "Genre", resolved.genre ?: "Unknown")
+                    DetailCard(Icons.Filled.Album, "Album", song.album)
+                    DetailCard(Icons.Filled.Person, "Artist", song.artist)
+                    DetailCard(Icons.Filled.Badge, "Album artist", resolved.albumArtist ?: song.artist)
+                    DetailCard(Icons.Filled.Info, "Year", resolved.year ?: "Unknown")
 
                     val format = resolved.formatInfo
                     val audioInfo = buildList {
@@ -214,9 +213,9 @@ fun DetailsScreen(
                         format?.bitrateKbps?.let { add("$it kbps") }
                         format?.mimeLabel?.let { add(it) }
                     }.joinToString(" • ").ifBlank { "Unknown" }
-                    DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo, artColors)
-                    DetailCard(Icons.Filled.Storage, "Size", formatFileSize(resolved.sizeBytes), artColors)
-                    DetailCard(Icons.Filled.Storage, "Path", resolved.path ?: song.contentUri.toString(), artColors)
+                    DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo)
+                    DetailCard(Icons.Filled.Storage, "Size", formatFileSize(resolved.sizeBytes))
+                    DetailCard(Icons.Filled.Storage, "Path", resolved.path ?: song.contentUri.toString())
                 }
             }
         }
@@ -229,28 +228,28 @@ fun DetailsScreen(
 private fun DetailCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    value: String,
-    artColors: com.example.minimusic.ui.theme.ArtColorRoles
+    value: String
 ) {
+    // Default Monet theme — no album-art tinting in this dialog.
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         shape = RoundedCornerShape(18.dp),
-        color = artColors.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = artColors.onSurfaceVariant, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall, color = artColors.onSurface)
+                Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     value,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = artColors.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp)
@@ -258,11 +257,6 @@ private fun DetailCard(
             }
         }
     }
-}
-
-@Composable
-private fun DetailsRule(color: Color) {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(color))
 }
 
 private fun formatDuration(durationMs: Long): String {
@@ -287,6 +281,3 @@ private fun formatFileSize(sizeBytes: Long?): String {
         "%.1f %s".format(Locale.US, value, units[unitIndex])
     }
 }
-
-private fun com.example.minimusic.ui.theme.ArtColorRoles.outlineColor(): Color =
-    onSurfaceVariant.copy(alpha = 0.45f)

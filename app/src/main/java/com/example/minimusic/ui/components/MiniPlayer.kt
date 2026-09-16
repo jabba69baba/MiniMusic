@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.minimusic.data.PaletteStyle
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -90,6 +91,7 @@ fun MiniPlayer(
     onSkipNext: () -> Unit,
     onClick: () -> Unit,
     onSwipeToPlayer: () -> Unit,
+    albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
     modifier: Modifier = Modifier
 ) {
     // Collected here so the position ticker recomposes only this bar — never
@@ -113,7 +115,7 @@ fun MiniPlayer(
             if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
         }
     }
-    val artColors = rememberArtColorRoles(song?.albumArtUri)
+    val artColors = rememberArtColorRoles(song?.albumArtUri, albumArtPaletteStyle)
     val miniPlayerColor = artColors.primaryContainer
     val controlTint = if (song != null) artColors.onSurface else artColors.onSurfaceVariant
     val progressRingColor = readableProgressColor(

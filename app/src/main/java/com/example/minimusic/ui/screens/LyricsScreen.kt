@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.minimusic.data.PaletteStyle
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -106,7 +107,8 @@ fun LyricsScreen(
     playbackFlow: StateFlow<PlaybackUiState>,
     lyricsState: LyricsState,
     onSeekTo: (Long) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT
 ) {
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
@@ -147,7 +149,7 @@ fun LyricsScreen(
         onDispose { scrollJob?.cancel() }
     }
 
-    val artColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri)
+    val artColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri, albumArtPaletteStyle)
     val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
     val activeColor = artColors.primary
 

@@ -393,6 +393,7 @@ fun MiniMusicNavGraph(
                 onBack = { navController.popBackStack() },
                 onDynamicColorChange = settingsViewModel::setDynamicColorEnabled,
                 onThemeModeChange = settingsViewModel::setThemeMode,
+                onAlbumArtPaletteStyleChange = settingsViewModel::setAlbumArtPaletteStyle,
                 onAmoledBlackModeChange = settingsViewModel::setAmoledBlackMode,
                 onResumeOnLaunchChange = settingsViewModel::setResumeOnLaunch,
                 onShowAudioQualityBadgeChange = settingsViewModel::setShowAudioQualityBadge,
@@ -476,6 +477,7 @@ fun MiniMusicNavGraph(
                         playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
                         onSeekTo = playerViewModel::seekTo,
+                        albumArtPaletteStyle = appSettings.albumArtPaletteStyle,
                         // Back always lands on the player card: pop to PLAYER
                         // when it's in the stack (tap/drag-open path), else
                         // rebuild it above Home (drag-open path has no PLAYER
@@ -497,6 +499,7 @@ fun MiniMusicNavGraph(
                     playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
                     onSeekTo = playerViewModel::seekTo,
+                    albumArtPaletteStyle = appSettings.albumArtPaletteStyle,
                     onBack = {
                         val popped =
                             navController.popBackStack(Routes.PLAYER, inclusive = false)
@@ -580,6 +583,7 @@ fun MiniMusicNavGraph(
                     queueSnapshot = queueSnapshot,
                     showAudioQualityBadge = appSettings.showAudioQualityBadge,
                     centeredTitle = appSettings.centeredTitle,
+                    albumArtPaletteStyle = appSettings.albumArtPaletteStyle,
                     sleepTimerState = sleepTimerState,
                     onBack = { navController.popBackStack() },
                     onSwipeToMiniplayer = {},
@@ -627,7 +631,8 @@ fun MiniMusicNavGraph(
                     onTogglePlayPause = playerViewModel::togglePlayPause,
                     onSkipNext = playerViewModel::skipToNext,
                     onClick = ::openPlayerWithSheetTransition,
-                    onSwipeToPlayer = {}
+                    onSwipeToPlayer = {},
+                    albumArtPaletteStyle = appSettings.albumArtPaletteStyle
                 )
                 }
             }

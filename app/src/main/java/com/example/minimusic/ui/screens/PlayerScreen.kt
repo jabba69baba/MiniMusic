@@ -120,6 +120,7 @@ import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.minimusic.data.AudioFormatInfo
+import com.example.minimusic.data.PaletteStyle
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.data.readAudioFormatInfo
 import com.example.minimusic.playback.PlaybackUiState
@@ -201,6 +202,7 @@ fun PlayerScreen(
     queueSnapshot: QueueSnapshot,
     showAudioQualityBadge: Boolean = true,
     centeredTitle: Boolean = false,
+    albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
     sleepTimerState: SleepTimerState? = null,
     onBack: () -> Unit,
     onSwipeToMiniplayer: () -> Unit = onBack,
@@ -240,14 +242,14 @@ fun PlayerScreen(
     BackHandler(enabled = queueOpen) {
         setQueueOpen(false)
     }
-    val targetArtColors = rememberArtColorRoles(song.albumArtUri)
+    val targetArtColors = rememberArtColorRoles(song.albumArtUri, albumArtPaletteStyle)
     val artColors = animateArtColorRoles(targetArtColors)
     val navigationBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val queueSlotVisible = playbackState.queue.size > 1 || playbackState.repeatMode == RepeatMode.ONE
     val view = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
 
-    val visibleNavigationSurface = if (queueOpen) artColors.surfaceVariant else artColors.background
+    val visibleNavigationSurface = if (queueOpen) artColors.surfaceContainer else artColors.background
     // Window attributes are system calls: only re-apply when the resolved
     // colors actually change, never on every position-tick recomposition.
     var lastAppliedBars by remember { mutableStateOf<Pair<Color, Color>?>(null) }
@@ -678,11 +680,13 @@ private fun QueueArtStrip(
                         }
                 ) {
                     if (song.albumArtUri == null) {
+                        // PixelPlayer's placeholder icon tone (0.2 on the
+                        // primary-container canvas).
                         Icon(
                             imageVector = Icons.Filled.MusicNote,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(0.3f),
-                            tint = artColors.onPrimaryContainer
+                            tint = artColors.onPrimaryContainer.copy(alpha = 0.2f)
                         )
                     } else {
                         val artLoadRequest = remember(song.id, song.albumArtUri) {
@@ -779,7 +783,7 @@ private fun VerticalMetadataStrip(
                     Text(
                         text = song.artist,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = artColors.onSurfaceVariant,
+                        color = artColors.onPrimaryContainer.copy(alpha = 0.7f),
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -839,58 +843,50 @@ private fun NowPlayingPanel(
     val queue = playbackState.queue
     val safeLastIndex = (queue.size - 1).coerceAtLeast(0)
     val targetIndex = (pendingCarouselIndex ?: playbackState.currentIndex).coerceIn(0, safeLastIndex)
-    // The composed item window only changes when the focused index crosses a
-    // strip boundary; per-frame progress stays in the graphicsLayer draw
-    // phase and must never recompose the strips.
-    var focusedIndex by remember(queue) {
+    // The discrete strip window follows the rounded progress (per-frame
+    // progress itself stays in the graphicsLayer draw phase and must never
+    // recompose the strips). It is never reset on queue change: the driver
+    // below re-anchors it atomically with the rendered list, and any other
+    // reset would expose a one-frame mismatch between list and index.
+    var focusedIndex by remember {
         mutableIntStateOf(playbackState.currentIndex.coerceIn(0, safeLastIndex))
     }
-    LaunchedEffect(carouselProgress, queue) {
+    LaunchedEffect(carouselProgress) {
         snapshotFlow { carouselProgress.value.roundToInt() }
             .distinctUntilChanged()
             .collect { focusedIndex = it.coerceIn(0, safeLastIndex) }
     }
 
-    // The queue display list is rebuilt in place whenever its geometry
-    // changes (shuffle toggle, reorder, edit): the same song can sit at a new
-    // display index. Track the previous (queue, target) pair so the driver can
-    // tell "same song, new geometry" (refocus instantly) from a real song
-    // change (slide).
+    // The queue list the strips actually render. It changes only in the same
+    // snapshot as the driver's re-anchored progress, so a queue geometry
+    // change (shuffle toggle, reorder, edit) never composes the NEW list at
+    // the OLD index for one frame — that stale-frame was the "another song's
+    // cover and title for a split second" flash on shuffle.
+    var renderedQueue by remember { mutableStateOf(queue) }
     var lastQueue by remember { mutableStateOf<List<Song>?>(null) }
-    var lastTargetIndex by remember { mutableIntStateOf(-1) }
 
     LaunchedEffect(targetIndex, queue) {
         if (queue.isEmpty() || targetIndex !in queue.indices) return@LaunchedEffect
         val target = targetIndex.toFloat()
         val distance = abs(carouselProgress.value - target)
-        val landingSong = queue[targetIndex]
         val queueChanged = lastQueue !== queue
-        val prevLandingSong = lastQueue?.getOrNull(lastTargetIndex)
-        val sameSongNewGeometry = queueChanged &&
-            prevLandingSong != null &&
-            prevLandingSong.id == landingSong.id
         when {
-            // Same cover at a (possibly shifted) index: a confirmed optimistic
-            // prediction, or the queue was reordered/edited. A tiny residual
-            // settles on the spring (a mid-flight confirmation reads as a
-            // continuation, not a hop); a real displacement refocuses
-            // instantly — sliding across a reordered queue would show covers
-            // that no longer follow each other.
-            sameSongNewGeometry -> {
-                if (distance <= 0.3f) {
-                    carouselProgress.animateTo(target, MiniMusicMotion.carouselSpatial())
-                } else {
-                    carouselProgress.snapTo(target)
-                }
-            }
+            // Any geometry change refocuses instantly: sliding across a
+            // reordered queue would show covers that no longer follow each
+            // other, and the rendered list swaps in this same snapshot as the
+            // snap, so the focused cover is never wrong.
+            queueChanged -> carouselProgress.snapTo(target)
             // Adjacent travels ride the shared carousel spring; long jumps
-            // (shuffle landing far away, wrap, queue reorders) snap instead
-            // of flying across the queue.
+            // (shuffle landing far away, wrap) snap instead of flying across
+            // the queue.
             distance > 1.5f -> carouselProgress.snapTo(target)
             else -> carouselProgress.animateTo(target, MiniMusicMotion.carouselSpatial())
         }
+        if (queueChanged) {
+            focusedIndex = targetIndex
+            renderedQueue = queue
+        }
         lastQueue = queue
-        lastTargetIndex = targetIndex
     }
 
     // Reconcile the optimistic index with the real playback state. A
@@ -994,7 +990,7 @@ private fun NowPlayingPanel(
         ) {
             QueueArtStrip(
                 progress = carouselProgress,
-                queue = queue,
+                queue = renderedQueue,
                 focusedIndex = focusedIndex,
                 artColors = artColors,
                 modifier = Modifier.fillMaxSize()
@@ -1006,7 +1002,7 @@ private fun NowPlayingPanel(
         Column(modifier = modifier) {
             VerticalMetadataStrip(
                 progress = carouselProgress,
-                queue = queue,
+                queue = renderedQueue,
                 focusedIndex = focusedIndex,
                 centeredTitle = centeredTitle,
                 artColors = artColors,
@@ -1026,8 +1022,8 @@ private fun NowPlayingPanel(
                     value = playbackState.positionMs.toFloat().coerceIn(0f, playbackState.durationMs.toFloat().coerceAtLeast(1f)),
                     valueRange = 0f..playbackState.durationMs.toFloat().coerceAtLeast(1f),
                     onValueChange = { onSeekTo(it.toLong()) },
-                    activeColor = artColors.primary,
-                    inactiveColor = artColors.onSurface.copy(alpha = 0.34f),
+                    activeColor = artColors.onPrimaryContainer,
+                    inactiveColor = artColors.onPrimaryContainer.copy(alpha = 0.2f),
                     transitionKey = song.id
                 )
                 Row(
@@ -1041,7 +1037,7 @@ private fun NowPlayingPanel(
                     Text(
                         formatDuration(playbackState.positionMs),
                         style = MaterialTheme.typography.labelMedium,
-                        color = artColors.onSurfaceVariant
+                        color = artColors.onPrimaryContainer
                     )
 
                     Box(
@@ -1054,7 +1050,7 @@ private fun NowPlayingPanel(
                         if (showAudioQualityBadge && badgeReady && badgeText != null) {
                             Surface(
                                 shape = RoundedCornerShape(50),
-                                color = artColors.surfaceVariant,
+                                color = artColors.onPrimaryContainer.copy(alpha = 0.1f),
                                 modifier = Modifier.graphicsLayer {
                                     scaleX = badgeScale.value
                                     scaleY = badgeScale.value
@@ -1063,7 +1059,7 @@ private fun NowPlayingPanel(
                                 Text(
                                     text = badgeText,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = artColors.onSurfaceVariant,
+                                    color = artColors.onPrimaryContainer,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }
@@ -1073,7 +1069,7 @@ private fun NowPlayingPanel(
                     Text(
                         formatDuration(playbackState.durationMs),
                         style = MaterialTheme.typography.labelMedium,
-                        color = artColors.onSurfaceVariant
+                        color = artColors.onPrimaryContainer
                     )
                 }
             }
@@ -1096,8 +1092,8 @@ private fun NowPlayingPanel(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous",
                 shape = CircleShape,
-                containerColor = artColors.secondaryContainer,
-                contentColor = artColors.onSecondaryContainer,
+                containerColor = artColors.secondaryFixedDim,
+                contentColor = artColors.onSecondaryFixed,
                 onClick = {
                     if (hapticsEnabled) view.performMiniMusicHaptic()
                     pendingCarouselIndex = predictSkipIndex(-1)
@@ -1107,8 +1103,8 @@ private fun NowPlayingPanel(
             )
             PlayPauseButton(
                 isPlaying = playbackState.isPlaying,
-                containerColor = artColors.primary,
-                contentColor = artColors.onPrimary,
+                containerColor = artColors.tertiaryFixedDim,
+                contentColor = artColors.onTertiaryFixed,
                 onClick = {
                     if (hapticsEnabled) view.performMiniMusicHaptic()
                     onTogglePlayPause()
@@ -1121,8 +1117,8 @@ private fun NowPlayingPanel(
                 icon = Icons.Filled.SkipNext,
                 contentDescription = "Next",
                 shape = CircleShape,
-                containerColor = artColors.secondaryContainer,
-                contentColor = artColors.onSecondaryContainer,
+                containerColor = artColors.secondaryFixedDim,
+                contentColor = artColors.onSecondaryFixed,
                 onClick = {
                     if (hapticsEnabled) view.performMiniMusicHaptic()
                     pendingCarouselIndex = predictSkipIndex(1)
@@ -1142,9 +1138,11 @@ private fun NowPlayingPanel(
                     else Modifier.padding(top = landscapeFunctionSectionGap)
                 )
         ) {
+            // PixelPlayer's capsule track: surfaceContainerLowest at 70% —
+            // visible in both light and dark without a neutral band.
             Surface(
                 shape = RoundedCornerShape(50),
-                color = artColors.surfaceVariant,
+                color = artColors.surfaceContainerLowest.copy(alpha = 0.7f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(landscapeCapsuleHeight)
@@ -1153,8 +1151,13 @@ private fun NowPlayingPanel(
                     modifier = Modifier.padding(4.dp).fillMaxHeight(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // One distinct vivid hue per active segment (PixelPlayer's
+                    // capsule rule): repeat = secondary, shuffle = primary,
+                    // lyrics = tertiary.
                     CapsuleSegment(
                         artColors = artColors,
+                        activeContainer = artColors.secondaryFixed,
+                        activeContent = artColors.onSecondaryFixed,
                         icon = if (playbackState.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         active = playbackState.repeatMode != RepeatMode.OFF,
                         contentDescription = "Repeat",
@@ -1164,6 +1167,8 @@ private fun NowPlayingPanel(
                     )
                     CapsuleSegment(
                         artColors = artColors,
+                        activeContainer = artColors.primaryFixed,
+                        activeContent = artColors.onPrimaryFixed,
                         icon = Icons.Filled.Shuffle,
                         active = playbackState.isShuffled,
                         contentDescription = "Shuffle",
@@ -1172,6 +1177,8 @@ private fun NowPlayingPanel(
                     )
                     CapsuleSegment(
                         artColors = artColors,
+                        activeContainer = artColors.tertiaryFixed,
+                        activeContent = artColors.onTertiaryFixed,
                         icon = Icons.Filled.Subtitles,
                         active = false,
                         contentDescription = "Lyrics",
@@ -1442,6 +1449,8 @@ private fun PlayPauseButton(
 @Composable
 private fun CapsuleSegment(
     artColors: ArtColorRoles,
+    activeContainer: Color,
+    activeContent: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     active: Boolean,
     contentDescription: String,
@@ -1451,12 +1460,14 @@ private fun CapsuleSegment(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (active) artColors.tertiaryContainer else Color.Transparent,
+        targetValue = if (active) activeContainer else Color.Transparent,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabBackground"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (active) artColors.onTertiaryContainer else artColors.onSurfaceVariant,
+        // Inactive icons sit at full onSurface on the translucent track —
+        // PixelPlayer's inactive capsule treatment (no neutral grey).
+        targetValue = if (active) activeContent else artColors.onSurface,
         animationSpec = MiniMusicMotion.defaultEffects(),
         label = "functionTabContent"
     )

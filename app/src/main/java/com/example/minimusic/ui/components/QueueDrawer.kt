@@ -106,7 +106,8 @@ private fun QueueActionPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     contentDescription: String,
-    artColors: ArtColorRoles,
+    containerColor: Color,
+    contentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -114,7 +115,7 @@ private fun QueueActionPill(
         modifier = modifier
             .height(44.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(artColors.primaryContainer)
+            .background(containerColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.Center,
@@ -124,12 +125,12 @@ private fun QueueActionPill(
             imageVector = icon,
             contentDescription = contentDescription,
             modifier = Modifier.size(18.dp),
-            tint = artColors.onPrimaryContainer
+            tint = contentColor
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = artColors.onPrimaryContainer,
+            color = contentColor,
             modifier = Modifier.padding(start = 7.dp)
         )
     }
@@ -151,11 +152,12 @@ fun QueueScreen(
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
 
+    // PixelPlayer's queue surface tone.
     Surface(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.systemBars),
-        color = artColors.surfaceVariant,
+        color = artColors.surfaceContainer,
         tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -294,7 +296,7 @@ fun LandscapeQueueContent(
                 .fillMaxWidth()
                 .clickable { onOpenChange(true) },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceVariant,
+            color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
@@ -392,7 +394,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     )
                 },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceVariant,
+            color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
@@ -472,11 +474,14 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // PixelPlayer's queue action colors: destructive =
+                        // error tones, locate = tertiary tones.
                         QueueActionPill(
                             icon = Icons.Filled.Delete,
                             label = "Clear",
                             contentDescription = "Clear queue",
-                            artColors = artColors,
+                            containerColor = artColors.errorContainer,
+                            contentColor = artColors.onErrorContainer,
                             onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
                             modifier = Modifier.weight(1f)
                         )
@@ -484,7 +489,8 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             icon = Icons.Filled.MyLocation,
                             label = "Locate",
                             contentDescription = "Locate current song",
-                            artColors = artColors,
+                            containerColor = artColors.tertiaryContainer,
+                            contentColor = artColors.onTertiaryContainer,
                             onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                             modifier = Modifier.weight(1f)
                         )
@@ -548,7 +554,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceVariant,
+            color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier
@@ -639,7 +645,8 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 icon = Icons.Filled.Delete,
                                 label = "Clear",
                                 contentDescription = "Clear queue",
-                                artColors = artColors,
+                                containerColor = artColors.errorContainer,
+                                contentColor = artColors.onErrorContainer,
                                 onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
                                 modifier = Modifier.weight(1f)
                             )
@@ -647,7 +654,8 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 icon = Icons.Filled.MyLocation,
                                 label = "Locate",
                                 contentDescription = "Locate current song",
-                                artColors = artColors,
+                                containerColor = artColors.tertiaryContainer,
+                                contentColor = artColors.onTertiaryContainer,
                                 onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                                 modifier = Modifier.weight(1f)
                             )
@@ -1293,16 +1301,13 @@ private class PracticalQueueAdapter(
             onStartDrag: () -> Unit
         ) {
             val resolved = colors ?: return
-            // Keep every state fully opaque. The current row uses a restrained
-            // blend toward the queue surface so album-art colors remain present
-            // without becoming overly saturated; history uses a quieter tonal
-            // blend so played rows recede without alpha/transparency.
+            // Keep every state fully opaque. The current row carries the
+            // scheme's tertiary container — a distinct vivid hue that marks
+            // the now-playing track in both light and dark (PixelPlayer's
+            // queue treatment); history uses a quieter tonal blend so played
+            // rows recede without alpha/transparency.
             val rowArgb = if (isCurrent) {
-                ColorUtils.blendARGB(
-                    resolved.primaryContainer.toArgb(),
-                    resolved.surface.toArgb(),
-                    0.22f
-                )
+                resolved.tertiaryContainer.toArgb()
             } else {
                 resolved.surface.toArgb()
             }
@@ -1336,7 +1341,7 @@ private class PracticalQueueAdapter(
             val titleArgb = if (isHistory) {
                 ColorUtils.blendARGB(resolved.onSurface.toArgb(), opaqueHistoryColor, 0.28f)
             } else if (isCurrent) {
-                resolved.onPrimaryContainer.toArgb()
+                resolved.onTertiaryContainer.toArgb()
             } else {
                 resolved.onSurface.toArgb()
             }
@@ -1344,13 +1349,18 @@ private class PracticalQueueAdapter(
                 ColorUtils.blendARGB(resolved.onSurfaceVariant.toArgb(), opaqueHistoryColor, 0.36f)
             } else if (isCurrent) {
                 ColorUtils.blendARGB(
-                    resolved.onPrimaryContainer.toArgb(),
+                    resolved.onTertiaryContainer.toArgb(),
                     resolved.onSurfaceVariant.toArgb(),
                     0.18f
                 )
             } else {
                 resolved.onSurfaceVariant.toArgb()
             }
+            // PixelPlayer's queue art tiles: current song on the tertiary
+            // container, every other row on surfaceContainerHigh.
+            (artwork.background as? GradientDrawable)?.setColor(
+                if (isCurrent) resolved.tertiaryContainer.toArgb() else resolved.surfaceContainerHigh.toArgb()
+            )
             title.setTextColor(titleArgb)
             artist.setTextColor(artistArgb)
             title.textSize = 16f

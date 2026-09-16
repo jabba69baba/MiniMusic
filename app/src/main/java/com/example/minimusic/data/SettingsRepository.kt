@@ -19,6 +19,7 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 data class AppSettings(
     val dynamicColorEnabled: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
     val amoledBlackMode: Boolean = false,
     val showAudioQualityBadge: Boolean = true,
     val centeredTitle: Boolean = false,
@@ -43,6 +44,7 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color_enabled")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val ALBUM_ART_PALETTE_STYLE = stringPreferencesKey("album_art_palette_style")
         val AMOLED_BLACK_MODE = booleanPreferencesKey("amoled_black_mode")
         val SHOW_AUDIO_QUALITY_BADGE = booleanPreferencesKey("show_audio_quality_badge")
         val CENTERED_TITLE = booleanPreferencesKey("centered_title")
@@ -62,6 +64,7 @@ class SettingsRepository(private val context: Context) {
             themeMode = prefs[Keys.THEME_MODE]?.let {
                 runCatching { ThemeMode.valueOf(it) }.getOrNull()
             } ?: ThemeMode.SYSTEM,
+            albumArtPaletteStyle = PaletteStyle.fromString(prefs[Keys.ALBUM_ART_PALETTE_STYLE]),
             amoledBlackMode = prefs[Keys.AMOLED_BLACK_MODE] ?: false,
             showAudioQualityBadge = prefs[Keys.SHOW_AUDIO_QUALITY_BADGE] ?: true,
             centeredTitle = prefs[Keys.CENTERED_TITLE] ?: false,
@@ -84,6 +87,9 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[Keys.THEME_MODE] = mode.name }
     }
 
+    suspend fun setAlbumArtPaletteStyle(style: PaletteStyle) {
+        context.dataStore.edit { it[Keys.ALBUM_ART_PALETTE_STYLE] = style.name }
+    }
 
     suspend fun setAmoledBlackMode(enabled: Boolean) {
         context.dataStore.edit { it[Keys.AMOLED_BLACK_MODE] = enabled }

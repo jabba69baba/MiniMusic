@@ -433,6 +433,10 @@ class PlayerController(private val context: Context) {
             manualQueueOrderEntryIds = null
             c.shuffleModeEnabled = enabled
             shuffleActive = enabled
+            // Toggling shuffle makes Media3 re-derive its playback state;
+            // hold isPlaying across that re-derivation exactly like a track
+            // transition, or the play/pause button morphs for a frame.
+            holdPlaybackStateAcrossTransition()
             _uiState.value = _uiState.value.copy(isShuffled = enabled)
             if (enabled) {
                 c.sendCustomCommand(freshShuffleCommand, Bundle())
