@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,6 +56,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -76,6 +79,17 @@ private val DetailSectionGap = 20.dp
 
 /** Gap between the info cards themselves. */
 private val DetailCardGap = 8.dp
+
+/**
+ * Dim behind the card. The dialog draws this itself (see the Dialog call in
+ * [DetailsScreen]) so the scrim and the card share one animation instead of the
+ * platform dim arriving on its own, un-animated, ahead of the card.
+ */
+private const val ScrimAlpha = 0.6f
+
+/** The card's resting size inside that scrim. */
+private const val CardWidthFraction = 0.96f
+private const val CardHeightFraction = 0.82f
 
 @Composable
 fun DetailsScreen(
@@ -116,89 +130,135 @@ fun DetailsScreen(
         revealed.animateTo(1f, revealSpec)
     }
 
-    Dialog(onDismissRequest = { dismiss() }) {
-        // The platform dialog window runs its own fade, which only ever plays
-        // on the way in. Switching it off leaves this surface as the single
-        // owner of both directions.
+    Dialog(
+        onDismissRequest = { dismiss() },
+        // The platform's default width is switched off so this composable owns
+        // the whole screen: the dim behind the card is then drawn here and rides
+        // the same value as the card's scale, instead of being a platform window
+        // fade that only ever plays on the way in. That asymmetry — card
+        // animated, dim snapped — is what made the two directions disagree.
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            // Outside taps are handled below so they leave through the same
+            // animated exit rather than an instant dismissal.
+            dismissOnClickOutside = false
+        )
+    ) {
         val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
         DisposableEffect(dialogWindow) {
+            // No window enter/exit animation and no platform dim: this
+            // composable is the single owner of both directions.
             dialogWindow?.setWindowAnimations(0)
+            dialogWindow?.setDimAmount(0f)
             onDispose { }
         }
 
-        Surface(
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.82f)
-                .graphicsLayer {
-                    val progress = revealed.value
-                    alpha = progress
-                    val scale = 0.92f + 0.08f * progress
-                    scaleX = scale
-                    scaleY = scale
-                },
-            shape = RoundedCornerShape(28.dp),
-            color = scheme.surfaceContainerHigh
+                .fillMaxSize()
+                .background(scheme.scrim.copy(alpha = ScrimAlpha * revealed.value))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { dismiss() }
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 18.dp, bottom = 20.dp)
-            ) {
-                Text(
-                    text = "Details",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = scheme.onSurface
-                )
-
-                Spacer(Modifier.height(DetailSectionGap))
-
-                DetailIdentity(song = song, scheme = scheme)
-
-                Spacer(Modifier.height(DetailSectionGap))
-
-                val loaded = details
-                if (loaded == null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = scheme.primary)
+                    .fillMaxWidth(CardWidthFraction)
+                    .fillMaxHeight(CardHeightFraction)
+                    .graphicsLayer {
+                        val progress = revealed.value
+                        alpha = progress
+                        val scale = 0.92f + 0.08f * progress
+                        scaleX = scale
+                        scaleY = scale
                     }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(DetailCardGap)) {
-                        DetailCard(Icons.Filled.Person, "Artist", song.artist, scheme)
-                        DetailCard(Icons.Filled.Album, "Album", song.album, scheme)
-                        DetailCard(
-                            Icons.Filled.Badge,
-                            "Album artist",
-                            loaded.albumArtist ?: song.artist,
-                            scheme
-                        )
-                        DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs), scheme)
-                        DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.genre ?: "Unknown", scheme)
-                        DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", scheme)
+                    // Swallow taps on the card so only the scrim dismisses.
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                shape = RoundedCornerShape(28.dp),
+                color = scheme.surfaceContainerHigh
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 18.dp, bottom = 20.dp)
+                ) {
+                    Text(
+                        text = "Details",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = scheme.onSurface
+                    )
 
-                        val format = loaded.formatInfo
-                        val audioInfo = buildList {
-                            format?.sampleRateHz?.let {
-                                add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz")
-                            }
-                            format?.bitrateKbps?.let { add("$it kbps") }
-                            format?.mimeLabel?.let { add(it) }
-                        }.joinToString(" • ").ifBlank { "Unknown" }
-                        DetailCard(Icons.Filled.AudioFile, "Quality", audioInfo, scheme)
-                        DetailCard(Icons.Filled.SdCard, "Size", formatFileSize(loaded.sizeBytes), scheme)
-                        DetailCard(
-                            Icons.Filled.Storage,
-                            "Path",
-                            loaded.path ?: song.contentUri.toString(),
-                            scheme
-                        )
+                    Spacer(Modifier.height(DetailSectionGap))
+
+                    DetailIdentity(song = song, scheme = scheme)
+
+                    Spacer(Modifier.height(DetailSectionGap))
+
+                    val loaded = details
+                    if (loaded == null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = scheme.primary)
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(DetailCardGap)) {
+                            DetailCard(Icons.Filled.Person, "Artist", song.artist, scheme)
+                            DetailCard(Icons.Filled.Album, "Album", song.album, scheme)
+                            DetailCard(
+                                Icons.Filled.Badge,
+                                "Album artist",
+                                loaded.albumArtist ?: song.artist,
+                                scheme
+                            )
+                            DetailCard(
+                                Icons.Filled.Timer,
+                                "Duration",
+                                formatDuration(song.durationMs),
+                                scheme
+                            )
+                            DetailCard(
+                                Icons.Filled.GraphicEq,
+                                "Genre",
+                                loaded.genre ?: "Unknown",
+                                scheme
+                            )
+                            DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", scheme)
+
+                            val format = loaded.formatInfo
+                            val audioInfo = buildList {
+                                format?.sampleRateHz?.let {
+                                    add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz")
+                                }
+                                format?.bitrateKbps?.let { add("$it kbps") }
+                                format?.mimeLabel?.let { add(it) }
+                            }.joinToString(" • ").ifBlank { "Unknown" }
+                            DetailCard(Icons.Filled.AudioFile, "Quality", audioInfo, scheme)
+                            DetailCard(
+                                Icons.Filled.SdCard,
+                                "Size",
+                                formatFileSize(loaded.sizeBytes),
+                                scheme
+                            )
+                            DetailCard(
+                                Icons.Filled.Storage,
+                                "Path",
+                                loaded.path ?: song.contentUri.toString(),
+                                scheme
+                            )
+                        }
                     }
                 }
             }

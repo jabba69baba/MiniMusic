@@ -15,6 +15,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -95,6 +96,20 @@ import kotlin.math.roundToInt
 
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
 val QueueDrawerCollapsedHeight = 48.dp
+
+/**
+ * Landscape's collapsed bar. It is taller than the portrait one because the
+ * landscape pane has no navigation-bar clearance of its own, and the controls
+ * pane reserves exactly this much room for it.
+ */
+val LandscapeQueueCollapsedHeight = 72.dp
+
+/**
+ * Height of the landscape sheet's header. The collapsed bar is the first
+ * [LandscapeQueueCollapsedHeight] of it, so the action pills start below that
+ * line and stay hidden until the sheet has actually risen.
+ */
+private val LandscapeQueueHeaderHeight = 116.dp
 private const val OPEN_FRACTION = 0.82f
 
 @Composable
@@ -183,64 +198,21 @@ fun LandscapeQueueContent(
     onRemoveEntry: (Long) -> Unit,
     onClearQueue: () -> Unit
 ) {
-    if (!isOpen) {
-        // Collapsed bar floats on the player canvas, so it keeps the same
-        // translucent tonal overlay as the portrait drawer's collapsed bar and
-        // the same header roles it shows once open.
-        Surface(
-            modifier = modifier
-                .fillMaxWidth()
-                .clickable { onOpenChange(true) },
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceContainerLowest.copy(alpha = 0.7f),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 10.dp)
-                        .size(width = 36.dp, height = 4.dp)
-                        .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = artColors.onSurface
-                    )
-                    Text(
-                        text = "Queue",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = artColors.onSurface,
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
-                }
-            }
-        }
-    } else {
-        BoxWithConstraints(modifier = modifier) {
-            LandscapeQueueBottomSheet(
-                snapshot = snapshot,
-                artColors = artColors,
-                isOpen = true,
-                onOpenChange = onOpenChange,
-                onEntryClick = onEntryClick,
-                onReorderEntry = onReorderEntry,
-                onRemoveEntry = onRemoveEntry,
-                onClearQueue = onClearQueue
-            )
-        }
+    // One always-composed surface for both states. The collapsed bar is this
+    // same sheet with only its top [LandscapeQueueCollapsedHeight] inside the
+    // pane, so opening and closing is one slide instead of the old swap
+    // between a flow bar and a pane-filling sheet.
+    BoxWithConstraints(modifier = modifier) {
+        LandscapeQueueBottomSheet(
+            snapshot = snapshot,
+            artColors = artColors,
+            isOpen = isOpen,
+            onOpenChange = onOpenChange,
+            onEntryClick = onEntryClick,
+            onReorderEntry = onReorderEntry,
+            onRemoveEntry = onRemoveEntry,
+            onClearQueue = onClearQueue
+        )
     }
 }
 
@@ -259,7 +231,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     // PlayerScreen bounds this composable to the controls-side pane. The sheet
     // therefore fills that pane and slides vertically from its bottom edge.
     val panelHeight = maxHeight
-    val closedOffset = (panelHeight - 64.dp).coerceAtLeast(0.dp)
+    val closedOffset = (panelHeight - LandscapeQueueCollapsedHeight).coerceAtLeast(0.dp)
     val offsetY = remember(panelHeight) { Animatable(closedOffset.value) }
     val scope = rememberCoroutineScope()
     var locateRequest by remember { mutableStateOf(0) }
@@ -274,6 +246,20 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
             animationSpec = MiniMusicMotion.defaultSpatial()
         )
     }
+
+    // Effects motion (critically damped) for the surface tone: colour must not
+    // overshoot, and the collapsed overlay and the open drawer surface are the
+    // two ends of one blend rather than a swap.
+    val panelColor by animateColorAsState(
+        targetValue = if (isOpen) {
+            artColors.surfaceContainer
+        } else {
+            artColors.surfaceContainerLowest.copy(alpha = 0.7f)
+        },
+        animationSpec = MiniMusicMotion.defaultEffects(),
+        label = "landscapeQueuePanelColor"
+    )
+
 
     Box(
         modifier = Modifier
@@ -290,7 +276,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     )
                 },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceContainer,
+            color = panelColor,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
@@ -298,7 +284,8 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(102.dp)
+                        .height(LandscapeQueueHeaderHeight)
+                        .clipToBounds()
                         .clickable(enabled = !isOpen) { onOpenChange(true) }
                         .draggable(
                             orientation = Orientation.Vertical,
@@ -314,13 +301,19 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                                 } else {
                                     offsetY.value < closedOffset.value / 2f
                                 }
-                                scope.launch {
-                                    offsetY.animateTo(
-                                        if (shouldOpen) 0f else closedOffset.value,
-                                        animationSpec = MiniMusicMotion.defaultSpatial()
-                                    )
+                                // One animator owns the settle (same rule as
+                                // the portrait sheet): if the dragged state
+                                // changes, the isOpen effect animates it.
+                                if (shouldOpen == isOpen) {
+                                    scope.launch {
+                                        offsetY.animateTo(
+                                            if (shouldOpen) 0f else closedOffset.value,
+                                            animationSpec = MiniMusicMotion.defaultSpatial()
+                                        )
+                                    }
+                                } else {
+                                    onOpenChange(shouldOpen)
                                 }
-                                onOpenChange(shouldOpen)
                             }
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -362,6 +355,10 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             )
                         }
                     }
+                    // Everything above this line is the collapsed bar; the
+                    // clip keeps the pills out of the pane until the sheet has
+                    // risen past [LandscapeQueueCollapsedHeight].
+                    Spacer(modifier = Modifier.height(LandscapeQueueHeaderHeight - 90.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -370,8 +367,9 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // PixelPlayer's queue action colors: destructive =
-                        // error tones, locate = tertiary tones.
+                        // Destructive = error tones; locate = the secondary
+                        // family, so it never competes with the current song's
+                        // primary-container row.
                         QueueActionPill(
                             icon = Icons.Filled.Delete,
                             label = "Clear",
@@ -393,20 +391,20 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     }
                 }
 
-                if (isOpen) {
-                    QueueDrawerList(
-                        snapshot = snapshot,
-                        artColors = artColors,
-                        onEntryClick = onEntryClick,
-                        onReorderEntry = onReorderEntry,
-                        onRemoveEntry = onRemoveEntry,
-                        locateRequest = locateRequest,
-                        queueTopRequest = queueTopRequest,
-                        openRequest = openRequest,
-                        onTopCloseDrag = {},
-                        onTopCloseDragEnd = {}
-                    )
-                }
+                // Always composed (see the portrait sheet): the panel's own
+                // geometry hides it while collapsed.
+                QueueDrawerList(
+                    snapshot = snapshot,
+                    artColors = artColors,
+                    onEntryClick = onEntryClick,
+                    onReorderEntry = onReorderEntry,
+                    onRemoveEntry = onRemoveEntry,
+                    locateRequest = locateRequest,
+                    queueTopRequest = queueTopRequest,
+                    openRequest = openRequest,
+                    onTopCloseDrag = {},
+                    onTopCloseDragEnd = {}
+                )
             }
         }
 
@@ -443,6 +441,20 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
         offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
     }
 
+    // Effects motion (critically damped) for the surface tone: colour must not
+    // overshoot, and the collapsed overlay and the open drawer surface are the
+    // two ends of one blend rather than a swap.
+    val panelColor by animateColorAsState(
+        targetValue = if (isOpen) {
+            artColors.surfaceContainer
+        } else {
+            artColors.surfaceContainerLowest.copy(alpha = 0.7f)
+        },
+        animationSpec = MiniMusicMotion.defaultEffects(),
+        label = "queuePanelColor"
+    )
+
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -452,9 +464,9 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             // Collapsed: a translucent tonal overlay on the player canvas
             // (the capsule track's treatment) instead of an opaque neutral
-            // slab. Open: the drawer's own surface tone.
-            color = if (isOpen) artColors.surfaceContainer
-            else artColors.surfaceContainerLowest.copy(alpha = 0.7f),
+            // slab. Open: the drawer's own surface tone. Animating between
+            // them stops the tone from stomping as the state flips.
+            color = panelColor,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier
