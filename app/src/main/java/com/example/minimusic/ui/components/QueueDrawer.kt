@@ -15,7 +15,6 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -247,19 +246,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
         )
     }
 
-    // Effects motion (critically damped) for the surface tone: colour must not
-    // overshoot, and the collapsed overlay and the open drawer surface are the
-    // two ends of one blend rather than a swap.
-    val panelColor by animateColorAsState(
-        targetValue = if (isOpen) {
-            artColors.surfaceContainer
-        } else {
-            artColors.surfaceContainerLowest.copy(alpha = 0.7f)
-        },
-        animationSpec = MiniMusicMotion.defaultEffects(),
-        label = "landscapeQueuePanelColor"
-    )
-
 
     Box(
         modifier = Modifier
@@ -276,7 +262,12 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     )
                 },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = panelColor,
+            // Opaque in both states. The drawer used to hand the collapsed bar
+            // a 70% translucent art tone (matching the player's capsule track),
+            // which let the player canvas read through the queue surface and
+            // made the drawer look like it was still opening. One solid tone
+            // for the whole surface instead.
+            color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
@@ -441,19 +432,6 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
         offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
     }
 
-    // Effects motion (critically damped) for the surface tone: colour must not
-    // overshoot, and the collapsed overlay and the open drawer surface are the
-    // two ends of one blend rather than a swap.
-    val panelColor by animateColorAsState(
-        targetValue = if (isOpen) {
-            artColors.surfaceContainer
-        } else {
-            artColors.surfaceContainerLowest.copy(alpha = 0.7f)
-        },
-        animationSpec = MiniMusicMotion.defaultEffects(),
-        label = "queuePanelColor"
-    )
-
 
     Box(
         modifier = Modifier
@@ -462,11 +440,12 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            // Collapsed: a translucent tonal overlay on the player canvas
-            // (the capsule track's treatment) instead of an opaque neutral
-            // slab. Open: the drawer's own surface tone. Animating between
-            // them stops the tone from stomping as the state flips.
-            color = panelColor,
+            // Opaque in both states. The drawer used to hand the collapsed bar
+            // a 70% translucent art tone (matching the player's capsule track),
+            // which let the player canvas read through the queue surface and
+            // made the drawer look like it was still opening. One solid tone
+            // for the whole surface instead.
+            color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier

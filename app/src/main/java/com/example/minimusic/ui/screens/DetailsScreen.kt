@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -86,6 +85,26 @@ private val DetailCardGap = 8.dp
  * platform dim arriving on its own, un-animated, ahead of the card.
  */
 private const val ScrimAlpha = 0.6f
+
+/**
+ * Shown in a card whose value has to be read out of the file. The read takes a
+ * frame or two on a local file, so the dialog renders every card immediately and
+ * these fill in behind the open animation — there is no spinner and no layout
+ * change, because the dialog should never announce that it is working.
+ */
+private const val PendingValue = "—"
+
+/**
+ * Reads one value out of the resolved details, falling back to [orElse] and then
+ * to "Unknown", or to [PendingValue] while the read is still in flight.
+ */
+private fun SongDetails?.readOrPending(
+    extract: (SongDetails) -> String?,
+    orElse: String? = null
+): String {
+    val snapshot = this ?: return PendingValue
+    return extract(snapshot) ?: orElse ?: "Unknown"
+}
 
 /** The card's resting size inside that scrim. */
 private const val CardWidthFraction = 0.96f
@@ -203,62 +222,48 @@ fun DetailsScreen(
 
                     Spacer(Modifier.height(DetailSectionGap))
 
+                    // Every card is rendered from the first frame: the fields
+                    // MediaStore already knows (artist, album, duration) are
+                    // real values, and the ones that need the file are read
+                    // behind the open animation from a neutral placeholder.
+                    // No loading indicator — the dialog never looks like it is
+                    // waiting on something.
                     val loaded = details
-                    if (loaded == null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(140.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = scheme.primary)
-                        }
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(DetailCardGap)) {
-                            DetailCard(Icons.Filled.Person, "Artist", song.artist, scheme)
-                            DetailCard(Icons.Filled.Album, "Album", song.album, scheme)
-                            DetailCard(
-                                Icons.Filled.Badge,
-                                "Album artist",
-                                loaded.albumArtist ?: song.artist,
-                                scheme
-                            )
-                            DetailCard(
-                                Icons.Filled.Timer,
-                                "Duration",
-                                formatDuration(song.durationMs),
-                                scheme
-                            )
-                            DetailCard(
-                                Icons.Filled.GraphicEq,
-                                "Genre",
-                                loaded.genre ?: "Unknown",
-                                scheme
-                            )
-                            DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", scheme)
-
-                            val format = loaded.formatInfo
-                            val audioInfo = buildList {
-                                format?.sampleRateHz?.let {
-                                    add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz")
-                                }
-                                format?.bitrateKbps?.let { add("$it kbps") }
-                                format?.mimeLabel?.let { add(it) }
-                            }.joinToString(" • ").ifBlank { "Unknown" }
-                            DetailCard(Icons.Filled.AudioFile, "Quality", audioInfo, scheme)
-                            DetailCard(
-                                Icons.Filled.SdCard,
-                                "Size",
-                                formatFileSize(loaded.sizeBytes),
-                                scheme
-                            )
-                            DetailCard(
-                                Icons.Filled.Storage,
-                                "Path",
-                                loaded.path ?: song.contentUri.toString(),
-                                scheme
-                            )
-                        }
+                    Column(verticalArrangement = Arrangement.spacedBy(DetailCardGap)) {
+                        DetailCard(Icons.Filled.Person, "Artist", song.artist, scheme)
+                        DetailCard(Icons.Filled.Album, "Album", song.album, scheme)
+                        DetailCard(
+                            Icons.Filled.Badge,
+                            "Album artist",
+                            loaded.readOrPending({ it.albumArtist }, song.artist),
+                            scheme
+                        )
+                        DetailCard(
+                            Icons.Filled.Timer,
+                            "Duration",
+                            formatDuration(song.durationMs),
+                            scheme
+                        )
+                        DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.readOrPending { it.genre }, scheme)
+                        DetailCard(Icons.Filled.Info, "Year", loaded.readOrPending { it.year }, scheme)
+                        DetailCard(
+                            Icons.Filled.AudioFile,
+                            "Quality",
+                            if (loaded == null) PendingValue else audioQualityLabel(loaded),
+                            scheme
+                        )
+                        DetailCard(
+                            Icons.Filled.SdCard,
+                            "Size",
+                            if (loaded == null) PendingValue else formatFileSize(loaded.sizeBytes),
+                            scheme
+                        )
+                        DetailCard(
+                            Icons.Filled.Storage,
+                            "Path",
+                            loaded.readOrPending({ it.path }, song.contentUri.toString()),
+                            scheme
+                        )
                     }
                 }
             }
@@ -398,6 +403,17 @@ private fun DetailCard(
             }
         }
     }
+}
+
+private fun audioQualityLabel(loaded: SongDetails): String {
+    val format = loaded.formatInfo
+    return buildList {
+        format?.sampleRateHz?.let {
+            add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz")
+        }
+        format?.bitrateKbps?.let { add("$it kbps") }
+        format?.mimeLabel?.let { add(it) }
+    }.joinToString(" • ").ifBlank { "Unknown" }
 }
 
 private fun formatDuration(durationMs: Long): String {
