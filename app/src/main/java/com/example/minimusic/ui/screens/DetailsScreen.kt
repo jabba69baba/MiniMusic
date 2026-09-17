@@ -244,8 +244,8 @@ fun DetailsScreen(
                             formatDuration(song.durationMs),
                             scheme
                         )
-                        DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.readOrPending { it.genre }, scheme)
-                        DetailCard(Icons.Filled.Info, "Year", loaded.readOrPending { it.year }, scheme)
+                        DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.readOrPending({ it.genre }), scheme)
+                        DetailCard(Icons.Filled.Info, "Year", loaded.readOrPending({ it.year }), scheme)
                         DetailCard(
                             Icons.Filled.AudioFile,
                             "Quality",
