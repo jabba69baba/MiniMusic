@@ -81,8 +81,7 @@ class MainActivity : ComponentActivity() {
             MiniMusicTheme(
                 darkTheme = darkTheme,
                 dynamicColor = appSettings.dynamicColorEnabled,
-                amoledBlack = appSettings.amoledBlackMode,
-                paletteStyle = appSettings.albumArtPaletteStyle
+                amoledBlack = appSettings.amoledBlackMode
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var hasPermission by remember {

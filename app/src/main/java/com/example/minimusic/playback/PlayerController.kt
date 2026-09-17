@@ -390,26 +390,92 @@ class PlayerController(private val context: Context) {
      * right after the current track without disturbing the rest of the queue.
      * If nothing is playing yet, falls back to starting a fresh single-song queue.
      */
+    /**
+     * Inserts [song] at [targetPosition] of the *displayed* queue.
+     *
+     * The old implementation inserted at [MediaController.currentMediaItemIndex]
+     * — a TIMELINE index — both into the controller and into our entry list.
+     * With shuffle on those orderings disagree, and the unvalidated index made
+     * addMediaItem(index, item) reject the command outright, so the song
+     * neither appeared in the queue nor played next. Positions now come from
+     * the displayed (user-visible) queue, and placement reuses the same
+     * machinery as drag-reorder:
+     * - unshuffled: one validated insert at the display position
+     *   (coerced against the controller's own count, so never out of range)
+     * - shuffled: append, then an explicit shuffle-order command makes the
+     *   traversal (and the displayed queue) follow the new order.
+     */
+    private fun appendAndPlace(song: Song, targetPosition: Int) {
+        val c = controller ?: return
+        if (currentQueue.isEmpty()) {
+            playQueue(listOf(song), 0)
+            return
+        }
+        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
+        val displayBefore = manualQueueOrderEntryIds
+            ?.mapNotNull { id -> currentQueueEntries.firstOrNull { it.entryId == id } }
+            ?: if (c.shuffleModeEnabled) nativePlaybackOrder(c) else currentQueueEntries
+        val position = targetPosition.coerceIn(0, displayBefore.size)
+        val item = song.toMediaItem(mediaId = entry.entryId.toString())
+
+        runTimelineMutation {
+            if (c.shuffleModeEnabled) {
+                // Physical position is irrelevant under shuffle: append, then
+                // make the traversal follow the desired displayed order —
+                // exactly what a manual move does.
+                c.addMediaItem(item)
+                currentQueueEntries = currentQueueEntries + entry
+                currentQueue = currentQueueEntries.map { it.song }
+                val newDisplay = displayBefore.toMutableList().apply { add(position, entry) }
+                manualQueueOrderEntryIds = newDisplay.map { it.entryId }
+                val physicalOrder = manualQueueOrderEntryIds.orEmpty().mapNotNull { id ->
+                    currentQueueEntries.indexOfFirst { it.entryId == id }
+                        .takeIf { it >= 0 }
+                }.toIntArray()
+                if (physicalOrder.size == currentQueueEntries.size) {
+                    val args = Bundle().apply {
+                        putIntArray(MusicService.EXTRA_SHUFFLE_ORDER, physicalOrder)
+                    }
+                    c.sendCustomCommand(applyShuffleOrderCommand, args)
+                        .addListener({ refreshCurrentItem() }, MoreExecutors.directExecutor())
+                }
+            } else {
+                // Display order == physical order. Insert at the validated
+                // position — a single command, so the timeline event that
+                // follows lands in the final state.
+                val insertAt = position.coerceIn(0, c.mediaItemCount)
+                c.addMediaItem(insertAt, item)
+                currentQueueEntries = currentQueueEntries.toMutableList().apply { add(insertAt, entry) }
+                currentQueue = currentQueueEntries.map { it.song }
+            }
+            refreshCurrentItem()
+        }
+    }
+
+    /**
+     * Queues [song] to play immediately after the current one, in the
+     * displayed order (works with shuffle on: the shuffled traversal is
+     * re-ordered so the new item comes right after the current song).
+     */
     fun playNext(song: Song) {
         val c = controller ?: return
         if (currentQueue.isEmpty()) {
             playQueue(listOf(song), 0)
             return
         }
-        val insertAt = (c.currentMediaItemIndex + 1).coerceIn(0, currentQueueEntries.size)
-        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
-        c.addMediaItem(insertAt, song.toMediaItem(mediaId = entry.entryId.toString()))
-        currentQueueEntries = currentQueueEntries.toMutableList().apply { add(insertAt, entry) }
-        manualQueueOrderEntryIds = manualQueueOrderEntryIds?.toMutableList()?.apply {
-            add(entry.entryId)
-        }
-        currentQueue = currentQueueEntries.map { it.song }
-        refreshCurrentItem()
+        val display = manualQueueOrderEntryIds
+            ?.mapNotNull { id -> currentQueueEntries.firstOrNull { it.entryId == id } }
+            ?: if (c.shuffleModeEnabled) nativePlaybackOrder(c) else currentQueueEntries
+        val currentEntry = resolveCurrentEntry(c)
+        val currentPos = currentEntry
+            ?.let { e -> display.indexOfFirst { it.entryId == e.entryId } }
+            ?: -1
+        appendAndPlace(song, if (currentPos >= 0) currentPos + 1 else display.size)
     }
 
     /**
-     * Appends [song] to the end of the current queue. If nothing is playing yet,
-     * falls back to starting a fresh single-song queue.
+     * Appends [song] to the end of the current (displayed) queue. If nothing
+     * is playing yet, falls back to starting a fresh single-song queue.
      */
     fun addToQueue(song: Song) {
         val c = controller ?: return
@@ -417,15 +483,7 @@ class PlayerController(private val context: Context) {
             playQueue(listOf(song), 0)
             return
         }
-        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
-        c.addMediaItem(
-            currentQueueEntries.size,
-            song.toMediaItem(mediaId = entry.entryId.toString())
-        )
-        currentQueueEntries = currentQueueEntries + entry
-        manualQueueOrderEntryIds = manualQueueOrderEntryIds?.plus(entry.entryId)
-        currentQueue = currentQueueEntries.map { it.song }
-        refreshCurrentItem()
+        appendAndPlace(song, Int.MAX_VALUE)
     }
 
     fun toggleShuffle() {

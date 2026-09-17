@@ -890,6 +890,16 @@ private fun NowPlayingPanel(
 
     LaunchedEffect(targetIndex, queue) {
         if (queue.isEmpty() || targetIndex !in queue.indices) return@LaunchedEffect
+        // Defense in depth (no animation change): a mid-shuffle state can
+        // transiently pair the new list with an index that does not hold the
+        // current song. Anchor the strip on the current song's real position
+        // instead, or stay put until a settled state arrives. An active skip
+        // prediction keeps its own anchor by design.
+        val targetIndex = if (pendingCarouselIndex != null || queue.getOrNull(targetIndex)?.id == song.id) {
+            targetIndex
+        } else {
+            queue.indexOfFirst { it.id == song.id }.takeIf { it >= 0 } ?: return@LaunchedEffect
+        }
         val target = targetIndex.toFloat()
         val distance = abs(carouselProgress.value - target)
         val queueChanged = lastQueue !== queue

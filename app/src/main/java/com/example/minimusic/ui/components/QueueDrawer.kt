@@ -291,12 +291,15 @@ fun LandscapeQueueContent(
     onClearQueue: () -> Unit
 ) {
     if (!isOpen) {
+        // Collapsed bar floats on the player canvas, so it gets the same
+        // translucent tonal overlay as the capsule track (not an opaque
+        // neutral slab) and canvas-text content colors.
         Surface(
             modifier = modifier
                 .fillMaxWidth()
                 .clickable { onOpenChange(true) },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceContainer,
+            color = artColors.surfaceContainerLowest.copy(alpha = 0.7f),
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
         ) {
@@ -308,7 +311,7 @@ fun LandscapeQueueContent(
                     modifier = Modifier
                         .padding(top = 10.dp)
                         .size(width = 36.dp, height = 4.dp)
-                        .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                        .background(artColors.onPrimaryContainer.copy(alpha = 0.5f), RoundedCornerShape(50))
                 )
                 Row(
                     modifier = Modifier
@@ -321,12 +324,12 @@ fun LandscapeQueueContent(
                         imageVector = Icons.Filled.QueueMusic,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = artColors.onSurface
+                        tint = artColors.onPrimaryContainer
                     )
                     Text(
                         text = "Queue",
                         style = MaterialTheme.typography.titleMedium,
-                        color = artColors.onSurface,
+                        color = artColors.onPrimaryContainer,
                         modifier = Modifier.padding(start = 6.dp)
                     )
                 }
@@ -554,7 +557,11 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceContainer,
+            // Collapsed: a translucent tonal overlay on the player canvas
+            // (the capsule track's treatment) instead of an opaque neutral
+            // slab. Open: the drawer's own surface tone.
+            color = if (isOpen) artColors.surfaceContainer
+            else artColors.surfaceContainerLowest.copy(alpha = 0.7f),
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier
@@ -598,7 +605,11 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                         modifier = Modifier
                             .padding(top = 6.dp, bottom = 4.dp)
                             .size(width = 36.dp, height = 4.dp)
-                            .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                            .background(
+                                if (isOpen) artColors.onSurfaceVariant.copy(alpha = 0.55f)
+                                else artColors.onPrimaryContainer.copy(alpha = 0.5f),
+                                RoundedCornerShape(50)
+                            )
                     )
                     if (isOpen) {
                         Row(
@@ -667,6 +678,9 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 .height(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
+                            // Canvas-text rule: the collapsed bar floats on the
+                            // player canvas, so its content follows the
+                            // onPrimaryContainer family.
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
@@ -678,12 +692,12 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                     imageVector = Icons.Filled.QueueMusic,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = artColors.onSurface
+                                    tint = artColors.onPrimaryContainer
                                 )
                                 Text(
                                     text = "Queue",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = artColors.onSurface,
+                                    color = artColors.onPrimaryContainer,
                                     modifier = Modifier.padding(start = 6.dp)
                                 )
                             }

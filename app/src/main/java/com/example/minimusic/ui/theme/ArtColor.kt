@@ -19,6 +19,10 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.minimusic.data.PaletteStyle
 import com.google.android.material.color.utilities.DynamicScheme
+import com.google.android.material.color.utilities.SchemeExpressive
+import com.google.android.material.color.utilities.SchemeFruitSalad
+import com.google.android.material.color.utilities.SchemeTonalSpot
+import com.google.android.material.color.utilities.SchemeVibrant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.google.android.material.color.utilities.Hct
@@ -152,11 +156,20 @@ private fun artworkSwatchScore(swatch: Palette.Swatch): Double {
         chromaScore.coerceAtLeast(0.0) * 0.50
 }
 
-private fun artScheme(seed: Color, isDark: Boolean, style: PaletteStyle): DynamicScheme =
+private fun artScheme(seed: Color, isDark: Boolean, style: PaletteStyle): DynamicScheme {
+    val hct = Hct.fromInt(seed.toArgb())
     // M3 dynamic color from in-app content: the seed (album art) generates an
     // accessible scheme; role mappings in the UI stay constant across styles.
-    // The wallpaper-derived app theme uses the same builder (see Theme.kt).
-    dynamicSchemeFromHct(Hct.fromInt(seed.toArgb()), isDark, style)
+    // Vibrant/Expressive/Fruit Salad spread the secondary and tertiary hues
+    // around the source hue, giving each transport control a distinct vivid
+    // tone (PixelPlayer's reference look).
+    return when (style) {
+        PaletteStyle.TONAL_SPOT -> SchemeTonalSpot(hct, isDark, 0.0)
+        PaletteStyle.VIBRANT -> SchemeVibrant(hct, isDark, 0.0)
+        PaletteStyle.EXPRESSIVE -> SchemeExpressive(hct, isDark, 0.0)
+        PaletteStyle.FRUIT_SALAD -> SchemeFruitSalad(hct, isDark, 0.0)
+    }
+}
 /**
  * Normalize a palette seed before it reaches Material scheme generation.
  * Album art can contain nearly-black or highly saturated pixels that are useful
