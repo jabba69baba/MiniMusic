@@ -769,6 +769,23 @@ private fun ColumnScope.QueueDrawerList(
     var locatePending by remember { mutableStateOf(true) }
     // Rows are laid out 72dp tall in the adapter below.
     val rowHeightPx = remember(context) { 72f * context.resources.displayMetrics.density }
+    // Follows the queue while the drawer is open: a song change re-centres on
+    // the new now-playing row, so the drawer stays truthful without the user
+    // touching it. Comparing entry ids (not positions) keeps a reorder or a
+    // position tick from triggering it.
+    var previousCurrentEntryId by remember { mutableStateOf(snapshot.currentEntryId) }
+
+    /**
+     * Offset that lands a row in the middle of the viewport, but never invents
+     * a gap above the queue's own first row: the list can only show as much
+     * history as it actually has, so a current song near the top still starts
+     * flush.
+     */
+    fun centeredAnchorOffset(view: RecyclerView, position: Int): Int {
+        val centered = ((view.height - rowHeightPx) / 2f).toInt().coerceAtLeast(0)
+        val historyAbove = (position * rowHeightPx).toInt()
+        return minOf(centered, historyAbove)
+    }
 
     fun locateCurrentEntryIfReady(view: RecyclerView) {
         if (!locatePending || view.height < rowHeightPx) return
@@ -777,7 +794,7 @@ private fun ColumnScope.QueueDrawerList(
         if (position < 0) return
         locatePending = false
         view.stopScroll()
-        layout.scrollToPositionWithOffset(position, 0)
+        layout.scrollToPositionWithOffset(position, centeredAnchorOffset(view, position))
     }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
@@ -859,6 +876,17 @@ private fun ColumnScope.QueueDrawerList(
                     }
                 }
             }
+            if (snapshot.currentEntryId != previousCurrentEntryId) {
+                previousCurrentEntryId = snapshot.currentEntryId
+                val currentPosition = snapshot.resolvedVisiblePosition
+                // Only when the drawer is in repose: never yank the list out
+                // from under a scroll or a drag the user is performing.
+                if (currentPosition >= 0 &&
+                    recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE
+                ) {
+                    recyclerView.post { animateQueueScroll(recyclerView, currentPosition) }
+                }
+            }
             if (queueTopRequest != previousQueueTopRequest) {
                 previousQueueTopRequest = queueTopRequest
                 recyclerView.stopScroll()
@@ -874,25 +902,45 @@ private fun ColumnScope.QueueDrawerList(
     )
 }
 
-/** Matches the library locate motion: stage long jumps, then glide the final tail. */
+/**
+ * Matches the library locate motion — stage long jumps, then glide the final
+ * tail — but settles the target row in the middle of the viewport rather than
+ * at its top edge, so the drawer shows the current song with the songs already
+ * played above it and what is coming below. The scroller clamps itself at the
+ * list's own ends, so near the top or bottom the glide simply stops flush.
+ */
 private fun animateQueueScroll(recyclerView: RecyclerView, targetPosition: Int) {
     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
     val first = layout.findFirstVisibleItemPosition()
-    fun glideToStart() {
+    fun glideToTarget() {
         val scroller = object : LinearSmoothScroller(recyclerView.context) {
             override fun getVerticalSnapPreference(): Int = SNAP_TO_START
+
+            // Delta to bring the row to the middle: measure where it would sit
+            // centred and move it there.
+            override fun calculateDtToFit(
+                viewStart: Int,
+                viewEnd: Int,
+                boxStart: Int,
+                boxEnd: Int,
+                snapPreference: Int
+            ): Int {
+                val viewport = boxEnd - boxStart
+                val row = viewEnd - viewStart
+                return viewStart - (boxStart + (viewport - row) / 2)
+            }
         }
         scroller.targetPosition = targetPosition
         layout.startSmoothScroll(scroller)
     }
     if (first < 0 || abs(targetPosition - first) <= 10) {
-        glideToStart()
+        glideToTarget()
         return
     }
     val staged = (targetPosition + if (targetPosition > first) -6 else 6)
         .coerceIn(0, (recyclerView.adapter?.itemCount ?: 1) - 1)
     layout.scrollToPositionWithOffset(staged, 0)
-    recyclerView.post { glideToStart() }
+    recyclerView.post { glideToTarget() }
 }
 
 private class QueueRecyclerView(
