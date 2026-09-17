@@ -1,26 +1,21 @@
 package com.example.minimusic.ui.screens
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,28 +27,34 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.ui.window.Dialog
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.CachePolicy
@@ -62,16 +63,29 @@ import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
+import com.example.minimusic.ui.theme.MiniMusicMotion
+import kotlinx.coroutines.launch
 import java.util.Locale
+
+/**
+ * The one gap the dialog uses between its three zones — title, identity block,
+ * info cards. Keeping it single-sourced is what removes the dead space that
+ * used to sit between the artwork and the first card.
+ */
+private val DetailSectionGap = 20.dp
+
+/** Gap between the info cards themselves. */
+private val DetailCardGap = 8.dp
 
 @Composable
 fun DetailsScreen(
     song: Song,
     onBack: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    // The details dialog intentionally does NOT tint from album art: it follows
-    // the app's default Monet color scheme (user preference).
+    val context = LocalContext.current
+    // The dialog follows the app's Monet scheme rather than the playing song's
+    // art colors: it is a document about the file, not part of the player
+    // canvas (see the art-palette scoping note in Theme.kt).
     val scheme = MaterialTheme.colorScheme
     var details by remember(song.id) { mutableStateOf<SongDetails?>(null) }
 
@@ -79,11 +93,50 @@ fun DetailsScreen(
         details = readSongDetails(context, song)
     }
 
-    Dialog(onDismissRequest = onBack) {
+    // One animation owns both directions: same duration, same easing, same
+    // scale pair, so opening and closing are the same motion played forwards
+    // and backwards. Closing runs the exit first and only then pops the route,
+    // so the route change can never cut the surface off mid-flight.
+    val revealed = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var dismissing by remember { mutableStateOf(false) }
+    val revealSpec = tween(
+        durationMillis = MiniMusicMotion.dialogDurationMillis,
+        easing = MiniMusicMotion.dialogEasing
+    )
+    fun dismiss() {
+        if (dismissing) return
+        dismissing = true
+        scope.launch {
+            revealed.animateTo(0f, revealSpec)
+            onBack()
+        }
+    }
+    LaunchedEffect(Unit) {
+        revealed.animateTo(1f, revealSpec)
+    }
+
+    Dialog(onDismissRequest = { dismiss() }) {
+        // The platform dialog window runs its own fade, which only ever plays
+        // on the way in. Switching it off leaves this surface as the single
+        // owner of both directions.
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        DisposableEffect(dialogWindow) {
+            dialogWindow?.setWindowAnimations(0)
+            onDispose { }
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.6f),
+                .fillMaxHeight(0.82f)
+                .graphicsLayer {
+                    val progress = revealed.value
+                    alpha = progress
+                    val scale = 0.92f + 0.08f * progress
+                    scaleX = scale
+                    scaleY = scale
+                },
             shape = RoundedCornerShape(28.dp),
             color = scheme.surfaceContainerHigh
         ) {
@@ -92,133 +145,158 @@ fun DetailsScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 20.dp)
+                    .padding(top = 18.dp, bottom = 20.dp)
             ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Details",
-                style = MaterialTheme.typography.titleLarge,
-                color = scheme.onSurface
-            )
-        }
+                Text(
+                    text = "Details",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = scheme.onSurface
+                )
 
+                Spacer(Modifier.height(DetailSectionGap))
+
+                DetailIdentity(song = song, scheme = scheme)
+
+                Spacer(Modifier.height(DetailSectionGap))
+
+                val loaded = details
+                if (loaded == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = scheme.primary)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(DetailCardGap)) {
+                        DetailCard(Icons.Filled.Person, "Artist", song.artist, scheme)
+                        DetailCard(Icons.Filled.Album, "Album", song.album, scheme)
+                        DetailCard(
+                            Icons.Filled.Badge,
+                            "Album artist",
+                            loaded.albumArtist ?: song.artist,
+                            scheme
+                        )
+                        DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs), scheme)
+                        DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.genre ?: "Unknown", scheme)
+                        DetailCard(Icons.Filled.Info, "Year", loaded.year ?: "Unknown", scheme)
+
+                        val format = loaded.formatInfo
+                        val audioInfo = buildList {
+                            format?.sampleRateHz?.let {
+                                add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz")
+                            }
+                            format?.bitrateKbps?.let { add("$it kbps") }
+                            format?.mimeLabel?.let { add(it) }
+                        }.joinToString(" • ").ifBlank { "Unknown" }
+                        DetailCard(Icons.Filled.AudioFile, "Quality", audioInfo, scheme)
+                        DetailCard(Icons.Filled.SdCard, "Size", formatFileSize(loaded.sizeBytes), scheme)
+                        DetailCard(
+                            Icons.Filled.Storage,
+                            "Path",
+                            loaded.path ?: song.contentUri.toString(),
+                            scheme
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The dialog's identity block: artwork at a third of the available width, the
+ * remaining two thirds carrying the song name above its artist. Both lines
+ * marquee when they don't fit, so a long name is read completely instead of
+ * being truncated to a different font size.
+ */
+@Composable
+private fun DetailIdentity(
+    song: Song,
+    scheme: ColorScheme
+) {
+    val context = LocalContext.current
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val artSize = maxWidth / 3f
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 20.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(18.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(112.dp)
+                    .size(artSize)
                     .clip(RoundedCornerShape(18.dp))
                     .background(scheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (song.albumArtUri == null) {
-                    Icon(
-                        Icons.Filled.MusicNote,
-                        contentDescription = null,
-                        tint = scheme.onSurfaceVariant,
-                        modifier = Modifier.size(42.dp)
-                    )
-                } else {
-                    // No bitmap fade: swaps the instant it decodes. On decode
-                    // failure falls back to the note icon, never an empty tile.
-                    val detailsArtRequest = remember(song.albumArtUri) {
+                val artRequest = song.albumArtUri?.let { uri ->
+                    remember(uri) {
                         ImageRequest.Builder(context)
-                            .data(song.albumArtUri)
+                            .data(uri)
+                            // No bitmap fade: the tile swaps the instant it
+                            // decodes. On decode failure the note icon below
+                            // takes over, never an empty tile.
                             .crossfade(false)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build()
                     }
-                    var detailsArtFailed by remember(song.albumArtUri) { mutableStateOf(false) }
-                    if (detailsArtFailed) {
-                        Icon(
-                            Icons.Filled.MusicNote,
-                            contentDescription = null,
-                            tint = scheme.onSurfaceVariant,
-                            modifier = Modifier.size(42.dp)
-                        )
-                    } else {
-                        AsyncImage(
-                            model = detailsArtRequest,
-                            imageLoader = MiniMusicImageLoader.get(context),
-                            contentDescription = "Album art",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            onState = { state ->
-                                if (state is AsyncImagePainter.State.Error) detailsArtFailed = true
-                            }
-                        )
-                    }
+                }
+                var artFailed by remember(song.albumArtUri) { mutableStateOf(false) }
+                if (artRequest == null || artFailed) {
+                    Icon(
+                        Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = scheme.onSurfaceVariant,
+                        modifier = Modifier.size(40.dp)
+                    )
+                } else {
+                    AsyncImage(
+                        model = artRequest,
+                        imageLoader = MiniMusicImageLoader.get(context),
+                        contentDescription = "Album art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        onState = { state ->
+                            if (state is AsyncImagePainter.State.Error) artFailed = true
+                        }
+                    )
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontSize = when {
-                            song.title.length > 34 -> 16.sp
-                            song.title.length > 24 -> 18.sp
-                            else -> MaterialTheme.typography.headlineSmall.fontSize
-                        }
-                    ),
+                    style = MaterialTheme.typography.titleLarge,
                     color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Clip,
                     modifier = Modifier
+                        .fillMaxWidth()
+                        .basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 900,
+                            initialDelayMillis = 700,
+                            velocity = 19.dp
+                        )
                 )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        val loaded = details
-        AnimatedContent(
-            targetState = loaded != null,
-            transitionSpec = {
-                EnterTransition.None togetherWith ExitTransition.None
-            },
-            label = "detailsContentTransition"
-        ) { hasDetails ->
-            if (!hasDetails) {
-                Box(
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = scheme.primary)
-                }
-            } else {
-                val resolved = loaded ?: return@AnimatedContent
-                Column {
-                    DetailCard(Icons.Filled.Timer, "Duration", formatDuration(song.durationMs))
-                    DetailCard(Icons.Filled.GraphicEq, "Genre", resolved.genre ?: "Unknown")
-                    DetailCard(Icons.Filled.Album, "Album", song.album)
-                    DetailCard(Icons.Filled.Person, "Artist", song.artist)
-                    DetailCard(Icons.Filled.Badge, "Album artist", resolved.albumArtist ?: song.artist)
-                    DetailCard(Icons.Filled.Info, "Year", resolved.year ?: "Unknown")
-
-                    val format = resolved.formatInfo
-                    val audioInfo = buildList {
-                        format?.sampleRateHz?.let { add("${String.format(Locale.US, "%.1f", it / 1000f)} kHz") }
-                        format?.bitrateKbps?.let { add("$it kbps") }
-                        format?.mimeLabel?.let { add(it) }
-                    }.joinToString(" • ").ifBlank { "Unknown" }
-                    DetailCard(Icons.Filled.AudioFile, "Song info", audioInfo)
-                    DetailCard(Icons.Filled.Storage, "Size", formatFileSize(resolved.sizeBytes))
-                    DetailCard(Icons.Filled.Storage, "Path", resolved.path ?: song.contentUri.toString())
-                }
-            }
-        }
+                        .padding(top = 2.dp)
+                        .basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 900,
+                            initialDelayMillis = 700,
+                            velocity = 19.dp
+                        )
+                )
             }
         }
     }
@@ -228,28 +306,31 @@ fun DetailsScreen(
 private fun DetailCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    value: String
+    value: String,
+    scheme: ColorScheme
 ) {
-    // Default Monet theme — no album-art tinting in this dialog.
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = scheme.surfaceVariant
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = scheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(label, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
                 Text(
                     value,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = scheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp)

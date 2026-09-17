@@ -16,13 +16,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,11 +38,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,8 +68,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -136,109 +132,6 @@ private fun QueueActionPill(
     }
 }
 
-/** Dedicated queue destination; the list is laid out below a fixed header. */
-@Composable
-fun QueueScreen(
-    snapshot: QueueSnapshot,
-    artColors: ArtColorRoles,
-    onBack: () -> Unit,
-    onEntryClick: (Long) -> Unit,
-    onReorderEntry: (Long, Int) -> Unit,
-    onRemoveEntry: (Long) -> Unit,
-    onClearQueue: () -> Unit
-) {
-    BackHandler(onBack = onBack)
-    var locateRequest by remember { mutableStateOf(0) }
-    val hapticView = LocalView.current
-    val hapticsEnabled = LocalMiniMusicHaptics.current
-
-    // PixelPlayer's queue surface tone.
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars),
-        color = artColors.surfaceContainer,
-        tonalElevation = 0.dp
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(88.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 10.dp)
-                        .size(width = 36.dp, height = 4.dp)
-                        .background(
-                            artColors.onSurfaceVariant.copy(alpha = 0.55f),
-                            RoundedCornerShape(50)
-                        )
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 28.dp, start = 8.dp, end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    androidx.compose.material3.IconButton(
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Clear queue",
-                            modifier = Modifier.size(21.dp),
-                            tint = artColors.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.size(28.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.QueueMusic,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = artColors.onSurface
-                        )
-                        Text(
-                            text = "Queue",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = artColors.onSurface,
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.size(28.dp))
-                    androidx.compose.material3.IconButton(
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.MyLocation,
-                            contentDescription = "Locate current song",
-                            modifier = Modifier.size(21.dp),
-                            tint = artColors.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            QueueDrawerList(
-                snapshot = snapshot,
-                artColors = artColors,
-                onEntryClick = onEntryClick,
-                onReorderEntry = onReorderEntry,
-                onRemoveEntry = onRemoveEntry,
-                locateRequest = locateRequest,
-                queueTopRequest = 0,
-                openRequest = 1,
-                onTopCloseDrag = {},
-                onTopCloseDragEnd = {}
-            )
-        }
-    }
-}
-
 @Composable
 fun BoxWithConstraintsScope.QueueDrawer(
     snapshot: QueueSnapshot,
@@ -291,9 +184,9 @@ fun LandscapeQueueContent(
     onClearQueue: () -> Unit
 ) {
     if (!isOpen) {
-        // Collapsed bar floats on the player canvas, so it gets the same
-        // translucent tonal overlay as the capsule track (not an opaque
-        // neutral slab) and canvas-text content colors.
+        // Collapsed bar floats on the player canvas, so it keeps the same
+        // translucent tonal overlay as the portrait drawer's collapsed bar and
+        // the same header roles it shows once open.
         Surface(
             modifier = modifier
                 .fillMaxWidth()
@@ -311,7 +204,7 @@ fun LandscapeQueueContent(
                     modifier = Modifier
                         .padding(top = 10.dp)
                         .size(width = 36.dp, height = 4.dp)
-                        .background(artColors.onPrimaryContainer.copy(alpha = 0.5f), RoundedCornerShape(50))
+                        .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
                 )
                 Row(
                     modifier = Modifier
@@ -324,12 +217,12 @@ fun LandscapeQueueContent(
                         imageVector = Icons.Filled.QueueMusic,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = artColors.onPrimaryContainer
+                        tint = artColors.onSurface
                     )
                     Text(
                         text = "Queue",
                         style = MaterialTheme.typography.titleMedium,
-                        color = artColors.onPrimaryContainer,
+                        color = artColors.onSurface,
                         modifier = Modifier.padding(start = 6.dp)
                     )
                 }
@@ -492,8 +385,8 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             icon = Icons.Filled.MyLocation,
                             label = "Locate",
                             contentDescription = "Locate current song",
-                            containerColor = artColors.tertiaryContainer,
-                            contentColor = artColors.onTertiaryContainer,
+                            containerColor = artColors.secondaryContainer,
+                            contentColor = artColors.onSecondaryContainer,
                             onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                             modifier = Modifier.weight(1f)
                         )
@@ -569,11 +462,21 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                 .fillMaxSize()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                val headerHeight = if (isOpen) 102.dp else QueueDrawerCollapsedHeight
+                // One header recipe for both states. The bar grows from the
+                // collapsed height to the open height on the same spring the
+                // panel travels on, and its rows are revealed by the clip
+                // instead of appearing in place — so opening and closing read
+                // as one motion and nothing changes hue on the way.
+                val headerHeight by animateDpAsState(
+                    targetValue = if (isOpen) 102.dp else QueueDrawerCollapsedHeight,
+                    animationSpec = MiniMusicMotion.defaultSpatial(),
+                    label = "queueHeaderHeight"
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(headerHeight)
+                        .clipToBounds()
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
@@ -589,14 +492,22 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 } else {
                                     offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
                                 }
-                                val target = if (shouldOpen) openOffsetPx else closedOffsetPx
-                                scope.launch {
-                                    offsetY.animateTo(
-                                        target,
-                                        animationSpec = MiniMusicMotion.defaultSpatial()
-                                    )
+                                // Only one animator may own the settle: when
+                                // the dragged state actually changes, the
+                                // isOpen effect animates it; otherwise the
+                                // release snaps back here. Two concurrent
+                                // animateTo calls on the same value made a
+                                // drag-close look faster than a back-close.
+                                if (shouldOpen == isOpen) {
+                                    scope.launch {
+                                        offsetY.animateTo(
+                                            if (shouldOpen) openOffsetPx else closedOffsetPx,
+                                            animationSpec = MiniMusicMotion.defaultSpatial()
+                                        )
+                                    }
+                                } else {
+                                    onOpenChange(shouldOpen)
                                 }
-                                onOpenChange(shouldOpen)
                             }
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -606,132 +517,105 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                             .padding(top = 6.dp, bottom = 4.dp)
                             .size(width = 36.dp, height = 4.dp)
                             .background(
-                                if (isOpen) artColors.onSurfaceVariant.copy(alpha = 0.55f)
-                                else artColors.onPrimaryContainer.copy(alpha = 0.5f),
+                                artColors.onSurfaceVariant.copy(alpha = 0.55f),
                                 RoundedCornerShape(50)
                             )
                     )
-                    if (isOpen) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .clickable {
-                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                        queueTopRequest++
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.QueueMusic,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = artColors.onSurface
-                                )
-                                Text(
-                                    text = "Queue",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = artColors.onSurface,
-                                    modifier = Modifier.padding(start = 6.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .padding(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                .clip(RoundedCornerShape(50))
+                                .clickable {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    if (isOpen) queueTopRequest++ else onOpenChange(true)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            QueueActionPill(
-                                icon = Icons.Filled.Delete,
-                                label = "Clear",
-                                contentDescription = "Clear queue",
-                                containerColor = artColors.errorContainer,
-                                contentColor = artColors.onErrorContainer,
-                                onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
-                                modifier = Modifier.weight(1f)
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = artColors.onSurface
                             )
-                            QueueActionPill(
-                                icon = Icons.Filled.MyLocation,
-                                label = "Locate",
-                                contentDescription = "Locate current song",
-                                containerColor = artColors.tertiaryContainer,
-                                contentColor = artColors.onTertiaryContainer,
-                                onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
-                                modifier = Modifier.weight(1f)
+                            Text(
+                                text = "Queue",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = artColors.onSurface,
+                                modifier = Modifier.padding(start = 6.dp)
                             )
                         }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Canvas-text rule: the collapsed bar floats on the
-                            // player canvas, so its content follows the
-                            // onPrimaryContainer family.
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .clickable { onOpenChange(true) }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.QueueMusic,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = artColors.onPrimaryContainer
-                                )
-                                Text(
-                                    text = "Queue",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = artColors.onPrimaryContainer,
-                                    modifier = Modifier.padding(start = 6.dp)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        QueueActionPill(
+                            icon = Icons.Filled.Delete,
+                            label = "Clear",
+                            contentDescription = "Clear queue",
+                            containerColor = artColors.errorContainer,
+                            contentColor = artColors.onErrorContainer,
+                            onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
+                            modifier = Modifier.weight(1f)
+                        )
+                        QueueActionPill(
+                            icon = Icons.Filled.MyLocation,
+                            label = "Locate",
+                            contentDescription = "Locate current song",
+                            containerColor = artColors.secondaryContainer,
+                            contentColor = artColors.onSecondaryContainer,
+                            onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // The list stays composed while the drawer is collapsed: the
+                // panel's own geometry hides it, so closing slides the rows
+                // away with the sheet instead of blanking the surface on the
+                // first frame of the close.
+                QueueDrawerList(
+                    snapshot = snapshot,
+                    artColors = artColors,
+                    onEntryClick = onEntryClick,
+                    onReorderEntry = onReorderEntry,
+                    onRemoveEntry = onRemoveEntry,
+                    locateRequest = locateRequest,
+                    queueTopRequest = queueTopRequest,
+                    openRequest = openRequest,
+                    onTopCloseDrag = { deltaY ->
+                        scope.launch {
+                            offsetY.snapTo((offsetY.value + deltaY).coerceIn(openOffsetPx, closedOffsetPx))
+                        }
+                    },
+                    onTopCloseDragEnd = { totalDistance ->
+                        val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
+                        if (shouldClose) {
+                            // Single owner: the isOpen effect animates the
+                            // sheet closed, this drag only decides the outcome.
+                            onOpenChange(false)
+                        } else {
+                            scope.launch {
+                                offsetY.animateTo(
+                                    openOffsetPx,
+                                    animationSpec = MiniMusicMotion.defaultSpatial()
                                 )
                             }
                         }
                     }
-                }
-
-                if (isOpen) {
-                    QueueDrawerList(
-                        snapshot = snapshot,
-                        artColors = artColors,
-                        onEntryClick = onEntryClick,
-                        onReorderEntry = onReorderEntry,
-                        onRemoveEntry = onRemoveEntry,
-                        locateRequest = locateRequest,
-                        queueTopRequest = queueTopRequest,
-                        openRequest = openRequest,
-                        onTopCloseDrag = { deltaY ->
-                            scope.launch {
-                                offsetY.snapTo((offsetY.value + deltaY).coerceIn(openOffsetPx, closedOffsetPx))
-                            }
-                        },
-                        onTopCloseDragEnd = { totalDistance ->
-                            val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
-                            scope.launch {
-                                offsetY.animateTo(
-                                    if (shouldClose) closedOffsetPx else openOffsetPx,
-                                    animationSpec = MiniMusicMotion.defaultSpatial()
-                                )
-                            }
-                            if (shouldClose) onOpenChange(false)
-                        }
-                    )
-                }
+                )
             }
         }
     }
@@ -766,7 +650,7 @@ private fun ColumnScope.QueueDrawerList(
     // boundary prevents rows from painting over the Queue title or controls.
     Spacer(modifier = Modifier.height(8.dp))
     androidx.compose.material3.HorizontalDivider(
-        color = artColors.onSurfaceVariant.copy(alpha = 0.28f)
+        color = artColors.outlineVariant
     )
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -1315,21 +1199,21 @@ private class PracticalQueueAdapter(
             onStartDrag: () -> Unit
         ) {
             val resolved = colors ?: return
-            // Keep every state fully opaque. The current row carries the
-            // scheme's tertiary container — a distinct vivid hue that marks
-            // the now-playing track in both light and dark (PixelPlayer's
-            // queue treatment); history uses a quieter tonal blend so played
-            // rows recede without alpha/transparency.
+            // Keep every state fully opaque, and keep each state inside one
+            // role family so the scheme guarantees its contrast. The current
+            // song uses the primary container — the same family the library
+            // marks its playing row with — ordinary rows sit on the surface
+            // role, and history recedes toward a container tone without alpha.
             val rowArgb = if (isCurrent) {
-                resolved.tertiaryContainer.toArgb()
+                resolved.primaryContainer.toArgb()
             } else {
                 resolved.surface.toArgb()
             }
             val opaqueHistoryColor = if (isHistory) {
                 ColorUtils.blendARGB(
                     resolved.surface.toArgb(),
-                    resolved.surfaceVariant.toArgb(),
-                    0.46f
+                    resolved.surfaceContainerHigh.toArgb(),
+                    0.55f
                 )
             } else {
                 rowArgb
@@ -1355,7 +1239,7 @@ private class PracticalQueueAdapter(
             val titleArgb = if (isHistory) {
                 ColorUtils.blendARGB(resolved.onSurface.toArgb(), opaqueHistoryColor, 0.28f)
             } else if (isCurrent) {
-                resolved.onTertiaryContainer.toArgb()
+                resolved.onPrimaryContainer.toArgb()
             } else {
                 resolved.onSurface.toArgb()
             }
@@ -1363,17 +1247,17 @@ private class PracticalQueueAdapter(
                 ColorUtils.blendARGB(resolved.onSurfaceVariant.toArgb(), opaqueHistoryColor, 0.36f)
             } else if (isCurrent) {
                 ColorUtils.blendARGB(
-                    resolved.onTertiaryContainer.toArgb(),
+                    resolved.onPrimaryContainer.toArgb(),
                     resolved.onSurfaceVariant.toArgb(),
                     0.18f
                 )
             } else {
                 resolved.onSurfaceVariant.toArgb()
             }
-            // PixelPlayer's queue art tiles: current song on the tertiary
-            // container, every other row on surfaceContainerHigh.
+            // Art tiles stay in their row's family: the current song on the
+            // primary container, every other row on a neutral container.
             (artwork.background as? GradientDrawable)?.setColor(
-                if (isCurrent) resolved.tertiaryContainer.toArgb() else resolved.surfaceContainerHigh.toArgb()
+                if (isCurrent) resolved.primaryContainer.toArgb() else resolved.surfaceContainerHigh.toArgb()
             )
             title.setTextColor(titleArgb)
             artist.setTextColor(artistArgb)

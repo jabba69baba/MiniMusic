@@ -2,8 +2,6 @@ package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -108,8 +106,11 @@ fun MiniMusicNavGraph(
     }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    // Details is excluded on purpose: it is a dialog window, which receives
+    // back before this handler ever could, and its own open/close animation
+    // must not be re-driven by the graph's predictive-back transform.
     val predictiveBackRoute = currentRoute == Routes.SETTINGS ||
-        currentRoute == Routes.DETAILS || currentRoute == Routes.ALBUM || currentRoute == Routes.ARTIST
+        currentRoute == Routes.ALBUM || currentRoute == Routes.ARTIST
     val predictiveBackProgress = remember { Animatable(0f) }
 
     PredictiveBackHandler(enabled = predictiveBackRoute) { progress ->
@@ -297,9 +298,6 @@ fun MiniMusicNavGraph(
                     initialOffsetX = { -it },
                     animationSpec = tween(MiniMusicMotion.navTransitionDurationMillis, easing = MiniMusicMotion.navEnterEasing)
                 )
-            } else if (initialState.destination.route?.startsWith("details/") == true) {
-                fadeIn(tween(220, easing = MiniMusicMotion.navEnterEasing)) +
-                    slideInHorizontally(initialOffsetX = { -(it * 0.08f).toInt() }, animationSpec = tween(220))
             } else slideInHorizontally(
                 initialOffsetX = { -(it * 0.25f).toInt() },
                 animationSpec = tween(
@@ -322,9 +320,6 @@ fun MiniMusicNavGraph(
                     targetOffsetX = { it },
                     animationSpec = tween(MiniMusicMotion.navTransitionDurationMillis, easing = MiniMusicMotion.navExitEasing)
                 )
-            } else if (initialState.destination.route?.startsWith("details/") == true) {
-                fadeOut(tween(180, easing = MiniMusicMotion.navExitEasing)) +
-                    slideOutHorizontally(targetOffsetX = { (it * 0.08f).toInt() }, animationSpec = tween(180))
             } else slideOutHorizontally(
                 targetOffsetX = { (it * 0.5f).toInt() },
                 animationSpec = tween(
@@ -446,7 +441,14 @@ fun MiniMusicNavGraph(
 
         composable(
             route = Routes.DETAILS,
-            arguments = listOf(navArgument("songId") { type = NavType.LongType })
+            arguments = listOf(navArgument("songId") { type = NavType.LongType }),
+            // No route motion: the details surface is a dialog that owns one
+            // symmetric open/close animation. Any tween here would double-drive
+            // it (the same reason the lyrics route overrides these).
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) { backStackEntry ->
             val songId = backStackEntry.arguments?.getLong("songId") ?: return@composable
             val song = libraryViewModel.songById(songId) ?: return@composable

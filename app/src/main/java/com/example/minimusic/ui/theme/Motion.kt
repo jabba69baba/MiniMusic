@@ -105,6 +105,17 @@ object MiniMusicMotion {
     /** Emphasized easing for elements leaving the screen (accelerate). */
     val navExitEasing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 
+    /**
+     * Dialogs (the song Details surface) open and close on one shared
+     * curvature and duration. A dialog is a small component that both starts
+     * and ends on screen, so unlike screen transitions its two directions must
+     * read as a single motion rather than a decelerate/accelerate pair.
+     */
+    const val dialogDurationMillis = 220
+
+    /** Standard M3 easing, used for both dialog directions. */
+    val dialogEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
     /** Screen-transition duration at 1x animator scale. */
     const val navTransitionDurationMillis = 400
 
