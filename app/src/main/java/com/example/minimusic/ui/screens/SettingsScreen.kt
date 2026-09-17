@@ -144,10 +144,10 @@ fun SettingsScreen(
                         title = "Album art palette",
                         subtitle = "Color style derived from the playing track's art",
                         options = listOf(
-                            PaletteStyle.TONAL_SPOT to "Tonal Spot",
-                            PaletteStyle.VIBRANT to "Vibrant",
                             PaletteStyle.EXPRESSIVE to "Expressive",
-                            PaletteStyle.FRUIT_SALAD to "Fruit Salad"
+                            PaletteStyle.FRUIT_SALAD to "Fruit Salad",
+                            PaletteStyle.TONAL_SPOT to "Tonal Spot",
+                            PaletteStyle.VIBRANT to "Vibrant"
                         ),
                         selected = settings.albumArtPaletteStyle,
                         onSelect = onAlbumArtPaletteStyleChange

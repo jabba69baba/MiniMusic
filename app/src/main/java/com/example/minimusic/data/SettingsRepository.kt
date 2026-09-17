@@ -25,7 +25,7 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 data class AppSettings(
     val dynamicColorEnabled: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
+    val albumArtPaletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT,
     val amoledBlackMode: Boolean = false,
     val showAudioQualityBadge: Boolean = true,
     val centeredTitle: Boolean = false,

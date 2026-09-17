@@ -15,6 +15,6 @@ enum class PaletteStyle(val label: String) {
 
     companion object {
         fun fromString(value: String?): PaletteStyle =
-            entries.firstOrNull { it.name == value } ?: VIBRANT
+            entries.firstOrNull { it.name == value } ?: TONAL_SPOT
     }
 }

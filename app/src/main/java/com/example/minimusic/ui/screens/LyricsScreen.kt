@@ -108,7 +108,7 @@ fun LyricsScreen(
     lyricsState: LyricsState,
     onSeekTo: (Long) -> Unit,
     onBack: () -> Unit,
-    albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT
+    albumArtPaletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT
 ) {
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current

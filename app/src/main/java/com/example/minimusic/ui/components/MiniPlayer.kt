@@ -91,7 +91,7 @@ fun MiniPlayer(
     onSkipNext: () -> Unit,
     onClick: () -> Unit,
     onSwipeToPlayer: () -> Unit,
-    albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
+    albumArtPaletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT,
     modifier: Modifier = Modifier
 ) {
     // Collected here so the position ticker recomposes only this bar — never

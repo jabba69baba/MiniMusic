@@ -202,7 +202,7 @@ fun PlayerScreen(
     queueSnapshot: QueueSnapshot,
     showAudioQualityBadge: Boolean = true,
     centeredTitle: Boolean = false,
-    albumArtPaletteStyle: PaletteStyle = PaletteStyle.VIBRANT,
+    albumArtPaletteStyle: PaletteStyle = PaletteStyle.TONAL_SPOT,
     artworkShadowEnabled: Boolean = true,
     artworkShadowDp: Int = 6,
     sleepTimerState: SleepTimerState? = null,
@@ -593,11 +593,28 @@ private fun SleepTimerSwitchRow(
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
-                colors = androidx.compose.material3.SwitchDefaults.colors(
+                // Full color set stated explicitly: in this material3 version
+                // the M3E switch's BORDER falls back to SwitchDefaults (the
+                // app's global theme) and showed a red hue over the
+                // art-derived track. The border follows the album art too.
+                // (SwitchColors.copy only exists from material3 alpha28 on.)
+                colors = androidx.compose.material3.SwitchColors(
                     checkedThumbColor = artColors.onPrimary,
                     checkedTrackColor = artColors.primary,
+                    checkedBorderColor = artColors.primary,
+                    checkedIconColor = artColors.onPrimary,
                     uncheckedThumbColor = artColors.onSurfaceVariant,
                     uncheckedTrackColor = artColors.surfaceVariant,
+                    uncheckedBorderColor = artColors.primary,
+                    uncheckedIconColor = artColors.onSurfaceVariant,
+                    disabledCheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledCheckedTrackColor = artColors.surfaceVariant,
+                    disabledCheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledCheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledUncheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledUncheckedTrackColor = artColors.surfaceVariant,
+                    disabledUncheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledUncheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f)
                 )
             )
         }
