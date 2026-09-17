@@ -96,19 +96,7 @@ import kotlin.math.roundToInt
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
 val QueueDrawerCollapsedHeight = 48.dp
 
-/**
- * Landscape's collapsed bar. It is taller than the portrait one because the
- * landscape pane has no navigation-bar clearance of its own, and the controls
- * pane reserves exactly this much room for it.
- */
-val LandscapeQueueCollapsedHeight = 72.dp
-
-/**
- * Height of the landscape sheet's header. The collapsed bar is the first
- * [LandscapeQueueCollapsedHeight] of it, so the action pills start below that
- * line and stay hidden until the sheet has actually risen.
- */
-private val LandscapeQueueHeaderHeight = 116.dp
+/** How much of the screen the open drawer covers. */
 private const val OPEN_FRACTION = 0.82f
 
 @Composable
@@ -197,21 +185,63 @@ fun LandscapeQueueContent(
     onRemoveEntry: (Long) -> Unit,
     onClearQueue: () -> Unit
 ) {
-    // One always-composed surface for both states. The collapsed bar is this
-    // same sheet with only its top [LandscapeQueueCollapsedHeight] inside the
-    // pane, so opening and closing is one slide instead of the old swap
-    // between a flow bar and a pane-filling sheet.
-    BoxWithConstraints(modifier = modifier) {
-        LandscapeQueueBottomSheet(
-            snapshot = snapshot,
-            artColors = artColors,
-            isOpen = isOpen,
-            onOpenChange = onOpenChange,
-            onEntryClick = onEntryClick,
-            onReorderEntry = onReorderEntry,
-            onRemoveEntry = onRemoveEntry,
-            onClearQueue = onClearQueue
-        )
+    if (!isOpen) {
+        // Opaque, like the rest of the drawer: the bar sits on the player
+        // canvas but is a solid surface, not a see-through overlay.
+        Surface(
+            modifier = modifier
+                .fillMaxWidth()
+                .clickable { onOpenChange(true) },
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            color = artColors.surfaceContainer,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.QueueMusic,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = artColors.onSurface
+                    )
+                    Text(
+                        text = "Queue",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = artColors.onSurface,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+        }
+    } else {
+        BoxWithConstraints(modifier = modifier) {
+            LandscapeQueueBottomSheet(
+                snapshot = snapshot,
+                artColors = artColors,
+                isOpen = true,
+                onOpenChange = onOpenChange,
+                onEntryClick = onEntryClick,
+                onReorderEntry = onReorderEntry,
+                onRemoveEntry = onRemoveEntry,
+                onClearQueue = onClearQueue
+            )
+        }
     }
 }
 
@@ -230,7 +260,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     // PlayerScreen bounds this composable to the controls-side pane. The sheet
     // therefore fills that pane and slides vertically from its bottom edge.
     val panelHeight = maxHeight
-    val closedOffset = (panelHeight - LandscapeQueueCollapsedHeight).coerceAtLeast(0.dp)
+    val closedOffset = (panelHeight - 64.dp).coerceAtLeast(0.dp)
     val offsetY = remember(panelHeight) { Animatable(closedOffset.value) }
     val scope = rememberCoroutineScope()
     var locateRequest by remember { mutableStateOf(0) }
@@ -245,7 +275,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
             animationSpec = MiniMusicMotion.defaultSpatial()
         )
     }
-
 
     Box(
         modifier = Modifier
@@ -262,11 +291,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     )
                 },
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            // Opaque in both states. The drawer used to hand the collapsed bar
-            // a 70% translucent art tone (matching the player's capsule track),
-            // which let the player canvas read through the queue surface and
-            // made the drawer look like it was still opening. One solid tone
-            // for the whole surface instead.
             color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp
@@ -275,8 +299,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(LandscapeQueueHeaderHeight)
-                        .clipToBounds()
+                        .height(102.dp)
                         .clickable(enabled = !isOpen) { onOpenChange(true) }
                         .draggable(
                             orientation = Orientation.Vertical,
@@ -292,19 +315,13 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                                 } else {
                                     offsetY.value < closedOffset.value / 2f
                                 }
-                                // One animator owns the settle (same rule as
-                                // the portrait sheet): if the dragged state
-                                // changes, the isOpen effect animates it.
-                                if (shouldOpen == isOpen) {
-                                    scope.launch {
-                                        offsetY.animateTo(
-                                            if (shouldOpen) 0f else closedOffset.value,
-                                            animationSpec = MiniMusicMotion.defaultSpatial()
-                                        )
-                                    }
-                                } else {
-                                    onOpenChange(shouldOpen)
+                                scope.launch {
+                                    offsetY.animateTo(
+                                        if (shouldOpen) 0f else closedOffset.value,
+                                        animationSpec = MiniMusicMotion.defaultSpatial()
+                                    )
                                 }
+                                onOpenChange(shouldOpen)
                             }
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -346,10 +363,6 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             )
                         }
                     }
-                    // Everything above this line is the collapsed bar; the
-                    // clip keeps the pills out of the pane until the sheet has
-                    // risen past [LandscapeQueueCollapsedHeight].
-                    Spacer(modifier = Modifier.height(LandscapeQueueHeaderHeight - 90.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -382,20 +395,20 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                     }
                 }
 
-                // Always composed (see the portrait sheet): the panel's own
-                // geometry hides it while collapsed.
-                QueueDrawerList(
-                    snapshot = snapshot,
-                    artColors = artColors,
-                    onEntryClick = onEntryClick,
-                    onReorderEntry = onReorderEntry,
-                    onRemoveEntry = onRemoveEntry,
-                    locateRequest = locateRequest,
-                    queueTopRequest = queueTopRequest,
-                    openRequest = openRequest,
-                    onTopCloseDrag = {},
-                    onTopCloseDragEnd = {}
-                )
+                if (isOpen) {
+                    QueueDrawerList(
+                        snapshot = snapshot,
+                        artColors = artColors,
+                        onEntryClick = onEntryClick,
+                        onReorderEntry = onReorderEntry,
+                        onRemoveEntry = onRemoveEntry,
+                        locateRequest = locateRequest,
+                        queueTopRequest = queueTopRequest,
+                        openRequest = openRequest,
+                        onTopCloseDrag = {},
+                        onTopCloseDragEnd = {}
+                    )
+                }
             }
         }
 
@@ -417,9 +430,15 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     val fullHeightPx = with(density) { maxHeight.toPx() }
     val collapsedBarHeightPx = with(density) { QueueDrawerCollapsedHeight.toPx() }
     val navBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-    val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
-    val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
-    val offsetY = remember { Animatable(closedOffsetPx) }
+    // The panel is anchored to the bottom edge of the screen and its own height
+    // does the travelling. That is what keeps the collapsed state honest: the
+    // bar is a 48dp panel with a navigation-bar strip under it and literally no
+    // room for the list, so no rows can peek below the bar, and the surface can
+    // never be partly the player canvas while a drawer is meant to be closed.
+    val collapsedPanelHeightPx = collapsedBarHeightPx + navBarHeightPx
+    val openPanelHeightPx = (fullHeightPx * OPEN_FRACTION)
+        .coerceAtLeast(collapsedPanelHeightPx + 1f)
+    val panelHeight = remember { Animatable(collapsedPanelHeightPx) }
     var locateRequest by remember { mutableStateOf(0) }
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
@@ -428,15 +447,16 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(isOpen, fullHeightPx) {
-        val target = if (isOpen) openOffsetPx else closedOffsetPx
-        offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
+        panelHeight.animateTo(
+            if (isOpen) openPanelHeightPx else collapsedPanelHeightPx,
+            animationSpec = MiniMusicMotion.defaultSpatial()
+        )
     }
 
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .offset { IntOffset(0, offsetY.value.roundToInt()) }
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -450,7 +470,8 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
             shadowElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxSize()
+                .height(with(density) { panelHeight.value.toDp() })
+                .clipToBounds()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // One header recipe for both states. The bar grows from the
@@ -471,8 +492,9 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
-                                val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
-                                scope.launch { offsetY.snapTo(newValue) }
+                                val newValue = (panelHeight.value - delta)
+                                    .coerceIn(collapsedPanelHeightPx, openPanelHeightPx)
+                                scope.launch { panelHeight.snapTo(newValue) }
                             },
                             // Let child action pills receive taps; the drawer still
                             // begins dragging as soon as the pointer moves.
@@ -481,7 +503,8 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 val shouldOpen = if (abs(velocity) > 800f) {
                                     velocity < 0f
                                 } else {
-                                    offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
+                                    panelHeight.value >
+                                        (collapsedPanelHeightPx + openPanelHeightPx) / 2f
                                 }
                                 // Only one animator may own the settle: when
                                 // the dragged state actually changes, the
@@ -491,8 +514,8 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 // drag-close look faster than a back-close.
                                 if (shouldOpen == isOpen) {
                                     scope.launch {
-                                        offsetY.animateTo(
-                                            if (shouldOpen) openOffsetPx else closedOffsetPx,
+                                        panelHeight.animateTo(
+                                            if (shouldOpen) openPanelHeightPx else collapsedPanelHeightPx,
                                             animationSpec = MiniMusicMotion.defaultSpatial()
                                         )
                                     }
@@ -573,40 +596,55 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                     }
                 }
 
-                // The list stays composed while the drawer is collapsed: the
-                // panel's own geometry hides it, so closing slides the rows
-                // away with the sheet instead of blanking the surface on the
-                // first frame of the close.
-                QueueDrawerList(
-                    snapshot = snapshot,
-                    artColors = artColors,
-                    onEntryClick = onEntryClick,
-                    onReorderEntry = onReorderEntry,
-                    onRemoveEntry = onRemoveEntry,
-                    locateRequest = locateRequest,
-                    queueTopRequest = queueTopRequest,
-                    openRequest = openRequest,
-                    onTopCloseDrag = { deltaY ->
-                        scope.launch {
-                            offsetY.snapTo((offsetY.value + deltaY).coerceIn(openOffsetPx, closedOffsetPx))
-                        }
-                    },
-                    onTopCloseDragEnd = { totalDistance ->
-                        val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
-                        if (shouldClose) {
-                            // Single owner: the isOpen effect animates the
-                            // sheet closed, this drag only decides the outcome.
-                            onOpenChange(false)
-                        } else {
+                // The list stays composed while the drawer is collapsed, so
+                // closing takes the rows down with the sheet instead of
+                // blanking the surface on the first frame. While collapsed this
+                // box measures zero: the bar and the navigation-bar strip have
+                // already used the panel's whole height.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clipToBounds()
+                ) {
+                    QueueDrawerList(
+                        snapshot = snapshot,
+                        artColors = artColors,
+                        onEntryClick = onEntryClick,
+                        onReorderEntry = onReorderEntry,
+                        onRemoveEntry = onRemoveEntry,
+                        locateRequest = locateRequest,
+                        queueTopRequest = queueTopRequest,
+                        openRequest = openRequest,
+                        onTopCloseDrag = { deltaY ->
                             scope.launch {
-                                offsetY.animateTo(
-                                    openOffsetPx,
-                                    animationSpec = MiniMusicMotion.defaultSpatial()
+                                panelHeight.snapTo(
+                                    (panelHeight.value - deltaY)
+                                        .coerceIn(collapsedPanelHeightPx, openPanelHeightPx)
                                 )
                             }
+                        },
+                        onTopCloseDragEnd = { totalDistance ->
+                            val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
+                            if (shouldClose) {
+                                // Single owner: the isOpen effect animates the
+                                // sheet closed, this drag only decides the
+                                // outcome.
+                                onOpenChange(false)
+                            } else {
+                                scope.launch {
+                                    panelHeight.animateTo(
+                                        openPanelHeightPx,
+                                        animationSpec = MiniMusicMotion.defaultSpatial()
+                                    )
+                                }
+                            }
                         }
-                    }
-                )
+                    )
+                }
+                // Clearance for the system navigation bar, inside the panel and
+                // below the list, in both states.
+                Spacer(modifier = Modifier.height(with(density) { navBarHeightPx.toDp() }))
             }
         }
     }

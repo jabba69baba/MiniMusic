@@ -133,7 +133,6 @@ import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.LandscapeQueueContent
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.QueueDrawer
-import com.example.minimusic.ui.components.LandscapeQueueCollapsedHeight
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.MiniMusicMotion
@@ -1251,21 +1250,19 @@ private fun NowPlayingPanel(
                         Spacer(modifier = Modifier.height(landscapeControlSectionGap))
                         functionBlock(Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
-                        if (landscapeQueueVisible) {
-                            // Reserve the collapsed bar's room in the controls
-                            // column, exactly where the bar itself used to sit.
-                            // The bar is now the queue sheet's own top edge (see
-                            // LandscapeQueueContent), so this keeps the player's
-                            // controls from shifting when it opens.
-                            Spacer(modifier = Modifier.height(LandscapeQueueCollapsedHeight))
+                        if (landscapeQueueVisible && !queueOpen) {
+                            landscapeQueueContent(
+                                false,
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp)
+                                    .height(72.dp)
+                            )
                         }
                     }
-                    if (landscapeQueueVisible) {
-                        // Always composed, in both states: the sheet slides
-                        // between its collapsed bar and the full pane instead of
-                        // being swapped for a separate bar composable.
+                    if (landscapeQueueVisible && queueOpen) {
                         landscapeQueueContent(
-                            queueOpen,
+                            true,
                             Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 8.dp)
