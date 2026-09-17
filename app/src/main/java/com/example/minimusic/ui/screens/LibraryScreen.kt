@@ -117,7 +117,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import com.example.minimusic.ui.components.LocalMiniMusicHaptics
@@ -132,6 +132,7 @@ import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.theme.MiniMusicMotion
+import com.example.minimusic.ui.theme.MiniMusicType
 import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
@@ -929,10 +930,14 @@ private fun SlidingCategoryControl(
                         Text(
                             text = activeCategory.label,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                            style = MiniMusicType.compactLabel.copy(
+                                // Holds the app's own family. This control used
+                                // to override fontFamily to the system SansSerif
+                                // at a one-off 13sp, so the pill alone rendered
+                                // in a different typeface from the rest of the
+                                // app. The filled slot already marks the active
+                                // state, so the label only adds a weight step.
+                                fontWeight = FontWeight.Bold
                             ),
                             modifier = Modifier.width(slotWidth),
                             textAlign = TextAlign.Center,
@@ -954,10 +959,8 @@ private fun SlidingCategoryControl(
                             Text(
                                 text = following(activeCategory).label,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                                    fontWeight = FontWeight.Normal,
-                                    fontSize = 13.sp
+                                style = MiniMusicType.compactLabel.copy(
+                                    fontWeight = FontWeight.Normal
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,

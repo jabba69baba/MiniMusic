@@ -66,6 +66,7 @@ import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.theme.MiniMusicMotion
+import com.example.minimusic.ui.theme.MiniMusicType
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -394,7 +395,12 @@ private fun DetailCard(
                 Text(label, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
                 Text(
                     value,
-                    style = MaterialTheme.typography.bodyMedium,
+                    // Tabular figures across the whole card: duration, sample
+                    // rate, bitrate and file size are a column of values read
+                    // against each other, which is the spec's case for
+                    // monospaced digits. Non-numeric values are unaffected —
+                    // the feature only equalises digit advances.
+                    style = MiniMusicType.tabular(MaterialTheme.typography.bodyMedium),
                     color = scheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,

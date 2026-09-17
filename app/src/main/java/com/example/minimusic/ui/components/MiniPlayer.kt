@@ -184,7 +184,13 @@ fun MiniPlayer(
                                 overflow = TextOverflow.Clip,
                                 modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
                             )
-                            Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = artColors.onPrimaryContainer.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // Emphasis comes from the role, not from a weight
+                            // bolted onto the body scale: the supporting line
+                            // is bodyMedium and stays regular, separated from
+                            // the title by size and color. 80% keeps it visibly
+                            // secondary while clearing the 4.5:1 contrast floor
+                            // the spec sets for small text.
+                            Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, color = artColors.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }

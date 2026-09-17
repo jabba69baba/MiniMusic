@@ -89,8 +89,11 @@ fun SongListItem(
                 )
                 Text(
                     text = song.artist,
+                    // The supporting line keeps its role's own weight: bolding
+                    // it made the artist visually heavier than the title above
+                    // it, which inverts the list's hierarchy. Roles carry the
+                    // hierarchy; the color role marks it as secondary.
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
                     color = if (isPlaying) contentColor.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

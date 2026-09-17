@@ -137,6 +137,7 @@ import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
 import com.example.minimusic.ui.theme.MiniMusicMotion
+import com.example.minimusic.ui.theme.MiniMusicType
 import com.example.minimusic.ui.theme.lerpTo
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -431,7 +432,9 @@ private fun SleepTimerButton(
                     )
                     Text(
                         text = formatRemaining(sleepTimerState.remainingMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        // Counts down once a second: tabular figures keep the
+                        // digits from resizing the chip around them on every tick.
+                        style = MiniMusicType.tabular(MaterialTheme.typography.labelMedium),
                         color = artColors.onPrimaryContainer
                     )
                 }
@@ -589,8 +592,10 @@ private fun SleepTimerSwitchRow(
             Text(
                 text = label,
                 color = if (checked) artColors.onPrimaryContainer else artColors.onSurface,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
+                // The row's own container color reports the switch state, so
+                // the label stays at its role's weight instead of bolding the
+                // body scale to fake the emphasis.
+                style = MaterialTheme.typography.bodyLarge
             )
             Switch(
                 checked = checked,
@@ -754,6 +759,20 @@ private fun VerticalMetadataStrip(
 ) {
     val density = LocalDensity.current
     val windowHeightPx = with(density) { windowHeight.toPx() }
+    // The strip is the app's tightest text box, so its roles are chosen to fit
+    // it rather than the other way round. Portrait gives it 72dp with a 16dp
+    // top padding, which holds headlineSmall (30dp) plus bodyLarge (24dp).
+    // Landscape gives it 48dp with no top padding at all, and those two lines
+    // need 52dp there — the artist line was being clipped by the strip's own
+    // bounds. The supporting line steps down to bodySmall in that box so the
+    // pair fits with room to spare (46dp of 48dp).
+    val compactStrip = windowHeight < 56.dp
+    val titleStyle = MaterialTheme.typography.headlineSmall
+    val artistStyle = if (compactStrip) {
+        MaterialTheme.typography.bodySmall
+    } else {
+        MaterialTheme.typography.bodyLarge
+    }
     val window = remember(focusedIndex, queue.size) {
         if (queue.isEmpty()) {
             IntArray(0)
@@ -783,7 +802,7 @@ private fun VerticalMetadataStrip(
                 ) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = titleStyle,
                         color = artColors.onBackground,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
@@ -805,8 +824,13 @@ private fun VerticalMetadataStrip(
                     )
                     Text(
                         text = song.artist,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = artColors.onPrimaryContainer.copy(alpha = 0.7f),
+                        style = artistStyle,
+                        // Secondary text on a background surface takes the
+                        // surface's own secondary role. The line previously
+                        // mixed a *container* role (onPrimaryContainer) at 70%
+                        // alpha over the background, which is not a pairing the
+                        // palette guarantees contrast for.
+                        color = artColors.onSurfaceVariant,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1076,7 +1100,10 @@ private fun NowPlayingPanel(
                 ) {
                     Text(
                         formatDuration(playbackState.positionMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        // A running playhead is the spec's clock case: tabular
+                        // figures stop the digits counting up from nudging the
+                        // duration off the far edge on every tick.
+                        style = MiniMusicType.tabular(MaterialTheme.typography.labelMedium),
                         color = artColors.onPrimaryContainer
                     )
 
@@ -1108,7 +1135,7 @@ private fun NowPlayingPanel(
 
                     Text(
                         formatDuration(playbackState.durationMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MiniMusicType.tabular(MaterialTheme.typography.labelMedium),
                         color = artColors.onPrimaryContainer
                     )
                 }

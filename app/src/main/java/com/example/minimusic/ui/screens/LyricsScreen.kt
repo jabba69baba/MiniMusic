@@ -150,7 +150,11 @@ fun LyricsScreen(
     }
 
     val artColors = rememberArtColorRoles(playbackState.currentSong?.albumArtUri, albumArtPaletteStyle)
-    val inactiveColor = artColors.onBackground.copy(alpha = 0.42f)
+    // Inactive lines take the background's own secondary role instead of a
+    // 42%-alpha copy of the primary one. De-emphasis by transparency that deep
+    // drops the lines well under the 4.5:1 the spec asks of small text, and
+    // "on surface variant" is the recommended alternative for secondary text.
+    val inactiveColor = artColors.onSurfaceVariant
     val activeColor = artColors.primary
 
     // Single motion owner for this card: one vertical offset drives open
