@@ -131,6 +131,7 @@ import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.LandscapeQueueContent
+import com.example.minimusic.ui.components.LandscapeQueueSlot
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
@@ -361,12 +362,13 @@ fun PlayerScreen(
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
                     onSwipeToMiniplayer = onSwipeToMiniplayer,
-                    landscapeQueueContent = { open, queueModifier ->
+                    landscapeQueueContent = { slot, queueModifier ->
                         LandscapeQueueContent(
                             modifier = queueModifier,
+                            slot = slot,
                             snapshot = queueSnapshot,
                             artColors = artColors,
-                            isOpen = open,
+                            isOpen = queueOpen,
                             onOpenChange = ::setQueueOpen,
                             onEntryClick = onQueueEntryClick,
                             onReorderEntry = onReorderQueue,
@@ -834,7 +836,7 @@ private fun NowPlayingPanel(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onSwipeToMiniplayer: () -> Unit,
-    landscapeQueueContent: @Composable (Boolean, Modifier) -> Unit = { _, _ -> },
+    landscapeQueueContent: @Composable (LandscapeQueueSlot, Modifier) -> Unit = { _, _ -> },
     isLandscape: Boolean = false,
     artworkShadowEnabled: Boolean = true,
     artworkShadowDp: Int = 6,
@@ -1250,9 +1252,13 @@ private fun NowPlayingPanel(
                         Spacer(modifier = Modifier.height(landscapeControlSectionGap))
                         functionBlock(Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
-                        if (landscapeQueueVisible && !queueOpen) {
+                        if (landscapeQueueVisible) {
+                            // The bar keeps its 72dp slot in this column in
+                            // both states, so the player's layout never moves.
+                            // It slides out of that slot and fades while the
+                            // sheet rises over the pane.
                             landscapeQueueContent(
-                                false,
+                                LandscapeQueueSlot.BAR,
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 8.dp)
@@ -1260,9 +1266,9 @@ private fun NowPlayingPanel(
                             )
                         }
                     }
-                    if (landscapeQueueVisible && queueOpen) {
+                    if (landscapeQueueVisible) {
                         landscapeQueueContent(
-                            true,
+                            LandscapeQueueSlot.SHEET,
                             Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 8.dp)

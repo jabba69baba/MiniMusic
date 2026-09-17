@@ -26,7 +26,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SdCard
@@ -245,7 +245,7 @@ fun DetailsScreen(
                             scheme
                         )
                         DetailCard(Icons.Filled.GraphicEq, "Genre", loaded.readOrPending({ it.genre }), scheme)
-                        DetailCard(Icons.Filled.Info, "Year", loaded.readOrPending({ it.year }), scheme)
+                        DetailCard(Icons.Filled.CalendarMonth, "Year", loaded.readOrPending({ it.year }), scheme)
                         DetailCard(
                             Icons.Filled.AudioFile,
                             "Quality",
