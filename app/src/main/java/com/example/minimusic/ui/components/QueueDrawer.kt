@@ -327,6 +327,14 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
         )
     }
 
+    // A new open cycle asks the list to place the current song. This counter
+    // was declared and threaded through but never incremented, so the list's
+    // locate-on-open branch had never once run — the drawer relied entirely on
+    // a one-shot scroll issued while it was being created (see QueueDrawerList).
+    LaunchedEffect(isOpen) {
+        if (isOpen) openRequest++
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -509,6 +517,14 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
             if (isOpen) openPanelHeightPx else collapsedPanelHeightPx,
             animationSpec = MiniMusicMotion.defaultSpatial()
         )
+    }
+
+    // A new open cycle asks the list to place the current song. This counter
+    // was declared and threaded through but never incremented, so the list's
+    // locate-on-open branch had never once run — the drawer relied entirely on
+    // a one-shot scroll issued while it was being created (see QueueDrawerList).
+    LaunchedEffect(isOpen) {
+        if (isOpen) openRequest++
     }
 
 
@@ -738,10 +754,31 @@ private fun ColumnScope.QueueDrawerList(
     val latestOnTopCloseDrag by rememberUpdatedState(onTopCloseDrag)
     val latestOnTopCloseDragEnd by rememberUpdatedState(onTopCloseDragEnd)
     val adapter = remember { PracticalQueueAdapter(context) }
-    var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
+    val latestSnapshot by rememberUpdatedState(snapshot)
     var previousLocateRequest by remember { mutableStateOf(locateRequest) }
     var previousQueueTopRequest by remember { mutableStateOf(queueTopRequest) }
     var previousOpenRequest by remember { mutableStateOf(0) }
+
+    // Pending while the list still owes the current song a placement; set again
+    // by every new open cycle, and on creation because a fresh list always means
+    // a drawer is opening. The placement deliberately waits for a viewport at
+    // least one row tall: the drawer grows its panel frame by frame, so this list
+    // is created with a sliver of space, and a scroll issued then is swallowed by
+    // the next layout — which is why the drawer used to open on the queue's first
+    // row.
+    var locatePending by remember { mutableStateOf(true) }
+    // Rows are laid out 72dp tall in the adapter below.
+    val rowHeightPx = remember(context) { 72f * context.resources.displayMetrics.density }
+
+    fun locateCurrentEntryIfReady(view: RecyclerView) {
+        if (!locatePending || view.height < rowHeightPx) return
+        val layout = view.layoutManager as? LinearLayoutManager ?: return
+        val position = latestSnapshot.resolvedVisiblePosition
+        if (position < 0) return
+        locatePending = false
+        view.stopScroll()
+        layout.scrollToPositionWithOffset(position, 0)
+    }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
     // boundary prevents rows from painting over the Queue title or controls.
@@ -769,14 +806,9 @@ private fun ColumnScope.QueueDrawerList(
                 onTopCloseDrag = latestOnTopCloseDrag,
                 onTopCloseDragEnd = latestOnTopCloseDragEnd
             ).apply {
-                val initialLayout = LinearLayoutManager(viewContext)
-                layoutManager = initialLayout
+                layoutManager = LinearLayoutManager(viewContext)
                 setHasFixedSize(true)
                 setItemViewCacheSize(8)
-                val initialPosition = snapshot.resolvedVisiblePosition
-                if (initialPosition >= 0) {
-                    initialLayout.scrollToPositionWithOffset(initialPosition, 0)
-                }
                 overScrollMode = View.OVER_SCROLL_NEVER
                 clipToPadding = true
                 itemAnimator = DefaultItemAnimator().apply {
@@ -786,6 +818,14 @@ private fun ColumnScope.QueueDrawerList(
                     changeDuration = 140L
                     supportsChangeAnimations = false
                 }
+            }
+            // Scroll to the current song only once this view is tall enough to
+            // hold a row. Asking earlier is what silently failed: with no usable
+            // viewport the layout manager consumes the pending position and lays
+            // out nothing, so the list settles at row 0 and stays there as the
+            // drawer finishes opening.
+            recyclerView.addOnLayoutChangeListener { view, _, top, _, bottom, _, _, _, _ ->
+                if (view is RecyclerView && bottom - top > 0) locateCurrentEntryIfReady(view)
             }
             val touchHelper = ItemTouchHelper(adapter.MoveCallback())
             adapter.startDrag = { holder -> touchHelper.startDrag(holder) }
@@ -801,14 +841,11 @@ private fun ColumnScope.QueueDrawerList(
             if (openRequest != previousOpenRequest) {
                 previousOpenRequest = openRequest
                 recyclerView.stopScroll()
-                recyclerView.post {
-                    recyclerView.stopScroll()
-                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
-                    val currentPosition = snapshot.resolvedVisiblePosition
-                    if (currentPosition >= 0) {
-                        layout.scrollToPositionWithOffset(currentPosition, 0)
-                    }
-                }
+                locatePending = true
+                // If the drawer is already tall enough (a drag-open that has
+                // grown past a row, or a reopen), place it now; otherwise the
+                // layout listener above does it as soon as the panel allows.
+                recyclerView.post { locateCurrentEntryIfReady(recyclerView) }
             }
             if (locateRequest != previousLocateRequest) {
                 previousLocateRequest = locateRequest
