@@ -145,7 +145,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    SONGS("Tracks", Icons.Filled.MusicNote),
+    SONGS("Songs", Icons.Filled.MusicNote),
     ARTISTS("Artists", Icons.Filled.Person),
     ALBUMS("Albums", Icons.Filled.Album)
 }
@@ -399,7 +399,7 @@ fun LibraryScreen(
                                 ) {
                                     Icon(
                                         Icons.Filled.Sort,
-                                        contentDescription = "Sort tracks",
+                                        contentDescription = "Sort songs",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(22.dp)
                                     )
@@ -1389,7 +1389,7 @@ private fun EmptyLibraryState() {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "No tracks found on this device yet.",
+            text = "No songs found on this device yet.",
             style = MaterialTheme.typography.titleMedium
         )
     }

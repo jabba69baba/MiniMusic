@@ -229,7 +229,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Crossfade",
-                        subtitle = "Blend adjacent tracks · not active yet",
+                        subtitle = "Blend adjacent songs · not active yet",
                         checked = settings.crossfadeEnabled,
                         onCheckedChange = onCrossfadeEnabledChange
                     )
@@ -257,7 +257,7 @@ fun SettingsScreen(
                 SettingsSectionHeader("Library", Icons.Filled.LibraryMusic)
                 SettingsGroup {
                     SettingsSliderRow(
-                        title = "Track minimum length",
+                        title = "Song minimum length",
                         subtitle = if (settings.minDurationSeconds == 0) "No minimum" else "${settings.minDurationSeconds} seconds",
                         value = settings.minDurationSeconds.toFloat(),
                         valueRange = 0f..60f,
