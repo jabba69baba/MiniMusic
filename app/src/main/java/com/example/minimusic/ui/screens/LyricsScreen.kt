@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.minimusic.data.PaletteStyle
 import com.example.minimusic.playback.PlaybackUiState
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.LyricsState
@@ -163,10 +164,18 @@ fun LyricsScreen(
     // is no nested AnimatedVisibility: the old triple-drive (route tween +
     // visibility spring + sheet progress) is what made close fall, stick,
     // then slide left, and open pop out of nowhere.
+    // A full-height slide is the most intense motion in the app, so it is the
+    // one the guide's reduced-motion rule is really about: "use subtle fades
+    // instead of intense sliding or scaling animations". With that setting on,
+    // the card rises a short distance and fades instead of travelling the whole
+    // pane, still on the single driver below so neither direction can disagree
+    // with the other.
+    val reducedMotion = LocalMiniMusicReducedMotion.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val fullHeightPx = with(density) { maxHeight.toPx() }
-        val cardOffsetY = remember(fullHeightPx) { Animatable(fullHeightPx) }
-        LaunchedEffect(fullHeightPx) {
+        val closedOffsetPx = if (reducedMotion) fullHeightPx * 0.08f else fullHeightPx
+        val cardOffsetY = remember(closedOffsetPx) { Animatable(closedOffsetPx) }
+        LaunchedEffect(closedOffsetPx) {
             cardOffsetY.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(
@@ -181,7 +190,7 @@ fun LyricsScreen(
                 // Close mirrors open (same duration, same decelerate curve,
                 // reversed direction) so neither feels faster.
                 cardOffsetY.animateTo(
-                    targetValue = fullHeightPx,
+                    targetValue = closedOffsetPx,
                     animationSpec = tween(
                         MiniMusicMotion.navTransitionDurationMillis,
                         easing = MiniMusicMotion.navEnterEasing
@@ -193,7 +202,12 @@ fun LyricsScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = cardOffsetY.value }
+                .graphicsLayer {
+                    translationY = cardOffsetY.value
+                    if (reducedMotion && closedOffsetPx > 0f) {
+                        alpha = (1f - cardOffsetY.value / closedOffsetPx).coerceIn(0f, 1f)
+                    }
+                }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
         ) {
         when (lyricsState) {

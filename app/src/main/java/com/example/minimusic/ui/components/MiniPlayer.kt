@@ -1,8 +1,6 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -159,14 +157,27 @@ fun MiniPlayer(
             ) {
                 // Keyed so a new bitmap never cross-dissolves over the old
                 // tile: the art swaps the instant its request resolves.
+                //
+                // No fades here. The guide is explicit that content should not
+                // be seen partially transparent and overlapping — "fully fade out
+                // content before fading new content in… avoid showing cross faded
+                // content" — which is what the previous fadeIn(180)/fadeOut(120)
+                // pair produced for 120ms on every track change. Both rows now
+                // travel on one axis and one clock, the incoming one arriving as
+                // the outgoing one leaves, which is the same film-strip motion the
+                // full player's artwork and title strips already use
+                // ([MiniMusicMotion.carouselSpatial] — critically damped, so a
+                // rapid skip burst never bounces).
                 AnimatedContent(
                     targetState = song,
                     transitionSpec = {
-                        (fadeIn(tween(180)) + slideInVertically(
-                            initialOffsetY = { trackTransitionDirection * it }, animationSpec = tween(360)
-                        )) togetherWith (fadeOut(tween(120)) + slideOutVertically(
-                            targetOffsetY = { -trackTransitionDirection * it }, animationSpec = tween(260)
-                        ))
+                        slideInVertically(
+                            initialOffsetY = { trackTransitionDirection * it },
+                            animationSpec = MiniMusicMotion.carouselSpatial()
+                        ) togetherWith slideOutVertically(
+                            targetOffsetY = { -trackTransitionDirection * it },
+                            animationSpec = MiniMusicMotion.carouselSpatial()
+                        )
                     },
                     contentKey = { it?.id },
                     label = "miniPlayerTrackSwitch",

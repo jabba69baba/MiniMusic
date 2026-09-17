@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,7 +18,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
@@ -85,7 +85,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -109,7 +108,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -128,9 +126,13 @@ import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.AlbumGridItem
 import com.example.minimusic.ui.components.AlphabetScrollbar
 import com.example.minimusic.ui.components.ArtistListItem
+import com.example.minimusic.ui.components.AlbumGridSkeleton
+import com.example.minimusic.ui.components.ArtistListSkeleton
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.SongListItem
+import com.example.minimusic.ui.components.SongListSkeleton
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.MiniMusicType
 import com.example.minimusic.ui.theme.PillShape
@@ -183,6 +185,7 @@ fun LibraryScreen(
     onRetryLoad: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
+    val reducedMotion = LocalMiniMusicReducedMotion.current
     val view = LocalView.current
     val appNavigationBarColor = MaterialTheme.colorScheme.surface
     DisposableEffect(view, appNavigationBarColor) {
@@ -199,6 +202,16 @@ fun LibraryScreen(
     // only the persistent miniplayer here so navigation space is not counted twice.
     val footerHeight = MiniPlayerReservedHeight
     val filteredSongs = uiState.filteredSongs
+    // Which of the four mutually exclusive states the content area is in. A
+    // skeleton stands in only for content that has never arrived: a rescan of a
+    // populated library keeps the real rows on screen rather than replacing
+    // them with placeholders, so the layout never shifts under the user.
+    val libraryContentState = when {
+        uiState.isLoading && uiState.allSongs.isEmpty() -> LibraryContentState.Loading
+        uiState.loadError != null -> LibraryContentState.Error
+        uiState.allSongs.isEmpty() -> LibraryContentState.Empty
+        else -> LibraryContentState.Ready
+    }
 
     // Handles the one round-trip Android 10+ requires to delete a song this app
     // doesn't own the underlying file for: launch the system confirmation dialog,
@@ -416,37 +429,85 @@ fun LibraryScreen(
                     }
 
                     Box(modifier = Modifier.weight(1f)) {
-                        when {
-                            uiState.isLoading -> LoadingState()
-                            uiState.loadError != null -> LibraryLoadErrorState(
-                                message = uiState.loadError,
-                                onRetry = onRetryLoad
-                            )
-                            uiState.allSongs.isEmpty() -> EmptyLibraryState()
-                            else -> when (selectedTab) {
-                                LibraryTab.SONGS -> SongsTab(
-                                    songs = filteredSongs,
-                                    currentSongId = currentSongId,
-                                    jumpToCurrentRequest = jumpToCurrentRequest,
-                                    stopScrollRequest = stopSongScrollRequest,
-                                    bottomContentPadding = footerHeight,
-                                    onPlaySong = { song -> onPlaySong(song, filteredSongs) },
-                                    onPlayNext = onPlayNext,
-                                    onAddToQueue = onAddToQueue,
-                                    onShufflePlayFrom = { song -> onShufflePlayFrom(song, filteredSongs) },
-                                    onDelete = onDeleteSong,
-                                    onOpenDetails = onOpenDetails
+                        // Skeleton-to-content handoff. This is the one place the
+                        // guide sanctions overlapping fades — "content quickly
+                        // fades in once it's loaded, on top of the skeleton
+                        // loader" — because what overlaps is a placeholder
+                        // standing in for the content, not other content.
+                        Crossfade(
+                            targetState = libraryContentState,
+                            animationSpec = tween(MiniMusicMotion.contentHandoffMillis),
+                            label = "libraryContent"
+                        ) { contentState ->
+                            when (contentState) {
+                                LibraryContentState.Loading -> LibrarySkeleton(
+                                    tab = selectedTab,
+                                    bottomContentPadding = footerHeight
                                 )
-                                LibraryTab.ALBUMS -> AlbumsTab(
-                                    albums = uiState.albums,
-                                    bottomContentPadding = footerHeight,
-                                    onAlbumClick = onAlbumClick
+
+                                LibraryContentState.Error -> LibraryLoadErrorState(
+                                    message = uiState.loadError ?: "",
+                                    onRetry = onRetryLoad
                                 )
-                                LibraryTab.ARTISTS -> ArtistsTab(
-                                    artists = uiState.artists,
-                                    bottomContentPadding = footerHeight,
-                                    onArtistClick = onArtistClick
-                                )
+
+                                LibraryContentState.Empty -> EmptyLibraryState()
+
+                                // The three tabs are peers of one set, so the
+                                // change between them is a *lateral* transition:
+                                // both contents slide in unison along one axis
+                                // with no fade, which reads them as equals and
+                                // hints that the content area is swipeable. A
+                                // fade here would read as a hierarchy move, and
+                                // the jump cut this replaced left the user to
+                                // work out what had changed. The clock is the
+                                // carousel token — critically damped, because a
+                                // full-width slide that settles with an overshoot
+                                // charges for the bounce on every frame.
+                                LibraryContentState.Ready -> AnimatedContent(
+                                    targetState = selectedTab,
+                                    transitionSpec = {
+                                        val direction =
+                                            if (targetState.ordinal > initialState.ordinal) 1 else -1
+                                        if (reducedMotion) {
+                                            fadeIn(MiniMusicMotion.fastEffects()) togetherWith
+                                                fadeOut(MiniMusicMotion.fastEffects())
+                                        } else {
+                                            slideInHorizontally(
+                                                animationSpec = MiniMusicMotion.carouselSpatial()
+                                            ) { width -> direction * width } togetherWith
+                                                slideOutHorizontally(
+                                                    animationSpec = MiniMusicMotion.carouselSpatial()
+                                                ) { width -> -direction * width }
+                                        }
+                                    },
+                                    label = "libraryTabs"
+                                ) { tab ->
+                                    when (tab) {
+                                        LibraryTab.SONGS -> SongsTab(
+                                        songs = filteredSongs,
+                                        currentSongId = currentSongId,
+                                        jumpToCurrentRequest = jumpToCurrentRequest,
+                                        stopScrollRequest = stopSongScrollRequest,
+                                        bottomContentPadding = footerHeight,
+                                        onPlaySong = { song -> onPlaySong(song, filteredSongs) },
+                                        onPlayNext = onPlayNext,
+                                        onAddToQueue = onAddToQueue,
+                                        onShufflePlayFrom = { song -> onShufflePlayFrom(song, filteredSongs) },
+                                        onDelete = onDeleteSong,
+                                        onOpenDetails = onOpenDetails
+                                    )
+                                    LibraryTab.ALBUMS -> AlbumsTab(
+                                        albums = uiState.albums,
+                                        bottomContentPadding = footerHeight,
+                                        onAlbumClick = onAlbumClick
+                                    )
+                                    LibraryTab.ARTISTS -> ArtistsTab(
+                                        artists = uiState.artists,
+                                        bottomContentPadding = footerHeight,
+                                        onArtistClick = onArtistClick
+                                    )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1288,66 +1349,41 @@ private fun SortDirectionOption(
     }
 }
 
-@Composable
-private fun LoadingState() {
-    AnimatedVisibility(
-        visible = true,
-        // Scale-only appear, no fade.
-        enter = scaleIn(initialScale = 0.94f, animationSpec = MiniMusicMotion.selectionEffects()),
-        exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects()),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            M3ExpressiveContainedLoadingIndicator()
-        }
-    }
-}
+/**
+ * The content area's four mutually exclusive states. A skeleton is shown only
+ * for content that has never arrived; anything that has been on screen keeps it.
+ */
+private enum class LibraryContentState { Loading, Error, Empty, Ready }
 
 /**
- * Local spec-matched fallback for the contained M3 Expressive indicator. The
- * project is pinned to Material 3 1.4.0, whose Android artifact does not yet
- * expose ContainedLoadingIndicator, so this keeps the documented 48dp overall
- * footprint, 38dp container, contained color roles, and expressive motion
- * without adding a network dependency or changing the project version.
+ * Skeleton loaders for the library's three tabs, drawn in the shape of the real
+ * rows so the layout is already correct before the scan lands — the guide's
+ * "stable layouts" characteristic, and the reason the spinner (which said
+ * nothing about what was coming) is gone.
+ *
+ * One shared pulse drives every placeholder, so the sweep reads as a single
+ * sheet of light travelling down and to the right rather than as independent
+ * blinking rows.
  */
 @Composable
-private fun M3ExpressiveContainedLoadingIndicator() {
-    val containerColor = MaterialTheme.colorScheme.primaryContainer
-    val indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(
-        label = "libraryLoadingIndicator"
-    )
-    val rotation by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(
-                                durationMillis = 1200,
-                easing = androidx.compose.animation.core.LinearEasing
-            )
-
-        ),
-        label = "libraryLoadingRotation"
-    )
-    Box(
-        modifier = Modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(containerColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(22.dp)) {
-            rotate(rotation) {
-                drawRoundRect(
-                    color = indicatorColor,
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * 0.22f),
-                    size = size
-                )
-            }
+private fun LibrarySkeleton(
+    tab: LibraryTab,
+    bottomContentPadding: androidx.compose.ui.unit.Dp
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (tab) {
+            LibraryTab.SONGS -> SongListSkeleton()
+            LibraryTab.ARTISTS -> ArtistListSkeleton()
+            LibraryTab.ALBUMS -> AlbumGridSkeleton()
         }
+        // Same reserved space the real lists leave, so the mini player never
+        // sits on top of a placeholder that the content will not sit under.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(bottomContentPadding)
+        )
     }
 }
 

@@ -4,6 +4,10 @@ Source studied: **m3.material.io/styles/motion/transitions** — *Applying trans
 *Transition patterns* (fetched 2026-09-18). Everything below is either a quotation of that
 page or a line-anchored observation about this repo at `fc2687e`.
 
+> **Status (2026-09-18):** §3.1, §3.2, §3.3, §3.4, §3.5 (Tier 1), §3.6 and §3.7 are
+> implemented — see `docs/motion-implementation.md` for what changed and what is
+> still open (the container transform in §3.5 Tier 2, and the §3.8 sweep items).
+
 ---
 
 ## 1. What the guide actually asks for

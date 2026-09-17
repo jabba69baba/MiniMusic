@@ -1,17 +1,16 @@
 package com.example.minimusic.ui.navigation
 
 import androidx.compose.animation.EnterTransition
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.CancellationException
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.Composable
@@ -48,6 +48,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import com.example.minimusic.ui.screens.DetailsScreen
 import com.example.minimusic.ui.screens.FilteredSongsScreen
 import com.example.minimusic.ui.screens.LibraryScreen
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.screens.LyricsScreen
 import com.example.minimusic.ui.screens.PlayerScreen
@@ -112,6 +113,10 @@ fun MiniMusicNavGraph(
     val predictiveBackRoute = currentRoute == Routes.SETTINGS ||
         currentRoute == Routes.ALBUM || currentRoute == Routes.ARTIST
     val predictiveBackProgress = remember { Animatable(0f) }
+    // Every transition below branches on this: with reduced motion on, the
+    // guide asks for fades instead of the sliding, so the recipes collapse to
+    // their fade component and keep the same timing.
+    val reducedMotion = LocalMiniMusicReducedMotion.current
 
     PredictiveBackHandler(enabled = predictiveBackRoute) { progress ->
         var completed = false
@@ -260,81 +265,10 @@ fun MiniMusicNavGraph(
                 scaleY = 1f - progress * 0.04f
             }
             .zIndex(3f),
-        enterTransition = {
-            // Shared-axis push, no fade: the entering screen slides in
-            // half-width over the exiting one with a slight scale-up, all on
-            // the decelerate curve. Screens overlap like cards throughout.
-            slideInHorizontally(
-                initialOffsetX = { (it * 0.5f).toInt() },
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            ) + scaleIn(
-                initialScale = 0.92f,
-                transformOrigin = TransformOrigin(0.5f, 0.5f),
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            )
-        },
-        exitTransition = {
-            // Exiting screen holds its pixels (zero-travel slide) while the
-            // entering screen covers it — overlap, never a fade.
-            slideOutHorizontally(
-                targetOffsetX = { 0 },
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navExitEasing
-                )
-            )
-        },
-        popEnterTransition = {
-            if (initialState.destination.route == Routes.SETTINGS) {
-                // Returning from Settings reveals the underlying screen from
-                // left to right; no fade or scale overlap.
-                slideInHorizontally(
-                    initialOffsetX = { -it },
-                    animationSpec = tween(MiniMusicMotion.navTransitionDurationMillis, easing = MiniMusicMotion.navEnterEasing)
-                )
-            } else slideInHorizontally(
-                initialOffsetX = { -(it * 0.25f).toInt() },
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            ) + scaleIn(
-                initialScale = 0.95f,
-                transformOrigin = TransformOrigin(0.5f, 0.5f),
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            )
-        },
-        popExitTransition = {
-            if (initialState.destination.route == Routes.SETTINGS) {
-                // Settings itself leaves toward the right as a card.
-                slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(MiniMusicMotion.navTransitionDurationMillis, easing = MiniMusicMotion.navExitEasing)
-                )
-            } else slideOutHorizontally(
-                targetOffsetX = { (it * 0.5f).toInt() },
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            ) + scaleOut(
-                targetScale = 0.92f,
-                transformOrigin = TransformOrigin(0.5f, 0.5f),
-                animationSpec = tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            )
-        }
+        enterTransition = { pushEnter(reducedMotion) },
+        exitTransition = { pushExit(reducedMotion) },
+        popEnterTransition = { backEnter(reducedMotion) },
+        popExitTransition = { backExit(reducedMotion) }
     ) {
 
         composable(Routes.LIBRARY) {
@@ -342,43 +276,7 @@ fun MiniMusicNavGraph(
         }
 
         composable(
-            route = Routes.SETTINGS,
-            enterTransition = {
-                slideInHorizontally(
-                    initialOffsetX = { it },
-                    animationSpec = tween(
-                        MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navEnterEasing
-                    )
-                )
-            },
-            exitTransition = {
-                slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(
-                        MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navExitEasing
-                    )
-                )
-            },
-            popEnterTransition = {
-                slideInHorizontally(
-                    initialOffsetX = { -it },
-                    animationSpec = tween(
-                        MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navEnterEasing
-                    )
-                )
-            },
-            popExitTransition = {
-                slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(
-                        MiniMusicMotion.navTransitionDurationMillis,
-                        easing = MiniMusicMotion.navExitEasing
-                    )
-                )
-            }
+            route = Routes.SETTINGS
         ) {
             CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
             SettingsScreen(
@@ -644,4 +542,80 @@ fun MiniMusicNavGraph(
             }
         }
     }
+}
+
+/**
+ * Forward and backward navigation, the M3 *"forward and backward"* pattern.
+ *
+ * The guide's rule for this pattern is to use the platform default, and
+ * Android's default is *"a fade as screens slide"*: the screens travel part of
+ * the width so the amount of motion stays small, and the fade carries the rest.
+ * Four things follow from that, and every hierarchy edge in this graph — a
+ * Settings push, an Album push, an Artist push, and their pops — now uses
+ * exactly these two recipes, mirrored, instead of the previous mix of
+ * full-half-width slides, a zero-travel exit hold, and a Settings-only fork
+ * that made *returning from Settings* a different move from *returning from
+ * Album*.
+ *
+ * 1. **Unified direction.** Entering and exiting elements move along one axis
+ *    as a group, the incoming screen travelling further than the outgoing one
+ *    drifts, so the pair reads as a single gesture rather than two independent
+ *    animations.
+ * 2. **Exits accelerate, entries decelerate** — [MiniMusicMotion.navExitEasing]
+ *    for anything leaving, [MiniMusicMotion.navEnterEasing] for anything
+ *    arriving. An exit on the decelerate curve is what makes a dismissal feel
+ *    like it is being dragged rather than released.
+ * 3. **A real fade on the exiting screen.** It used to run a slide with zero
+ *    travel for the full duration purely to stay visible, which is a hold
+ *    dressed up as an animation; the Library layer already sits beneath this
+ *    graph, so the fade dissolves onto it the way the pattern intends.
+ * 4. **Reduced motion collapses to the fade alone**, per the guide's first
+ *    characteristic.
+ */
+private fun pushEnter(reduced: Boolean): EnterTransition {
+    val spec = tween<IntOffset>(
+        MiniMusicMotion.navForwardDurationMillis,
+        easing = MiniMusicMotion.navEnterEasing
+    )
+    val fade = fadeIn(
+        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navEnterEasing)
+    )
+    return if (reduced) fade
+    else fade + slideInHorizontally(animationSpec = spec) { it / 3 }
+}
+
+private fun pushExit(reduced: Boolean): ExitTransition {
+    val spec = tween<IntOffset>(
+        MiniMusicMotion.navForwardDurationMillis,
+        easing = MiniMusicMotion.navExitEasing
+    )
+    val fade = fadeOut(
+        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navExitEasing)
+    )
+    return if (reduced) fade
+    else fade + slideOutHorizontally(animationSpec = spec) { -it / 6 }
+}
+
+private fun backEnter(reduced: Boolean): EnterTransition {
+    val spec = tween<IntOffset>(
+        MiniMusicMotion.navForwardDurationMillis,
+        easing = MiniMusicMotion.navEnterEasing
+    )
+    val fade = fadeIn(
+        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navEnterEasing)
+    )
+    return if (reduced) fade
+    else fade + slideInHorizontally(animationSpec = spec) { -it / 6 }
+}
+
+private fun backExit(reduced: Boolean): ExitTransition {
+    val spec = tween<IntOffset>(
+        MiniMusicMotion.navForwardDurationMillis,
+        easing = MiniMusicMotion.navExitEasing
+    )
+    val fade = fadeOut(
+        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navExitEasing)
+    )
+    return if (reduced) fade
+    else fade + slideOutHorizontally(animationSpec = spec) { it / 3 }
 }

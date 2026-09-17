@@ -90,6 +90,7 @@ import com.example.minimusic.data.model.Song
 import com.example.minimusic.playback.QueueEntry
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -769,6 +770,10 @@ private fun ColumnScope.QueueDrawerList(
     var locatePending by remember { mutableStateOf(true) }
     // Rows are laid out 72dp tall in the adapter below.
     val rowHeightPx = remember(context) { 72f * context.resources.displayMetrics.density }
+    // The glide below is a view-system animation, so it does not follow
+    // Compose's own animation scale; reduced motion has to be honoured here
+    // explicitly. See placeQueueInstantly.
+    val reducedMotion = LocalMiniMusicReducedMotion.current
     // Follows the queue while the drawer is open: a song change re-centres on
     // the new now-playing row, so the drawer stays truthful without the user
     // touching it. Comparing entry ids (not positions) keeps a reorder or a
@@ -869,7 +874,11 @@ private fun ColumnScope.QueueDrawerList(
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
-                        animateQueueScroll(recyclerView, currentPosition, rowHeightPx)
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, currentPosition, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, currentPosition, rowHeightPx)
+                        }
                     }
                 }
             }
@@ -881,7 +890,13 @@ private fun ColumnScope.QueueDrawerList(
                 if (currentPosition >= 0 &&
                     recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE
                 ) {
-                    recyclerView.post { animateQueueScroll(recyclerView, currentPosition, rowHeightPx) }
+                    recyclerView.post {
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, currentPosition, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, currentPosition, rowHeightPx)
+                        }
+                    }
                 }
             }
             if (queueTopRequest != previousQueueTopRequest) {
@@ -891,7 +906,11 @@ private fun ColumnScope.QueueDrawerList(
                     recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     if (adapter.itemCount > 0) {
-                        animateQueueScroll(recyclerView, 0, rowHeightPx)
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, 0, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, 0, rowHeightPx)
+                        }
                     }
                 }
             }
@@ -934,6 +953,29 @@ private fun queueAnchorOffset(
  * played above it and what is coming below. The scroller clamps itself at the
  * list's own ends, so near the top or bottom the glide simply stops flush.
  */
+/**
+ * The reduced-motion counterpart of [animateQueueScroll]: the same destination,
+ * reached without travelling. A RecyclerView smooth scroll is a view-system
+ * animation, so unlike the Compose motion in this drawer it does not follow the
+ * platform's animation scale — without this branch the queue would keep sweeping
+ * across long lists even with reduced motion requested.
+ */
+private fun placeQueueInstantly(
+    recyclerView: RecyclerView,
+    targetPosition: Int,
+    rowHeightPx: Float
+) {
+    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
+    val viewportPx = recyclerView.height - recyclerView.paddingTop - recyclerView.paddingBottom
+    val offset = queueAnchorOffset(
+        viewportPx = viewportPx,
+        rowHeightPx = rowHeightPx,
+        itemCount = recyclerView.adapter?.itemCount ?: 0,
+        position = targetPosition
+    )
+    layout.scrollToPositionWithOffset(targetPosition, offset)
+}
+
 private fun animateQueueScroll(
     recyclerView: RecyclerView,
     targetPosition: Int,

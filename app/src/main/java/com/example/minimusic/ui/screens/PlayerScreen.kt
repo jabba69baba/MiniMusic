@@ -136,6 +136,7 @@ import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.MiniMusicType
 import com.example.minimusic.ui.theme.lerpTo
@@ -913,6 +914,9 @@ private fun NowPlayingPanel(
     // cover and title for a split second" flash on shuffle.
     var renderedQueue by remember { mutableStateOf(queue) }
     var lastQueue by remember { mutableStateOf<List<Song>?>(null) }
+    // With reduced motion on, a track change repositions the strip without
+    // travelling across it — the same destination, reached without the sweep.
+    val reducedMotion = LocalMiniMusicReducedMotion.current
 
     LaunchedEffect(targetIndex, queue) {
         if (queue.isEmpty() || targetIndex !in queue.indices) return@LaunchedEffect
@@ -939,6 +943,7 @@ private fun NowPlayingPanel(
             // (shuffle landing far away, wrap) snap instead of flying across
             // the queue.
             distance > 1.5f -> carouselProgress.snapTo(target)
+            reducedMotion -> carouselProgress.snapTo(target)
             else -> carouselProgress.animateTo(target, MiniMusicMotion.carouselSpatial())
         }
         if (queueChanged) {
@@ -1485,11 +1490,23 @@ private fun PlayPauseButton(
         AnimatedContent(
             targetState = isPlaying,
             transitionSpec = {
-                (androidx.compose.animation.fadeIn(tween(130)) + androidx.compose.animation.scaleIn(
-                    initialScale = 0.82f, animationSpec = MiniMusicMotion.selectionEffects()
-                )) togetherWith (androidx.compose.animation.fadeOut(tween(90)) + androidx.compose.animation.scaleOut(
-                    targetScale = 0.92f, animationSpec = MiniMusicMotion.fastEffects()
-                ))
+                // The icon's alpha and its size are different kinds of property,
+                // so they keep different specs on purpose — alpha is an effects
+                // property and must never overshoot, size is spatial and may —
+                // but both now come from the token file and settle on the
+                // *fast* role together. They previously ran 130ms/90ms raw
+                // tweens against a spring, so the icon finished fading at a
+                // different moment from when it stopped growing.
+                (androidx.compose.animation.fadeIn(MiniMusicMotion.fastEffects()) +
+                    androidx.compose.animation.scaleIn(
+                        initialScale = 0.82f,
+                        animationSpec = MiniMusicMotion.fastSpatial()
+                    )) togetherWith
+                    (androidx.compose.animation.fadeOut(MiniMusicMotion.fastEffects()) +
+                        androidx.compose.animation.scaleOut(
+                            targetScale = 0.92f,
+                            animationSpec = MiniMusicMotion.fastSpatial()
+                        ))
             },
             label = "playPauseMorph"
         ) { playing ->

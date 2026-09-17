@@ -1,6 +1,11 @@
 package com.example.minimusic.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -38,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -191,9 +197,14 @@ fun DetailsScreen(
                     .graphicsLayer {
                         val progress = revealed.value
                         alpha = progress
-                        val scale = 0.92f + 0.08f * progress
-                        scaleX = scale
-                        scaleY = scale
+                        // Android enter/exit expands a component along one axis;
+                        // a uniform scale is the iOS treatment and reads as a
+                        // z-axis move, "which doesn't match M3's reduced
+                        // elevation model". The card therefore opens by growing
+                        // vertically from its centre — same 220ms, same easing,
+                        // same single driver as the scrim — rather than zooming
+                        // up from 92%.
+                        scaleY = 0.94f + 0.06f * progress
                     }
                     // Swallow taps on the card so only the scrim dismisses.
                     .clickable(
@@ -393,6 +404,31 @@ private fun DetailCard(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(label, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
+                // A card whose value is still being read from the file shows the
+                // skeleton pattern in miniature: the placeholder pulses, and the
+                // real value then replaces it. Nothing moves and no spinner
+                // appears — the card is complete from the first frame, it is
+                // only its value that settles. The pulse rides the shared tone
+                // rather than a per-card animation so every pending card breathes
+                // together.
+                val isPending = value == PendingValue
+                val pendingPulse: State<Float>? = if (isPending) {
+                    val transition = rememberInfiniteTransition(label = "detailCardPending")
+                    transition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(
+                                MiniMusicMotion.skeletonPulseMillis,
+                                easing = LinearEasing
+                            ),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "detailCardPendingPulse"
+                    )
+                } else {
+                    null
+                }
                 Text(
                     value,
                     // Tabular figures across the whole card: duration, sample
@@ -404,7 +440,19 @@ private fun DetailCard(
                     color = scheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .then(
+                            if (pendingPulse != null) {
+                                // Read in the graphics layer, so the pulse never
+                                // recomposes the dialog.
+                                Modifier.graphicsLayer {
+                                    alpha = 0.3f + 0.5f * pendingPulse.value
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
                 )
             }
         }
