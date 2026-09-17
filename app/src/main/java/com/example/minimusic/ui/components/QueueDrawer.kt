@@ -600,47 +600,52 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                 // closing takes the rows down with the sheet instead of
                 // blanking the surface on the first frame. While collapsed this
                 // box measures zero: the bar and the navigation-bar strip have
-                // already used the panel's whole height.
+                // already used the panel's whole height, so no row can appear
+                // under the bar.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .clipToBounds()
                 ) {
-                    QueueDrawerList(
-                        snapshot = snapshot,
-                        artColors = artColors,
-                        onEntryClick = onEntryClick,
-                        onReorderEntry = onReorderEntry,
-                        onRemoveEntry = onRemoveEntry,
-                        locateRequest = locateRequest,
-                        queueTopRequest = queueTopRequest,
-                        openRequest = openRequest,
-                        onTopCloseDrag = { deltaY ->
-                            scope.launch {
-                                panelHeight.snapTo(
-                                    (panelHeight.value - deltaY)
-                                        .coerceIn(collapsedPanelHeightPx, openPanelHeightPx)
-                                )
-                            }
-                        },
-                        onTopCloseDragEnd = { totalDistance ->
-                            val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
-                            if (shouldClose) {
-                                // Single owner: the isOpen effect animates the
-                                // sheet closed, this drag only decides the
-                                // outcome.
-                                onOpenChange(false)
-                            } else {
+                    // QueueDrawerList is a ColumnScope extension: the inner
+                    // Column gives it that scope inside the clipping box.
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        QueueDrawerList(
+                            snapshot = snapshot,
+                            artColors = artColors,
+                            onEntryClick = onEntryClick,
+                            onReorderEntry = onReorderEntry,
+                            onRemoveEntry = onRemoveEntry,
+                            locateRequest = locateRequest,
+                            queueTopRequest = queueTopRequest,
+                            openRequest = openRequest,
+                            onTopCloseDrag = { deltaY ->
                                 scope.launch {
-                                    panelHeight.animateTo(
-                                        openPanelHeightPx,
-                                        animationSpec = MiniMusicMotion.defaultSpatial()
+                                    panelHeight.snapTo(
+                                        (panelHeight.value - deltaY)
+                                            .coerceIn(collapsedPanelHeightPx, openPanelHeightPx)
                                     )
                                 }
+                            },
+                            onTopCloseDragEnd = { totalDistance ->
+                                val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
+                                if (shouldClose) {
+                                    // Single owner: the isOpen effect animates
+                                    // the sheet closed, this drag only decides
+                                    // the outcome.
+                                    onOpenChange(false)
+                                } else {
+                                    scope.launch {
+                                        panelHeight.animateTo(
+                                            openPanelHeightPx,
+                                            animationSpec = MiniMusicMotion.defaultSpatial()
+                                        )
+                                    }
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
                 // Clearance for the system navigation bar, inside the panel and
                 // below the list, in both states.
