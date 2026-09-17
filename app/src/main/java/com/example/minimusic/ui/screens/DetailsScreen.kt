@@ -100,7 +100,7 @@ fun DetailsScreen(
     val revealed = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var dismissing by remember { mutableStateOf(false) }
-    val revealSpec = tween(
+    val revealSpec = tween<Float>(
         durationMillis = MiniMusicMotion.dialogDurationMillis,
         easing = MiniMusicMotion.dialogEasing
     )
