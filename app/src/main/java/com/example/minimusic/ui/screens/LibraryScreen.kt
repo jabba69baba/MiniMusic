@@ -21,15 +21,15 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -58,9 +58,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
@@ -68,6 +66,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -105,7 +104,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
@@ -298,16 +296,17 @@ fun LibraryScreen(
                     // one-off action, and it now serves all three tabs — so it
                     // belongs beside Settings in the bar, not squeezed into the
                     // row that has to fit the switcher as well.
+                    //
+                    // The glyph takes no flip. Material's sort icon already
+                    // draws its bars longest-first (18, 12, 6 from the top) —
+                    // the descending stack it should show — so the scaleY = -1
+                    // that used to sit here was mirroring the right icon into a
+                    // bar chart that grows downwards.
                     IconButton(onClick = { sortMenuExpanded = true }) {
                         Icon(
                             Icons.Filled.Sort,
                             contentDescription = "Sort",
-                            tint = MaterialTheme.colorScheme.secondary,
-                            // Flipped vertically: bars now increase downwards
-                            // instead of shortening, which reads as "order"
-                            // rather than the descending stack the stock glyph
-                            // draws.
-                            modifier = Modifier.graphicsLayer { scaleY = -1f }
+                            tint = MaterialTheme.colorScheme.secondary
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
@@ -399,72 +398,54 @@ fun LibraryScreen(
 
                         Spacer(modifier = Modifier.width(16.dp))
 
-                        // Locate and Shuffle: two icon actions in one outlined
-                        // container. Outlined rather than filled so the row has
-                        // exactly one filled shape — the switcher's current
-                        // segment — which is what makes "where I am" read
-                        // differently from "things I can press". Each button
-                        // keeps a full 48dp touch target.
+                        // Locate and Shuffle: two segments of one continuous
+                        // pill — the grouped treatment this row used before the
+                        // switcher redesign. The segments share a container and
+                        // a hairline, with the group's outer corners at a full
+                        // stadium radius and only a small radius where they
+                        // meet, so it reads as one object split in two rather
+                        // than two buttons that happen to be adjacent.
                         Row(
-                            modifier = Modifier
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(50))
-                                .border(
-                                    width = Dp.Hairline,
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(50)
-                                ),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) {
-                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                        stopSongScrollRequest++
-                                        jumpToCurrentRequest++
-                                    },
-                                contentAlignment = Alignment.Center
+                            PillButton(
+                                onClick = {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    stopSongScrollRequest++
+                                    jumpToCurrentRequest++
+                                },
+                                horizontalPadding = 12.dp,
+                                shape = PillGroupShapes.First,
+                                modifier = Modifier.width(ControlSegmentWidth)
                             ) {
                                 Icon(
                                     Icons.Filled.MyLocation,
                                     contentDescription = "Jump to current song",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
-                            Box(
-                                modifier = Modifier
-                                    .width(Dp.Hairline)
-                                    .height(20.dp)
-                                    .background(MaterialTheme.colorScheme.outlineVariant)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null
-                                    ) {
-                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                        // Shuffle changes playback only. Do not
-                                        // cancel an active LazyColumn fling or
-                                        // user drag when the control is tapped.
-                                        if (filteredSongs.isNotEmpty()) {
-                                            val startSong = filteredSongs.random()
-                                            onShufflePlayFrom(startSong, filteredSongs)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
+                            PillButton(
+                                onClick = {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    // Shuffle changes playback only. Do not
+                                    // cancel an active LazyColumn fling or
+                                    // user drag when the control is tapped.
+                                    if (filteredSongs.isNotEmpty()) {
+                                        val startSong = filteredSongs.random()
+                                        onShufflePlayFrom(startSong, filteredSongs)
+                                    }
+                                },
+                                horizontalPadding = 12.dp,
+                                shape = PillGroupShapes.Last,
+                                modifier = Modifier.width(ControlSegmentWidth)
                             ) {
                                 Icon(
                                     Icons.Filled.Shuffle,
                                     contentDescription = "Shuffle",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -995,14 +976,12 @@ private fun BoxScope.ArtistsScrollbarOverlay(
  * The legs animate by **weight** rather than by measured dp. A Row divides its
  * width by weight, so the three legs always add up to the row exactly — no
  * frame can overshoot the container the way independently animated widths can
- * when two legs shrink as one grows. Collapsed legs settle at a little under a
- * third of the row, which keeps them clear of M3's 48dp minimum touch target
- * at any phone width.
+ * when two legs shrink as one grows.
  *
  * Reuses the token file's default spatial spring, so a tap moves the fill and
  * the two labels on the same clock as every other component in the app.
  */
-private const val ExpandedLegWeight = 3.3f
+private val SwitcherCollapsedLegWidth = 48.dp
 
 @Composable
 private fun ExpandingCategoryControl(
@@ -1015,83 +994,156 @@ private fun ExpandingCategoryControl(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier.height(48.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS)
-            tabs.forEachIndexed { index, tab ->
-                val active = tab == selected
-                val weight by animateFloatAsState(
-                    targetValue = if (active) ExpandedLegWeight else 1f,
-                    animationSpec = MiniMusicMotion.defaultSpatial(),
-                    label = "switcherLegWeight"
-                )
-                val legShape = RoundedCornerShape(50)
-                Box(
-                    modifier = Modifier
-                        .weight(weight)
-                        .fillMaxHeight()
-                        .clip(legShape)
-                        .background(
-                            if (active) MaterialTheme.colorScheme.secondaryContainer
-                            else Color.Transparent
-                        )
-                        .clickable {
-                            if (!active) onSelect(tab)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (active) Icons.Filled.Check else tab.icon,
-                            contentDescription = null,
-                            tint = if (active) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+        // The split is measured, not fixed. The two collapsed legs are pinned
+        // at 48dp — M3's minimum touch target — and the selected leg takes
+        // every remaining dp, which is what makes the control read as one bar
+        // filling itself rather than three buttons of drifting size. A fixed
+        // ratio could not promise that: the same 3.3 weight that gives 48/162/
+        // 48 on a 412dp phone squeezes the collapsed legs to 39dp on a 360dp
+        // one, under the target M3 asks for.
+        BoxWithConstraints {
+            val expandedWeight = ((maxWidth - 8.dp) / SwitcherCollapsedLegWidth - 2f)
+                .coerceAtLeast(1f)
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS)
+                tabs.forEachIndexed { index, tab ->
+                    val active = tab == selected
+                    val weight by animateFloatAsState(
+                        targetValue = if (active) expandedWeight else 1f,
+                        animationSpec = MiniMusicMotion.defaultSpatial(),
+                        label = "switcherLegWeight"
+                    )
+                    val legShape = RoundedCornerShape(50)
+                    Box(
+                        modifier = Modifier
+                            .weight(weight)
+                            .fillMaxHeight()
+                            .clip(legShape)
+                            .background(
+                                if (active) MaterialTheme.colorScheme.secondaryContainer
+                                else Color.Transparent
+                            )
+                            .clickable {
+                                if (!active) onSelect(tab)
                             },
-                            modifier = Modifier.size(18.dp)
-                        )
-                        // The label belongs to the expanded leg only. It fades
-                        // rather than popping, and the leg clips its own
-                        // bounds, so a shrinking leg never spills text over its
-                        // neighbour mid-animation.
-                        AnimatedVisibility(
-                            visible = active,
-                            enter = fadeIn(MiniMusicMotion.fastEffects()),
-                            exit = fadeOut(MiniMusicMotion.fastEffects())
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = tab.label,
-                                style = MiniMusicType.compactLabel,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Clip
+                            // The icon is the same in both states. It used to
+                            // swap to a tick on the selected leg, which made
+                            // the segment change identity mid-animation — the
+                            // tab's mark disappeared exactly while the eye was
+                            // following it — and the fill plus the label are
+                            // already unambiguous on their own.
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = null,
+                                tint = if (active) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                            // The label belongs to the expanded leg only. It
+                            // fades rather than popping, and the leg clips its
+                            // own bounds, so a shrinking leg never spills text
+                            // over its neighbour mid-animation.
+                            AnimatedVisibility(
+                                visible = active,
+                                enter = fadeIn(MiniMusicMotion.fastEffects()),
+                                exit = fadeOut(MiniMusicMotion.fastEffects())
+                            ) {
+                                Text(
+                                    text = tab.label,
+                                    style = MiniMusicType.compactLabel,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip
+                                )
+                            }
+                        }
+                        // Hairline separator between legs, hidden wherever it
+                        // would touch the selected segment's filled shape.
+                        if (index > 0 && !active && tabs[index - 1] != selected) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .width(Dp.Hairline)
+                                    .height(20.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant)
                             )
                         }
-                    }
-                    // Hairline separator between legs, hidden wherever it would
-                    // touch the selected segment's filled shape.
-                    if (index > 0 && !active && tabs[index - 1] != selected) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .width(Dp.Hairline)
-                                .height(20.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
-                        )
                     }
                 }
             }
         }
     }
+}
+
+/** Height shared by the segments of the action pill, matched to the switcher
+ *  beside it in the same row so the two controls share a baseline. */
+private val PillButtonHeight = 48.dp
+
+/** Width of a single action-pill segment. Two of these plus the hairline
+ *  between them is the whole group, and 48dp keeps each a full touch target. */
+private val ControlSegmentWidth = 48.dp
+
+/**
+ * A single segment of the Locate/Shuffle pill — segments sit in a row with a
+ * hairline gap between them and per-segment corner shapes (see
+ * [PillGroupShapes]) so the group reads as one continuous pill silhouette,
+ * not a row of fully separate buttons and not one pill with divider lines
+ * drawn inside it.
+ */
+@Composable
+private fun PillButton(
+    onClick: () -> Unit,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
+    shape: androidx.compose.ui.graphics.Shape,
+    modifier: Modifier = Modifier,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.secondaryContainer,
+    content: @Composable RowScope.() -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = containerColor,
+        modifier = modifier.height(PillButtonHeight)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(horizontal = horizontalPadding),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
+        )
+    }
+}
+
+/** Corner shapes for a group of [PillButton]s meant to read as one continuous
+ *  pill split into segments — full stadium radius on the outer side of each
+ *  end segment (a corner size larger than the pill's own height clamps to a
+ *  perfect half-circle). Where two segments meet, a small (not zero) radius on
+ *  both facing corners gives the soft inward curve the design calls for — a
+ *  hard square edge there read as visually disconnected rather than like two
+ *  pieces of one pill. */
+private object PillGroupShapes {
+    private val Full = 50.dp
+    private val Meeting = 5.dp
+    val First = RoundedCornerShape(topStart = Full, topEnd = Meeting, bottomEnd = Meeting, bottomStart = Full)
+    val Last = RoundedCornerShape(topStart = Meeting, topEnd = Full, bottomEnd = Full, bottomStart = Meeting)
 }
 
 private enum class SortField {

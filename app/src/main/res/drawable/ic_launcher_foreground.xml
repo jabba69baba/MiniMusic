@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground: the vinyl artwork, cropped to its tile, with the
+     black frame keyed out. Regenerate with tools/make_icon.py. -->
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_launcher_waveform_foreground"
+    android:src="@drawable/ic_launcher_vinyl_foreground"
     android:gravity="fill" />

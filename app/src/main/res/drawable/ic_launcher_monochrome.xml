@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon layer: the same vinyl as the adaptive icon, reduced to the
+     shape that survives a single-colour mask — disc, groove cuts, spindle.
+     Regenerate with tools/make_icon.py. -->
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_launcher_waveform_foreground"
+    android:src="@drawable/ic_launcher_vinyl_glyph"
     android:gravity="fill" />
