@@ -1108,10 +1108,12 @@ private fun sortFieldOf(order: SongSortOrder): SortField = when (order) {
     SongSortOrder.ALBUM_A_Z, SongSortOrder.ALBUM_Z_A -> SortField.ALBUM
     SongSortOrder.DURATION_SHORTEST, SongSortOrder.DURATION_LONGEST -> SortField.DURATION
     SongSortOrder.DATE_ADDED_NEWEST, SongSortOrder.DATE_ADDED_OLDEST -> SortField.DATE_ADDED
-    // The count fields belong to the artists and albums menus. A song order
-    // cannot express one, so these branches are unreachable — listed to keep
-    // the mapping exhaustive as the field list grows.
-    SortField.SONGS, SortField.ALBUMS -> SortField.NAME
+    // The count fields belong to the artists and albums menus, and a
+    // SongSortOrder cannot express one, so no branch here can ever carry a
+    // count. `else` rather than enumerating the impossible: this `when` is
+    // subject-typed to SongSortOrder, so a SortField branch would be read as an
+    // equality test between two different enums.
+    else -> SortField.NAME
 }
 
 private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = when (field) {
