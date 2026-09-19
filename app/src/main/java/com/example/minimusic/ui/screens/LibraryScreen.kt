@@ -21,6 +21,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -89,6 +89,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -135,10 +136,13 @@ import com.example.minimusic.ui.components.SongListSkeleton
 import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.MiniMusicType
-import com.example.minimusic.ui.theme.PillShape
 import com.example.minimusic.ui.viewmodel.LibraryEvent
 import com.example.minimusic.ui.viewmodel.LibraryUiState
+import com.example.minimusic.ui.viewmodel.AlbumSortOrder
+import com.example.minimusic.ui.viewmodel.ArtistSortOrder
 import com.example.minimusic.ui.viewmodel.SongSortOrder
+import com.example.minimusic.ui.viewmodel.sortAlbums
+import com.example.minimusic.ui.viewmodel.sortArtists
 import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -186,6 +190,19 @@ fun LibraryScreen(
 ) {
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     val reducedMotion = LocalMiniMusicReducedMotion.current
+    // Each tab carries its own order, so switching tabs never silently reorders
+    // a list the user has already arranged. Songs' order lives in the view
+    // model (it is applied to the filtered list there); these two are applied
+    // here because the artists and albums lists are what this screen renders.
+    var artistSortOrder by remember { mutableStateOf(ArtistSortOrder.NAME_A_Z) }
+    var albumSortOrder by remember { mutableStateOf(AlbumSortOrder.TITLE_A_Z) }
+    val sortedArtists = remember(uiState.artists, artistSortOrder) {
+        sortArtists(uiState.artists, artistSortOrder)
+    }
+    val sortedAlbums = remember(uiState.albums, albumSortOrder) {
+        sortAlbums(uiState.albums, albumSortOrder)
+    }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val view = LocalView.current
     val appNavigationBarColor = MaterialTheme.colorScheme.surface
     DisposableEffect(view, appNavigationBarColor) {
@@ -275,12 +292,31 @@ fun LibraryScreen(
                     // primary, which read as too loud for a page title.
                     color = MaterialTheme.colorScheme.secondary
                 )
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Sort moved up here from the tab row. Sorting is a
+                    // preference about how a list is shown rather than a
+                    // one-off action, and it now serves all three tabs — so it
+                    // belongs beside Settings in the bar, not squeezed into the
+                    // row that has to fit the switcher as well.
+                    IconButton(onClick = { sortMenuExpanded = true }) {
+                        Icon(
+                            Icons.Filled.Sort,
+                            contentDescription = "Sort",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            // Flipped vertically: bars now increase downwards
+                            // instead of shortening, which reads as "order"
+                            // rather than the descending stack the stock glyph
+                            // draws.
+                            modifier = Modifier.graphicsLayer { scaleY = -1f }
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
             }
 
@@ -318,9 +354,13 @@ fun LibraryScreen(
 
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
             var stopSongScrollRequest by remember { mutableStateOf(0) }
-            var sortMenuExpanded by remember { mutableStateOf(false) }
-    val hapticView = LocalView.current
-    val hapticsEnabled = LocalMiniMusicHaptics.current
+            // sortMenuExpanded belongs to the screen, not to this drawer: the
+            // button that opens the menu now lives up in the app bar, outside
+            // this scope. Declaring a second one here would shadow the outer
+            // state and leave the app-bar button able to set a value nothing
+            // reads.
+            val hapticView = LocalView.current
+            val hapticsEnabled = LocalMiniMusicHaptics.current
 
             // One continuous drawer, rounded only at the top: the selector/
             // controls row and the song list beneath it share the same
@@ -339,50 +379,76 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        SlidingCategoryControl(
+                        // The switcher takes every dp the action pill does not
+                        // need. It is the primary control in this row — it
+                        // changes what the whole screen below is showing —
+                        // while Locate and Shuffle are one-off taps, so the
+                        // layout gives the width to the thing that is used
+                        // most and lets the buttons sit at their natural size
+                        // instead of stretching to fill a fixed slot.
+                        ExpandingCategoryControl(
                             selected = selectedTab,
-                            onSelectNext = {
+                            onSelect = { tab ->
                                 if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                selectedTab = when (selectedTab) {
-                                    LibraryTab.SONGS -> LibraryTab.ARTISTS
-                                    LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-                                    LibraryTab.ALBUMS -> LibraryTab.SONGS
-                                }
-                            }
+                                selectedTab = tab
+                            },
+                            modifier = Modifier.weight(1f)
                         )
 
-                        // Right controls: Locate, Shuffle, Sort — three
-                        // segments of one continuous pill silhouette, same
-                        // shape/height treatment as the left selector, but a
-                        // more neutral fill: these are one-off action taps,
-                        // not a persistent view-state toggle like the left
-                        // selector, so they shouldn't carry the same
-                        // saturated accent tone.
-                        Box {
-                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                PillButton(
-                                    onClick = {
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Locate and Shuffle: two icon actions in one outlined
+                        // container. Outlined rather than filled so the row has
+                        // exactly one filled shape — the switcher's current
+                        // segment — which is what makes "where I am" read
+                        // differently from "things I can press". Each button
+                        // keeps a full 48dp touch target.
+                        Row(
+                            modifier = Modifier
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(50))
+                                .border(
+                                    width = Dp.Hairline,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(50)
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
                                         if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                         stopSongScrollRequest++
                                         jumpToCurrentRequest++
                                     },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.First,
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.MyLocation,
-                                        contentDescription = "Jump to current song",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                PillButton(
-                                    onClick = {
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.MyLocation,
+                                    contentDescription = "Jump to current song",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .width(Dp.Hairline)
+                                    .height(20.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
                                         if (hapticsEnabled) hapticView.performMiniMusicHaptic()
                                         // Shuffle changes playback only. Do not
                                         // cancel an active LazyColumn fling or
@@ -392,41 +458,29 @@ fun LibraryScreen(
                                             onShufflePlayFrom(startSong, filteredSongs)
                                         }
                                     },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Middle,
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Shuffle,
-                                        contentDescription = "Shuffle",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                PillButton(
-                                    onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); sortMenuExpanded = true },
-                                    horizontalPadding = 12.dp,
-                                    shape = PillGroupShapes.Last,
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    modifier = Modifier.width(ControlSegmentWidth)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Sort,
-                                        contentDescription = "Sort songs",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.Shuffle,
+                                    contentDescription = "Shuffle",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
-                            SortMenu(
-                                expanded = sortMenuExpanded,
-                                selected = uiState.sortOrder,
-                                onDismiss = { sortMenuExpanded = false },
-                                onSelect = { onSortOrderChange(it) }
-                            )
                         }
                     }
+
+                    CategorySortMenu(
+                        expanded = sortMenuExpanded,
+                        tab = selectedTab,
+                        songSortOrder = uiState.sortOrder,
+                        artistSortOrder = artistSortOrder,
+                        albumSortOrder = albumSortOrder,
+                        onDismiss = { sortMenuExpanded = false },
+                        onSongSort = onSortOrderChange,
+                        onArtistSort = { artistSortOrder = it },
+                        onAlbumSort = { albumSortOrder = it }
+                    )
 
                     Box(modifier = Modifier.weight(1f)) {
                         // Skeleton-to-content handoff. This is the one place the
@@ -497,12 +551,12 @@ fun LibraryScreen(
                                         onOpenDetails = onOpenDetails
                                     )
                                     LibraryTab.ALBUMS -> AlbumsTab(
-                                        albums = uiState.albums,
+                                        albums = sortedAlbums,
                                         bottomContentPadding = footerHeight,
                                         onAlbumClick = onAlbumClick
                                     )
                                     LibraryTab.ARTISTS -> ArtistsTab(
-                                        artists = uiState.artists,
+                                        artists = sortedArtists,
                                         bottomContentPadding = footerHeight,
                                         onArtistClick = onArtistClick
                                     )
@@ -928,107 +982,111 @@ private fun BoxScope.ArtistsScrollbarOverlay(
     )
 }
 
-/** Fixed height shared by every [PillButton] segment across both control
- *  groups — without this, a segment with a text label (taller intrinsic
- *  line-height) and an icon-only segment can each size their own Row
- *  slightly differently even with identical vertical padding, which is
- *  exactly what made the Songs/chevron pill and the Shuffle/Locate/Sort
- *  pill sit at visibly different heights before. */
-private val PillButtonHeight = 44.dp
+/**
+ * The Songs / Artists / Albums switcher.
+ *
+ * All three destinations are on screen at once, and the selected one expands
+ * to carry its label while the other two sit as icons — so the width of a leg
+ * *is* the selection state, nothing is hidden behind a cycle, and every option
+ * is one tap away from wherever you are. The previous control showed two of
+ * three slots and only ever cycled forward, which meant Albums did not exist
+ * until you tapped once and going back a step cost two taps.
+ *
+ * The legs animate by **weight** rather than by measured dp. A Row divides its
+ * width by weight, so the three legs always add up to the row exactly — no
+ * frame can overshoot the container the way independently animated widths can
+ * when two legs shrink as one grows. Collapsed legs settle at a little under a
+ * third of the row, which keeps them clear of M3's 48dp minimum touch target
+ * at any phone width.
+ *
+ * Reuses the token file's default spatial spring, so a tap moves the fill and
+ * the two labels on the same clock as every other component in the app.
+ */
+private const val ExpandedLegWeight = 3.3f
 
 @Composable
-private fun SlidingCategoryControl(
+private fun ExpandingCategoryControl(
     selected: LibraryTab,
-    onSelectNext: () -> Unit
+    onSelect: (LibraryTab) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val slotWidth = 67.dp
-    val nextInteraction = remember { MutableInteractionSource() }
-
-    fun following(category: LibraryTab) = when (category) {
-        LibraryTab.SONGS -> LibraryTab.ARTISTS
-        LibraryTab.ARTISTS -> LibraryTab.ALBUMS
-        LibraryTab.ALBUMS -> LibraryTab.SONGS
-    }
-
     Surface(
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.background,
-        tonalElevation = 0.dp,
-        modifier = Modifier.width(142.dp).height(48.dp)
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.height(48.dp)
     ) {
-        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(50))) {
-            // The highlight stays anchored to the active left slot. Only the
-            // labels move, so the control remains a stable two-slot pill.
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier
-                    .padding(4.dp)
-                    .width(slotWidth)
-                    .fillMaxHeight()
-            ) {}
-
-            Box(
-                modifier = Modifier.padding(4.dp).fillMaxSize().clipToBounds()
-            ) {
-                AnimatedContent(
-                    targetState = selected,
-                    transitionSpec = {
-                        slideInHorizontally(
-                            initialOffsetX = { it },
-                            animationSpec = MiniMusicMotion.fastSpatial()
-                        ) togetherWith slideOutHorizontally(
-                            targetOffsetX = { -it },
-                            animationSpec = MiniMusicMotion.fastSpatial()
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS)
+            tabs.forEachIndexed { index, tab ->
+                val active = tab == selected
+                val weight by animateFloatAsState(
+                    targetValue = if (active) ExpandedLegWeight else 1f,
+                    animationSpec = MiniMusicMotion.defaultSpatial(),
+                    label = "switcherLegWeight"
+                )
+                val legShape = RoundedCornerShape(50)
+                Box(
+                    modifier = Modifier
+                        .weight(weight)
+                        .fillMaxHeight()
+                        .clip(legShape)
+                        .background(
+                            if (active) MaterialTheme.colorScheme.secondaryContainer
+                            else Color.Transparent
                         )
-                    },
-                    label = "categoryReel"
-                ) { activeCategory ->
+                        .clickable {
+                            if (!active) onSelect(tab)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = activeCategory.label,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            style = MiniMusicType.compactLabel.copy(
-                                // Holds the app's own family. This control used
-                                // to override fontFamily to the system SansSerif
-                                // at a one-off 13sp, so the pill alone rendered
-                                // in a different typeface from the rest of the
-                                // app. The filled slot already marks the active
-                                // state, so the label only adds a weight step.
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.width(slotWidth),
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip
+                        Icon(
+                            imageVector = if (active) Icons.Filled.Check else tab.icon,
+                            contentDescription = null,
+                            tint = if (active) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(18.dp)
                         )
-
-                        Box(
-                            modifier = Modifier
-                                .width(slotWidth)
-                                .fillMaxHeight()
-                                .clickable(
-                                    interactionSource = nextInteraction,
-                                    indication = null,
-                                    onClick = onSelectNext
-                                ),
-                            contentAlignment = Alignment.Center
+                        // The label belongs to the expanded leg only. It fades
+                        // rather than popping, and the leg clips its own
+                        // bounds, so a shrinking leg never spills text over its
+                        // neighbour mid-animation.
+                        AnimatedVisibility(
+                            visible = active,
+                            enter = fadeIn(MiniMusicMotion.fastEffects()),
+                            exit = fadeOut(MiniMusicMotion.fastEffects())
                         ) {
                             Text(
-                                text = following(activeCategory).label,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MiniMusicType.compactLabel.copy(
-                                    fontWeight = FontWeight.Normal
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
+                                text = tab.label,
+                                style = MiniMusicType.compactLabel,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 maxLines = 1,
+                                softWrap = false,
                                 overflow = TextOverflow.Clip
                             )
                         }
+                    }
+                    // Hairline separator between legs, hidden wherever it would
+                    // touch the selected segment's filled shape.
+                    if (index > 0 && !active && tabs[index - 1] != selected) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .width(Dp.Hairline)
+                                .height(20.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
                     }
                 }
             }
@@ -1036,64 +1094,12 @@ private fun SlidingCategoryControl(
     }
 }
 
-/** Fixed width for the complete Songs/Artists/Albums selector pill so
- *  switching labels never changes the control’s footprint. */
-private val SelectorPillWidth = 142.dp
-private val ControlSegmentWidth = 46.dp
-
-/**
- * A single segment of a multi-part pill control — several of these sit in a
- * row with a hairline gap between them and per-segment corner shapes (see
- * [PillGroupShapes]) so the group reads as one continuous pill silhouette,
- * not a row of fully separate buttons and not one pill with divider lines
- * drawn inside it. Used for both the Songs/Artists/Albums selector and the
- * Shuffle/Locate/Sort controls, so every segment across both groups shares
- * the same height, fill color, and content weight.
- */
-@Composable
-private fun PillButton(
-    onClick: () -> Unit,
-    horizontalPadding: androidx.compose.ui.unit.Dp,
-    shape: androidx.compose.ui.graphics.Shape,
-    modifier: Modifier = Modifier,
-    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.secondaryContainer,
-    content: @Composable RowScope.() -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = shape,
-        color = containerColor,
-        modifier = modifier.height(PillButtonHeight)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(horizontal = horizontalPadding),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-            content = content
-        )
-    }
-}
-
-/** Corner shapes for a group of [PillButton]s meant to read as one
- *  continuous pill split into segments — full stadium radius (a corner
- *  size larger than the pill's own height always clamps to a perfect
- *  half-circle) on the outer side of each end segment. Where two segments
- *  meet, a small (not zero) radius on both facing corners gives the soft
- *  inward curve the design calls for — a hard square edge there read as
- *  visually disconnected rather than like two pieces of one pill. */
-private object PillGroupShapes {
-    private val Full = 50.dp
-    private val Meeting = 5.dp
-    val First = RoundedCornerShape(topStart = Full, topEnd = Meeting, bottomEnd = Meeting, bottomStart = Full)
-    val Middle = RoundedCornerShape(Meeting)
-    val Last = RoundedCornerShape(topStart = Meeting, topEnd = Full, bottomEnd = Full, bottomStart = Meeting)
-}
-
 private enum class SortField {
-    NAME, ARTIST, ALBUM, DURATION, DATE_ADDED
+    NAME, ARTIST, ALBUM, DURATION, DATE_ADDED,
+    /** Row count — used by the artists and albums menus. */
+    SONGS,
+    /** Album count — artists only. */
+    ALBUMS
 }
 
 private fun sortFieldOf(order: SongSortOrder): SortField = when (order) {
@@ -1102,6 +1108,10 @@ private fun sortFieldOf(order: SongSortOrder): SortField = when (order) {
     SongSortOrder.ALBUM_A_Z, SongSortOrder.ALBUM_Z_A -> SortField.ALBUM
     SongSortOrder.DURATION_SHORTEST, SongSortOrder.DURATION_LONGEST -> SortField.DURATION
     SongSortOrder.DATE_ADDED_NEWEST, SongSortOrder.DATE_ADDED_OLDEST -> SortField.DATE_ADDED
+    // The count fields belong to the artists and albums menus. A song order
+    // cannot express one, so these branches are unreachable — listed to keep
+    // the mapping exhaustive as the field list grows.
+    SortField.SONGS, SortField.ALBUMS -> SortField.NAME
 }
 
 private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = when (field) {
@@ -1110,131 +1120,120 @@ private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = w
     SortField.ALBUM -> if (ascending) SongSortOrder.ALBUM_A_Z else SongSortOrder.ALBUM_Z_A
     SortField.DURATION -> if (ascending) SongSortOrder.DURATION_SHORTEST else SongSortOrder.DURATION_LONGEST
     SortField.DATE_ADDED -> if (ascending) SongSortOrder.DATE_ADDED_OLDEST else SongSortOrder.DATE_ADDED_NEWEST
+    // Unreachable from the songs menu (see sortFieldOf); a song list has no
+    // row count of its own to sort by, so these fall back to title order.
+    SortField.SONGS, SortField.ALBUMS ->
+        if (ascending) SongSortOrder.NAME_A_Z else SongSortOrder.NAME_Z_A
 }
 
+/**
+ * The sort sheet, for whichever of the three tabs is showing.
+ *
+ * Each tab gets the fields its rows can actually be judged by: a song by its
+ * title, artist, album, date added or length; an **artist** by name or by the
+ * two counts its row already prints; an **album** by title, artist or song
+ * count. One menu serves all three so the control behaves identically wherever
+ * it is opened, and the direction pill keeps its meaning (ascending = A-first
+ * for text, smallest-first for counts).
+ */
 @Composable
-private fun LibraryTabMenu(
+private fun CategorySortMenu(
     expanded: Boolean,
-    selected: LibraryTab,
+    tab: LibraryTab,
+    songSortOrder: SongSortOrder,
+    artistSortOrder: ArtistSortOrder,
+    albumSortOrder: AlbumSortOrder,
     onDismiss: () -> Unit,
-    onSelect: (LibraryTab) -> Unit
+    onSongSort: (SongSortOrder) -> Unit,
+    onArtistSort: (ArtistSortOrder) -> Unit,
+    onAlbumSort: (AlbumSortOrder) -> Unit
 ) {
     if (!expanded) return
-    val tabs = listOf(
-        LibraryTab.SONGS,
-        LibraryTab.ARTISTS,
-        LibraryTab.ALBUMS
-    )
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        modifier = Modifier.width(SelectorPillWidth)
-    ) {
-        tabs.forEach { tab ->
-            val selectedRow = selected == tab
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = tab.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = null,
-                        tint = if (selectedRow) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                },
-                trailingIcon = {
-                    if (selectedRow) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = androidx.compose.material3.MenuDefaults.itemColors(
-                    textColor = if (selectedRow) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    leadingIconColor = if (selectedRow) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    trailingIconColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier.background(
-                    if (selectedRow) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                ),
-                onClick = {
-                    onSelect(tab)
-                    onDismiss()
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SortMenu(
-    expanded: Boolean,
-    selected: SongSortOrder,
-    onDismiss: () -> Unit,
-    onSelect: (SongSortOrder) -> Unit
-) {
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
-    if (!expanded) return
-    var selectedField by remember(selected) { mutableStateOf(sortFieldOf(selected)) }
-    var ascending by remember(selected) {
-        mutableStateOf(
-            selected in setOf(
-                SongSortOrder.NAME_A_Z,
-                SongSortOrder.ARTIST_A_Z,
-                SongSortOrder.ALBUM_A_Z,
-                SongSortOrder.DURATION_SHORTEST,
-                SongSortOrder.DATE_ADDED_OLDEST
-            )
+
+    // Which row is highlighted, per tab.
+    val selectedField: SortField = when (tab) {
+        LibraryTab.SONGS -> sortFieldOf(songSortOrder)
+        LibraryTab.ARTISTS -> when (artistSortOrder) {
+            ArtistSortOrder.NAME_A_Z, ArtistSortOrder.NAME_Z_A -> SortField.NAME
+            ArtistSortOrder.SONGS_MOST, ArtistSortOrder.SONGS_FEWEST -> SortField.SONGS
+            ArtistSortOrder.ALBUMS_MOST, ArtistSortOrder.ALBUMS_FEWEST -> SortField.ALBUMS
+        }
+        LibraryTab.ALBUMS -> when (albumSortOrder) {
+            AlbumSortOrder.TITLE_A_Z, AlbumSortOrder.TITLE_Z_A -> SortField.NAME
+            AlbumSortOrder.ARTIST_A_Z, AlbumSortOrder.ARTIST_Z_A -> SortField.ARTIST
+            AlbumSortOrder.SONGS_MOST, AlbumSortOrder.SONGS_FEWEST -> SortField.SONGS
+        }
+    }
+    val ascending = when (tab) {
+        LibraryTab.SONGS -> songSortOrder in setOf(
+            SongSortOrder.NAME_A_Z,
+            SongSortOrder.ARTIST_A_Z,
+            SongSortOrder.ALBUM_A_Z,
+            SongSortOrder.DURATION_SHORTEST,
+            SongSortOrder.DATE_ADDED_OLDEST
+        )
+        LibraryTab.ARTISTS -> artistSortOrder in setOf(
+            ArtistSortOrder.NAME_A_Z,
+            ArtistSortOrder.SONGS_FEWEST,
+            ArtistSortOrder.ALBUMS_FEWEST
+        )
+        LibraryTab.ALBUMS -> albumSortOrder in setOf(
+            AlbumSortOrder.TITLE_A_Z,
+            AlbumSortOrder.ARTIST_A_Z,
+            AlbumSortOrder.SONGS_FEWEST
         )
     }
-    val fields = listOf(
-        SortField.NAME to "Title",
-        SortField.ARTIST to "Artist",
-        SortField.ALBUM to "Album",
-        SortField.DATE_ADDED to "Date added",
-        SortField.DURATION to "Duration"
-    )
+
+    fun apply(field: SortField, asc: Boolean) {
+        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+        when (tab) {
+            LibraryTab.SONGS -> onSongSort(sortOrderOf(field, asc))
+            LibraryTab.ARTISTS -> onArtistSort(artistSortOrderOf(field, asc))
+            LibraryTab.ALBUMS -> onAlbumSort(albumSortOrderOf(field, asc))
+        }
+    }
+
+    val fields = when (tab) {
+        LibraryTab.SONGS -> listOf(
+            SortField.NAME to "Title",
+            SortField.ARTIST to "Artist",
+            SortField.ALBUM to "Album",
+            SortField.DATE_ADDED to "Date added",
+            SortField.DURATION to "Duration"
+        )
+        LibraryTab.ARTISTS -> listOf(
+            SortField.NAME to "Name",
+            SortField.SONGS to "Songs",
+            SortField.ALBUMS to "Albums"
+        )
+        LibraryTab.ALBUMS -> listOf(
+            SortField.NAME to "Title",
+            SortField.ARTIST to "Artist",
+            SortField.SONGS to "Songs"
+        )
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        title = { Text("Sort by") },
+        title = {
+            Text(
+                when (tab) {
+                    LibraryTab.SONGS -> "Sort songs"
+                    LibraryTab.ARTISTS -> "Sort artists"
+                    LibraryTab.ALBUMS -> "Sort albums"
+                }
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SortDirectionPill(
                     ascending = ascending,
-                    onAscending = {
-                        ascending = true
-                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                        onSelect(sortOrderOf(selectedField, true))
-                    },
-                    onDescending = {
-                        ascending = false
-                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                        onSelect(sortOrderOf(selectedField, false))
-                    }
+                    onAscending = { apply(selectedField, true) },
+                    onDescending = { apply(selectedField, false) }
                 )
                 fields.forEach { (field, label) ->
                     val selectedFieldRow = selectedField == field
@@ -1242,11 +1241,7 @@ private fun SortMenu(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable {
-                                selectedField = field
-                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                onSelect(sortOrderOf(field, ascending))
-                            },
+                            .clickable { apply(field, ascending) },
                         shape = RoundedCornerShape(16.dp),
                         color = if (selectedFieldRow) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -1270,11 +1265,7 @@ private fun SortMenu(
                             )
                             RadioButton(
                                 selected = selectedFieldRow,
-                                onClick = {
-                                    selectedField = field
-                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                onSelect(sortOrderOf(field, ascending))
-                                }
+                                onClick = { apply(field, ascending) }
                             )
                         }
                     }
@@ -1284,6 +1275,25 @@ private fun SortMenu(
         confirmButton = {},
         dismissButton = {}
     )
+}
+
+/** Artists share fields with songs where the names line up; counts run "most" first when descending. */
+private fun artistSortOrderOf(field: SortField, ascending: Boolean): ArtistSortOrder = when (field) {
+    SortField.NAME -> if (ascending) ArtistSortOrder.NAME_A_Z else ArtistSortOrder.NAME_Z_A
+    SortField.SONGS -> if (ascending) ArtistSortOrder.SONGS_FEWEST else ArtistSortOrder.SONGS_MOST
+    SortField.ALBUMS -> if (ascending) ArtistSortOrder.ALBUMS_FEWEST else ArtistSortOrder.ALBUMS_MOST
+    // Fields an artist cannot be sorted by; unreachable from the artists menu.
+    SortField.ARTIST, SortField.ALBUM, SortField.DURATION, SortField.DATE_ADDED ->
+        if (ascending) ArtistSortOrder.NAME_A_Z else ArtistSortOrder.NAME_Z_A
+}
+
+private fun albumSortOrderOf(field: SortField, ascending: Boolean): AlbumSortOrder = when (field) {
+    SortField.NAME -> if (ascending) AlbumSortOrder.TITLE_A_Z else AlbumSortOrder.TITLE_Z_A
+    SortField.ARTIST -> if (ascending) AlbumSortOrder.ARTIST_A_Z else AlbumSortOrder.ARTIST_Z_A
+    SortField.SONGS -> if (ascending) AlbumSortOrder.SONGS_FEWEST else AlbumSortOrder.SONGS_MOST
+    // Fields an album cannot be sorted by; unreachable from the albums menu.
+    SortField.ALBUM, SortField.DURATION, SortField.DATE_ADDED, SortField.ALBUMS ->
+        if (ascending) AlbumSortOrder.TITLE_A_Z else AlbumSortOrder.TITLE_Z_A
 }
 
 @Composable

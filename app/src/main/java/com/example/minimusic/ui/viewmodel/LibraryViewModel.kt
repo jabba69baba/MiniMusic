@@ -36,6 +36,66 @@ enum class SongSortOrder {
     DATE_ADDED_NEWEST, DATE_ADDED_OLDEST
 }
 
+/**
+ * Sort order applied to the Artists tab's list.
+ *
+ * The three tabs are peers of one set, so each carries its own order rather
+ * than only Songs being sortable. Every order here is meaningful to an artist
+ * row: its name, or the two counts the row already displays.
+ */
+enum class ArtistSortOrder {
+    NAME_A_Z, NAME_Z_A,
+    SONGS_MOST, SONGS_FEWEST,
+    ALBUMS_MOST, ALBUMS_FEWEST
+}
+
+/**
+ * Sort order applied to the Albums tab's list. As with
+ * [ArtistSortOrder], the options are the ones an album row can actually be
+ * judged by: its title, its artist, or how many songs it holds.
+ */
+enum class AlbumSortOrder {
+    TITLE_A_Z, TITLE_Z_A,
+    ARTIST_A_Z, ARTIST_Z_A,
+    SONGS_MOST, SONGS_FEWEST
+}
+
+/** Applies an [ArtistSortOrder] to the artists list. */
+fun sortArtists(artists: List<Artist>, order: ArtistSortOrder): List<Artist> = when (order) {
+    ArtistSortOrder.NAME_A_Z -> artists.sortedBy { it.name.lowercase() }
+    ArtistSortOrder.NAME_Z_A -> artists.sortedByDescending { it.name.lowercase() }
+    ArtistSortOrder.SONGS_MOST -> artists.sortedWith(
+        compareByDescending<Artist> { it.songCount }.thenBy { it.name.lowercase() }
+    )
+    ArtistSortOrder.SONGS_FEWEST -> artists.sortedWith(
+        compareBy<Artist> { it.songCount }.thenBy { it.name.lowercase() }
+    )
+    ArtistSortOrder.ALBUMS_MOST -> artists.sortedWith(
+        compareByDescending<Artist> { it.albumCount }.thenBy { it.name.lowercase() }
+    )
+    ArtistSortOrder.ALBUMS_FEWEST -> artists.sortedWith(
+        compareBy<Artist> { it.albumCount }.thenBy { it.name.lowercase() }
+    )
+}
+
+/** Applies an [AlbumSortOrder] to the albums list. */
+fun sortAlbums(albums: List<Album>, order: AlbumSortOrder): List<Album> = when (order) {
+    AlbumSortOrder.TITLE_A_Z -> albums.sortedBy { it.title.lowercase() }
+    AlbumSortOrder.TITLE_Z_A -> albums.sortedByDescending { it.title.lowercase() }
+    AlbumSortOrder.ARTIST_A_Z -> albums.sortedWith(
+        compareBy<Album> { it.artist.lowercase() }.thenBy { it.title.lowercase() }
+    )
+    AlbumSortOrder.ARTIST_Z_A -> albums.sortedWith(
+        compareByDescending<Album> { it.artist.lowercase() }.thenBy { it.title.lowercase() }
+    )
+    AlbumSortOrder.SONGS_MOST -> albums.sortedWith(
+        compareByDescending<Album> { it.songCount }.thenBy { it.title.lowercase() }
+    )
+    AlbumSortOrder.SONGS_FEWEST -> albums.sortedWith(
+        compareBy<Album> { it.songCount }.thenBy { it.title.lowercase() }
+    )
+}
+
 data class LibraryUiState(
     val isLoading: Boolean = true,
     val loadError: String? = null,
