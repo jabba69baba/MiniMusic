@@ -49,6 +49,7 @@ data class ArtColorRoles(
     val onSurface: Color,
     val surfaceVariant: Color,
     val onSurfaceVariant: Color,
+    val outlineVariant: Color,
     // Expressive "fixed" tones (Material 3): vivid, contrast-guaranteed
     // container/on pairs used for the transport controls — the same roles
     // PixelPlayer maps its buttons to.
@@ -229,6 +230,7 @@ fun rememberArtColorRoles(
         onSurface = artOnSurface,
         surfaceVariant = artSurfaceVariant,
         onSurfaceVariant = artOnSurfaceVariant,
+        outlineVariant = Color(scheme.getOutlineVariant()),
         primaryFixed = Color(scheme.getPrimaryFixed()),
         onPrimaryFixed = Color(scheme.getOnPrimaryFixed()),
         secondaryFixed = Color(scheme.getSecondaryFixed()),
@@ -269,6 +271,7 @@ fun ArtColorRoles.lerpTo(target: ArtColorRoles, fraction: Float): ArtColorRoles 
         onSurface = blend(onSurface, target.onSurface),
         surfaceVariant = blend(surfaceVariant, target.surfaceVariant),
         onSurfaceVariant = blend(onSurfaceVariant, target.onSurfaceVariant),
+        outlineVariant = blend(outlineVariant, target.outlineVariant),
         primaryFixed = blend(primaryFixed, target.primaryFixed),
         onPrimaryFixed = blend(onPrimaryFixed, target.onPrimaryFixed),
         secondaryFixed = blend(secondaryFixed, target.secondaryFixed),

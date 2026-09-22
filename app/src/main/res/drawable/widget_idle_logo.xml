@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Idle art for the home-screen widget: the app's mark in white on nothing,
+     at the weight the widget's slot used before. Regenerate with
+     tools/make_icon.py. -->
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_launcher_waveform_foreground"
+    android:src="@drawable/ic_launcher_vinyl_widget"
     android:gravity="center" />

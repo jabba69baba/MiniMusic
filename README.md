@@ -17,7 +17,7 @@ from files already on the device.
 - **Lyrics**, read straight out of the song file's own embedded ID3 `USLT` tag —
   no network lookup, no `.lrc` sidecar files required
 - **Settings** screen — Appearance (dynamic color, theme mode), Player (auto-open
-  lyrics, resume on launch), Content (minimum track length, rescan library), About
+  lyrics, resume on launch), Content (minimum song length, rescan library), About
 - Background playback via a `MediaSessionService` (system notification, lock-screen
   controls, audio-focus handling, headphone-unplug pause — all standard Media3 behavior)
 - Material 3 **Expressive** theming throughout: `MaterialExpressiveTheme`, expressive
@@ -95,7 +95,7 @@ I'd tackle them:
    player. A small Room database (`playlists`, `playlist_songs` tables) plus a
    `PlaylistRepository` would slot in cleanly; `SongListItem` and
    `FilteredSongsScreen` are already reusable as-is for showing playlist contents.
-2. **Folder / "all tracks" view with sort options** — you scoped this out
+2. **Folder / "all songs" view with sort options** — you scoped this out
    initially, but it's a small addition once playlists exist: one more
    `MediaStore.Audio.Media.RELATIVE_PATH` projection column, following the same
    "derive, don't cache" pattern the Albums/Artists tabs already use.

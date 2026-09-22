@@ -5,6 +5,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.sp
 import com.example.minimusic.R
 
@@ -25,95 +26,95 @@ private val GoogleSansFlexFamily = FontFamily(
     Font(resId = R.font.google_sans_flex_bold, weight = FontWeight.ExtraBold)
 )
 
-val MiniMusicTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 57.sp,
-        lineHeight = 64.sp
-    ),
-    displayMedium = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 45.sp,
-        lineHeight = 52.sp
-    ),
-    displaySmall = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 36.sp,
-        lineHeight = 44.sp
-    ),
-    headlineLarge = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 32.sp,
-        lineHeight = 40.sp
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 28.sp,
-        lineHeight = 36.sp
-    ),
-    headlineSmall = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 24.sp,
-        lineHeight = 30.sp
-    ),
-    titleLarge = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 20.sp,
-        lineHeight = 26.sp
-    ),
-    titleMedium = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 16.sp,
-        lineHeight = 22.sp
-    ),
-    titleSmall = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        lineHeight = 20.sp
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 22.sp
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp
-    ),
-    bodySmall = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp
-    ),
-    labelLarge = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        lineHeight = 18.sp
-    ),
-    labelMedium = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = GoogleSansFlexFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp
-    )
+/**
+ * The Android half of M3's typesetting model.
+ *
+ * The spec splits typesetting by platform: web and iOS place text with
+ * bounding boxes and padding, while Android — "or platform-agnostic specs" —
+ * measures from the **baseline**, defining line height as the distance between
+ * the baselines of consecutive lines and expressing vertical centering as an
+ * *alignment* rather than a measured offset.
+ *
+ * Center alignment is exactly that: half-leading is split evenly above and
+ * below the line box, so a line sits on its baseline inside a box the height
+ * of its own line height instead of hanging off the top of it. Trim stays None
+ * because the app's own padding owns all outer spacing.
+ */
+private val BaselineLineHeight = LineHeightStyle(
+    alignment = LineHeightStyle.Alignment.Center,
+    trim = LineHeightStyle.Trim.None
 )
+
+/**
+ * One role of the M3 type scale: family, weight, size, line height, tracking.
+ *
+ * Line heights follow the spec's readability ratios — *"around 1.5 times the
+ * type size"* for body and label, *"a line height ratio of 1.2"* for the
+ * larger title, headline, and display styles — and tracking carries the
+ * scale's per-role optical spacing, which this app's scale previously omitted
+ * entirely (every role sat at zero tracking, so small text ran tight and large
+ * text ran loose).
+ */
+private fun role(
+    weight: FontWeight,
+    size: Int,
+    lineHeight: Int,
+    tracking: Double
+) = TextStyle(
+    fontFamily = GoogleSansFlexFamily,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = lineHeight.sp,
+    letterSpacing = tracking.sp,
+    lineHeightStyle = BaselineLineHeight
+)
+
+val MiniMusicTypography = Typography(
+    displayLarge = role(FontWeight.Normal, 57, 64, -0.25),
+    displayMedium = role(FontWeight.Normal, 45, 52, 0.0),
+    displaySmall = role(FontWeight.Normal, 36, 44, 0.0),
+    headlineLarge = role(FontWeight.Normal, 32, 40, 0.0),
+    headlineMedium = role(FontWeight.Normal, 28, 36, 0.0),
+    headlineSmall = role(FontWeight.Normal, 24, 30, 0.0),
+    titleLarge = role(FontWeight.Normal, 20, 26, 0.0),
+    titleMedium = role(FontWeight.Medium, 16, 22, 0.15),
+    titleSmall = role(FontWeight.Medium, 14, 20, 0.1),
+    bodyLarge = role(FontWeight.Normal, 16, 24, 0.5),
+    bodyMedium = role(FontWeight.Normal, 14, 20, 0.25),
+    bodySmall = role(FontWeight.Normal, 12, 16, 0.4),
+    labelLarge = role(FontWeight.Medium, 14, 20, 0.1),
+    labelMedium = role(FontWeight.Medium, 12, 16, 0.5),
+    labelSmall = role(FontWeight.Medium, 11, 16, 0.5)
+)
+
+/**
+ * Typography helpers that are about *applying* the scale rather than
+ * redefining it.
+ */
+object MiniMusicType {
+    /**
+     * Tabular figures for any text whose digits change or align in a column.
+     *
+     * The spec asks for this by name: *"Use tabular figures (also known as
+     * monospaced numbers) rather than proportional digits in tables or places
+     * where values may change often, such as clocks"*, illustrated with both a
+     * clock and **a music player's timecode**. Proportional digits change
+     * width as they tick, so a running playhead drags its own layout around
+     * and a value column never lines up.
+     *
+     * `tnum` is a font feature, not a different family: digits keep the
+     * app's Google Sans Flex shapes and only their advance widths are
+     * equalised. A font without the feature simply ignores it.
+     */
+    fun tabular(style: TextStyle): TextStyle =
+        style.copy(fontFeatureSettings = "tnum")
+
+    /**
+     * Compact single-line label for fixed-width controls (the library's
+     * Songs / Artists / Albums pill). Same family as the rest of the app —
+     * earlier this control overrode `fontFamily` to `SansSerif`, so the pill
+     * alone rendered in the system font — with a line height that keeps the
+     * label's ratio near 1.5 at its smaller size.
+     */
+    val compactLabel: TextStyle = role(FontWeight.Medium, 13, 19, 0.1)
+}

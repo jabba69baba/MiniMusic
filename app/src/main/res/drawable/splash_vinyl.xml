@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash mark. The system masks whatever it is given into a circle, so this
+     is the record alone at nearly the full width of its drawable — not the icon
+     foreground, whose record is a fraction of a 108dp layer and would appear as
+     a small disc adrift in the middle of the splash. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_vinyl_splash"
+    android:gravity="fill" />

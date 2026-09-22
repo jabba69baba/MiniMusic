@@ -16,13 +16,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,11 +38,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,13 +64,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -92,6 +90,7 @@ import com.example.minimusic.data.model.Song
 import com.example.minimusic.playback.QueueEntry
 import com.example.minimusic.playback.QueueSnapshot
 import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -99,7 +98,17 @@ import kotlin.math.roundToInt
 
 /** Height of the always-visible collapsed bar (handle + "Queue" label). */
 val QueueDrawerCollapsedHeight = 48.dp
+
+/** How much of the screen the open drawer covers. */
 private const val OPEN_FRACTION = 0.82f
+
+/**
+ * The two places landscape's queue lives. They are separate slots by design —
+ * the bar is a 72dp item at the bottom of the controls column so the player's
+ * layout never moves, and the sheet is a pane-filling overlay — so each call
+ * renders one of them and they animate together (see [LandscapeQueueContent]).
+ */
+enum class LandscapeQueueSlot { BAR, SHEET }
 
 @Composable
 private fun QueueActionPill(
@@ -133,109 +142,6 @@ private fun QueueActionPill(
             color = contentColor,
             modifier = Modifier.padding(start = 7.dp)
         )
-    }
-}
-
-/** Dedicated queue destination; the list is laid out below a fixed header. */
-@Composable
-fun QueueScreen(
-    snapshot: QueueSnapshot,
-    artColors: ArtColorRoles,
-    onBack: () -> Unit,
-    onEntryClick: (Long) -> Unit,
-    onReorderEntry: (Long, Int) -> Unit,
-    onRemoveEntry: (Long) -> Unit,
-    onClearQueue: () -> Unit
-) {
-    BackHandler(onBack = onBack)
-    var locateRequest by remember { mutableStateOf(0) }
-    val hapticView = LocalView.current
-    val hapticsEnabled = LocalMiniMusicHaptics.current
-
-    // PixelPlayer's queue surface tone.
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.systemBars),
-        color = artColors.surfaceContainer,
-        tonalElevation = 0.dp
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(88.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 10.dp)
-                        .size(width = 36.dp, height = 4.dp)
-                        .background(
-                            artColors.onSurfaceVariant.copy(alpha = 0.55f),
-                            RoundedCornerShape(50)
-                        )
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 28.dp, start = 8.dp, end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    androidx.compose.material3.IconButton(
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Clear queue",
-                            modifier = Modifier.size(21.dp),
-                            tint = artColors.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.size(28.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.QueueMusic,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = artColors.onSurface
-                        )
-                        Text(
-                            text = "Queue",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = artColors.onSurface,
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.size(28.dp))
-                    androidx.compose.material3.IconButton(
-                        onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.MyLocation,
-                            contentDescription = "Locate current song",
-                            modifier = Modifier.size(21.dp),
-                            tint = artColors.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            QueueDrawerList(
-                snapshot = snapshot,
-                artColors = artColors,
-                onEntryClick = onEntryClick,
-                onReorderEntry = onReorderEntry,
-                onRemoveEntry = onRemoveEntry,
-                locateRequest = locateRequest,
-                queueTopRequest = 0,
-                openRequest = 1,
-                onTopCloseDrag = {},
-                onTopCloseDragEnd = {}
-            )
-        }
     }
 }
 
@@ -281,6 +187,7 @@ fun BoxWithConstraintsScope.QueueDrawer(
 @Composable
 fun LandscapeQueueContent(
     modifier: Modifier = Modifier,
+    slot: LandscapeQueueSlot,
     snapshot: QueueSnapshot,
     artColors: ArtColorRoles,
     isOpen: Boolean,
@@ -290,63 +197,100 @@ fun LandscapeQueueContent(
     onRemoveEntry: (Long) -> Unit,
     onClearQueue: () -> Unit
 ) {
-    if (!isOpen) {
-        // Collapsed bar floats on the player canvas, so it gets the same
-        // translucent tonal overlay as the capsule track (not an opaque
-        // neutral slab) and canvas-text content colors.
-        Surface(
-            modifier = modifier
-                .fillMaxWidth()
-                .clickable { onOpenChange(true) },
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = artColors.surfaceContainerLowest.copy(alpha = 0.7f),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
+    // One spring drives both slots. They are separate composables because they
+    // occupy different places, so each owns an Animatable with the same spec;
+    // both are created or retargeted on the same frame, and a spring is a
+    // deterministic function of elapsed time, so the bar slides out of its slot
+    // exactly as fast as the sheet rises over the pane. That is what turns the
+    // old bar-vanishes/sheet-appears swap into one motion.
+    val progress = remember { Animatable(if (isOpen) 1f else 0f) }
+    LaunchedEffect(isOpen) {
+        progress.animateTo(
+            if (isOpen) 1f else 0f,
+            animationSpec = MiniMusicMotion.defaultSpatial()
+        )
+    }
+
+    when (slot) {
+        LandscapeQueueSlot.BAR -> {
+            val density = LocalDensity.current
+            val barHeightPx = with(density) { 72.dp.toPx() }
+            // Always composed, so its animation state survives the whole open
+            // and close; while the sheet owns the pane the bar is clipped out
+            // of its slot, fully transparent and inert to touch.
+            Box(modifier = modifier.clipToBounds()) {
+                Surface(
                     modifier = Modifier
-                        .padding(top = 10.dp)
-                        .size(width = 36.dp, height = 4.dp)
-                        .background(artColors.onPrimaryContainer.copy(alpha = 0.5f), RoundedCornerShape(50))
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationY = progress.value * barHeightPx
+                            alpha = 1f - progress.value
+                        }
+                        .clickable(enabled = !isOpen) { onOpenChange(true) },
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                    // Opaque, like the rest of the drawer: the bar sits on the
+                    // player canvas but is a solid surface, not a see-through
+                    // overlay.
+                    color = artColors.surfaceContainer,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = artColors.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Queue",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = artColors.onPrimaryContainer,
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 10.dp)
+                                .size(width = 36.dp, height = 4.dp)
+                                .background(artColors.onSurfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(50))
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = artColors.onSurface
+                            )
+                            Text(
+                                text = "Queue",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = artColors.onSurface,
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
-    } else {
-        BoxWithConstraints(modifier = modifier) {
-            LandscapeQueueBottomSheet(
-                snapshot = snapshot,
-                artColors = artColors,
-                isOpen = true,
-                onOpenChange = onOpenChange,
-                onEntryClick = onEntryClick,
-                onReorderEntry = onReorderEntry,
-                onRemoveEntry = onRemoveEntry,
-                onClearQueue = onClearQueue
-            )
+
+        LandscapeQueueSlot.SHEET -> {
+            // The sheet is composed from the moment the drawer starts opening
+            // until its own travel has finished, so it is still on screen to
+            // ride out during the close instead of vanishing on the first frame.
+            val sheetPresent by remember {
+                derivedStateOf { isOpen || progress.value > 0.001f }
+            }
+            if (sheetPresent) {
+                BoxWithConstraints(modifier = modifier) {
+                    LandscapeQueueBottomSheet(
+                        snapshot = snapshot,
+                        artColors = artColors,
+                        isOpen = isOpen,
+                        onOpenChange = onOpenChange,
+                        onEntryClick = onEntryClick,
+                        onReorderEntry = onReorderEntry,
+                        onRemoveEntry = onRemoveEntry,
+                        onClearQueue = onClearQueue
+                    )
+                }
+            }
         }
     }
 }
@@ -366,7 +310,9 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     // PlayerScreen bounds this composable to the controls-side pane. The sheet
     // therefore fills that pane and slides vertically from its bottom edge.
     val panelHeight = maxHeight
-    val closedOffset = (panelHeight - 64.dp).coerceAtLeast(0.dp)
+    // The sheet retracts fully below the pane: landscape's collapsed state is
+    // the bar's slot, not a strip of this sheet, so nothing of it may linger.
+    val closedOffset = panelHeight
     val offsetY = remember(panelHeight) { Animatable(closedOffset.value) }
     val scope = rememberCoroutineScope()
     var locateRequest by remember { mutableStateOf(0) }
@@ -380,6 +326,14 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
             if (isOpen) 0f else closedOffset.value,
             animationSpec = MiniMusicMotion.defaultSpatial()
         )
+    }
+
+    // A new open cycle asks the list to place the current song. This counter
+    // was declared and threaded through but never incremented, so the list's
+    // locate-on-open branch had never once run — the drawer relied entirely on
+    // a one-shot scroll issued while it was being created (see QueueDrawerList).
+    LaunchedEffect(isOpen) {
+        if (isOpen) openRequest++
     }
 
     Box(
@@ -421,13 +375,20 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                                 } else {
                                     offsetY.value < closedOffset.value / 2f
                                 }
-                                scope.launch {
-                                    offsetY.animateTo(
-                                        if (shouldOpen) 0f else closedOffset.value,
-                                        animationSpec = MiniMusicMotion.defaultSpatial()
-                                    )
+                                // One animator owns the settle, as in portrait:
+                                // when the dragged state changes, the isOpen
+                                // effect animates it; otherwise this hitches
+                                // the sheet back open.
+                                if (shouldOpen == isOpen) {
+                                    scope.launch {
+                                        offsetY.animateTo(
+                                            if (shouldOpen) 0f else closedOffset.value,
+                                            animationSpec = MiniMusicMotion.defaultSpatial()
+                                        )
+                                    }
+                                } else {
+                                    onOpenChange(shouldOpen)
                                 }
-                                onOpenChange(shouldOpen)
                             }
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -477,8 +438,9 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // PixelPlayer's queue action colors: destructive =
-                        // error tones, locate = tertiary tones.
+                        // Destructive = error tones; locate = the secondary
+                        // family, so it never competes with the current song's
+                        // primary-container row.
                         QueueActionPill(
                             icon = Icons.Filled.Delete,
                             label = "Clear",
@@ -492,8 +454,8 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                             icon = Icons.Filled.MyLocation,
                             label = "Locate",
                             contentDescription = "Locate current song",
-                            containerColor = artColors.tertiaryContainer,
-                            contentColor = artColors.onTertiaryContainer,
+                            containerColor = artColors.secondaryContainer,
+                            contentColor = artColors.onSecondaryContainer,
                             onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
                             modifier = Modifier.weight(1f)
                         )
@@ -535,9 +497,15 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     val fullHeightPx = with(density) { maxHeight.toPx() }
     val collapsedBarHeightPx = with(density) { QueueDrawerCollapsedHeight.toPx() }
     val navBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-    val openOffsetPx = fullHeightPx * (1f - OPEN_FRACTION)
-    val closedOffsetPx = fullHeightPx - collapsedBarHeightPx - navBarHeightPx
-    val offsetY = remember { Animatable(closedOffsetPx) }
+    // The panel is anchored to the bottom edge of the screen and its own height
+    // does the travelling. That is what keeps the collapsed state honest: the
+    // bar is a 48dp panel with a navigation-bar strip under it and literally no
+    // room for the list, so no rows can peek below the bar, and the surface can
+    // never be partly the player canvas while a drawer is meant to be closed.
+    val collapsedPanelHeightPx = collapsedBarHeightPx + navBarHeightPx
+    val openPanelHeightPx = (fullHeightPx * OPEN_FRACTION)
+        .coerceAtLeast(collapsedPanelHeightPx + 1f)
+    val panelHeight = remember { Animatable(collapsedPanelHeightPx) }
     var locateRequest by remember { mutableStateOf(0) }
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
@@ -546,39 +514,62 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(isOpen, fullHeightPx) {
-        val target = if (isOpen) openOffsetPx else closedOffsetPx
-        offsetY.animateTo(target, animationSpec = MiniMusicMotion.defaultSpatial())
+        panelHeight.animateTo(
+            if (isOpen) openPanelHeightPx else collapsedPanelHeightPx,
+            animationSpec = MiniMusicMotion.defaultSpatial()
+        )
     }
 
+    // A new open cycle asks the list to place the current song. This counter
+    // was declared and threaded through but never incremented, so the list's
+    // locate-on-open branch had never once run — the drawer relied entirely on
+    // a one-shot scroll issued while it was being created (see QueueDrawerList).
+    LaunchedEffect(isOpen) {
+        if (isOpen) openRequest++
+    }
+
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .offset { IntOffset(0, offsetY.value.roundToInt()) }
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            // Collapsed: a translucent tonal overlay on the player canvas
-            // (the capsule track's treatment) instead of an opaque neutral
-            // slab. Open: the drawer's own surface tone.
-            color = if (isOpen) artColors.surfaceContainer
-            else artColors.surfaceContainerLowest.copy(alpha = 0.7f),
+            // Opaque in both states. The drawer used to hand the collapsed bar
+            // a 70% translucent art tone (matching the player's capsule track),
+            // which let the player canvas read through the queue surface and
+            // made the drawer look like it was still opening. One solid tone
+            // for the whole surface instead.
+            color = artColors.surfaceContainer,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxSize()
+                .height(with(density) { panelHeight.value.toDp() })
+                .clipToBounds()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                val headerHeight = if (isOpen) 102.dp else QueueDrawerCollapsedHeight
+                // One header recipe for both states. The bar grows from the
+                // collapsed height to the open height on the same spring the
+                // panel travels on, and its rows are revealed by the clip
+                // instead of appearing in place — so opening and closing read
+                // as one motion and nothing changes hue on the way.
+                val headerHeight by animateDpAsState(
+                    targetValue = if (isOpen) 102.dp else QueueDrawerCollapsedHeight,
+                    animationSpec = MiniMusicMotion.defaultSpatial(),
+                    label = "queueHeaderHeight"
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(headerHeight)
+                        .clipToBounds()
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
-                                val newValue = (offsetY.value + delta).coerceIn(openOffsetPx, closedOffsetPx)
-                                scope.launch { offsetY.snapTo(newValue) }
+                                val newValue = (panelHeight.value - delta)
+                                    .coerceIn(collapsedPanelHeightPx, openPanelHeightPx)
+                                scope.launch { panelHeight.snapTo(newValue) }
                             },
                             // Let child action pills receive taps; the drawer still
                             // begins dragging as soon as the pointer moves.
@@ -587,16 +578,25 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 val shouldOpen = if (abs(velocity) > 800f) {
                                     velocity < 0f
                                 } else {
-                                    offsetY.value < (openOffsetPx + closedOffsetPx) / 2f
+                                    panelHeight.value >
+                                        (collapsedPanelHeightPx + openPanelHeightPx) / 2f
                                 }
-                                val target = if (shouldOpen) openOffsetPx else closedOffsetPx
-                                scope.launch {
-                                    offsetY.animateTo(
-                                        target,
-                                        animationSpec = MiniMusicMotion.defaultSpatial()
-                                    )
+                                // Only one animator may own the settle: when
+                                // the dragged state actually changes, the
+                                // isOpen effect animates it; otherwise the
+                                // release snaps back here. Two concurrent
+                                // animateTo calls on the same value made a
+                                // drag-close look faster than a back-close.
+                                if (shouldOpen == isOpen) {
+                                    scope.launch {
+                                        panelHeight.animateTo(
+                                            if (shouldOpen) openPanelHeightPx else collapsedPanelHeightPx,
+                                            animationSpec = MiniMusicMotion.defaultSpatial()
+                                        )
+                                    }
+                                } else {
+                                    onOpenChange(shouldOpen)
                                 }
-                                onOpenChange(shouldOpen)
                             }
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -606,132 +606,130 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                             .padding(top = 6.dp, bottom = 4.dp)
                             .size(width = 36.dp, height = 4.dp)
                             .background(
-                                if (isOpen) artColors.onSurfaceVariant.copy(alpha = 0.55f)
-                                else artColors.onPrimaryContainer.copy(alpha = 0.5f),
+                                artColors.onSurfaceVariant.copy(alpha = 0.55f),
                                 RoundedCornerShape(50)
                             )
                     )
-                    if (isOpen) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .clickable {
-                                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                        queueTopRequest++
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.QueueMusic,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = artColors.onSurface
-                                )
-                                Text(
-                                    text = "Queue",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = artColors.onSurface,
-                                    modifier = Modifier.padding(start = 6.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .padding(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                .clip(RoundedCornerShape(50))
+                                .clickable {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    if (isOpen) queueTopRequest++ else onOpenChange(true)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            QueueActionPill(
-                                icon = Icons.Filled.Delete,
-                                label = "Clear",
-                                contentDescription = "Clear queue",
-                                containerColor = artColors.errorContainer,
-                                contentColor = artColors.onErrorContainer,
-                                onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
-                                modifier = Modifier.weight(1f)
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = artColors.onSurface
                             )
-                            QueueActionPill(
-                                icon = Icons.Filled.MyLocation,
-                                label = "Locate",
-                                contentDescription = "Locate current song",
-                                containerColor = artColors.tertiaryContainer,
-                                contentColor = artColors.onTertiaryContainer,
-                                onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
-                                modifier = Modifier.weight(1f)
+                            Text(
+                                text = "Queue",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = artColors.onSurface,
+                                modifier = Modifier.padding(start = 6.dp)
                             )
                         }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Canvas-text rule: the collapsed bar floats on the
-                            // player canvas, so its content follows the
-                            // onPrimaryContainer family.
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .clickable { onOpenChange(true) }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.QueueMusic,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = artColors.onPrimaryContainer
-                                )
-                                Text(
-                                    text = "Queue",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = artColors.onPrimaryContainer,
-                                    modifier = Modifier.padding(start = 6.dp)
-                                )
-                            }
-                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        QueueActionPill(
+                            icon = Icons.Filled.Delete,
+                            label = "Clear",
+                            contentDescription = "Clear queue",
+                            containerColor = artColors.errorContainer,
+                            contentColor = artColors.onErrorContainer,
+                            onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); onClearQueue() },
+                            modifier = Modifier.weight(1f)
+                        )
+                        QueueActionPill(
+                            icon = Icons.Filled.MyLocation,
+                            label = "Locate",
+                            contentDescription = "Locate current song",
+                            containerColor = artColors.secondaryContainer,
+                            contentColor = artColors.onSecondaryContainer,
+                            onClick = { if (hapticsEnabled) hapticView.performMiniMusicHaptic(); locateRequest++ },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
 
-                if (isOpen) {
-                    QueueDrawerList(
-                        snapshot = snapshot,
-                        artColors = artColors,
-                        onEntryClick = onEntryClick,
-                        onReorderEntry = onReorderEntry,
-                        onRemoveEntry = onRemoveEntry,
-                        locateRequest = locateRequest,
-                        queueTopRequest = queueTopRequest,
-                        openRequest = openRequest,
-                        onTopCloseDrag = { deltaY ->
-                            scope.launch {
-                                offsetY.snapTo((offsetY.value + deltaY).coerceIn(openOffsetPx, closedOffsetPx))
-                            }
-                        },
-                        onTopCloseDragEnd = { totalDistance ->
-                            val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
-                            scope.launch {
-                                offsetY.animateTo(
-                                    if (shouldClose) closedOffsetPx else openOffsetPx,
-                                    animationSpec = MiniMusicMotion.defaultSpatial()
-                                )
-                            }
-                            if (shouldClose) onOpenChange(false)
-                        }
-                    )
+                // The list appears with the panel's first pixel of growth and
+                // leaves when the panel is fully collapsed again, so it is
+                // created with a viewport to lay out in: the list's own
+                // initial scroll to the current song needs a non-zero height to
+                // work, which is why composing it early left the drawer opening
+                // at the queue's first row.
+                val listVisible by remember {
+                    derivedStateOf { panelHeight.value > collapsedPanelHeightPx + 0.5f }
                 }
+                if (listVisible) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clipToBounds()
+                    ) {
+                        // QueueDrawerList is a ColumnScope extension: the inner
+                        // Column gives it that scope inside the clipping box.
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            QueueDrawerList(
+                                snapshot = snapshot,
+                                artColors = artColors,
+                                onEntryClick = onEntryClick,
+                                onReorderEntry = onReorderEntry,
+                                onRemoveEntry = onRemoveEntry,
+                                locateRequest = locateRequest,
+                                queueTopRequest = queueTopRequest,
+                                openRequest = openRequest,
+                                onTopCloseDrag = { deltaY ->
+                                    scope.launch {
+                                        panelHeight.snapTo(
+                                            (panelHeight.value - deltaY)
+                                                .coerceIn(collapsedPanelHeightPx, openPanelHeightPx)
+                                        )
+                                    }
+                                },
+                                onTopCloseDragEnd = { totalDistance ->
+                                    val shouldClose = totalDistance > with(density) { 48.dp.toPx() }
+                                    if (shouldClose) {
+                                        // Single owner: the isOpen effect animates
+                                        // the sheet closed, this drag only decides
+                                        // the outcome.
+                                        onOpenChange(false)
+                                    } else {
+                                        scope.launch {
+                                            panelHeight.animateTo(
+                                                openPanelHeightPx,
+                                                animationSpec = MiniMusicMotion.defaultSpatial()
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                // Clearance for the system navigation bar, inside the panel and
+                // below the list, in both states.
+                Spacer(modifier = Modifier.height(with(density) { navBarHeightPx.toDp() }))
             }
         }
     }
@@ -757,16 +755,55 @@ private fun ColumnScope.QueueDrawerList(
     val latestOnTopCloseDrag by rememberUpdatedState(onTopCloseDrag)
     val latestOnTopCloseDragEnd by rememberUpdatedState(onTopCloseDragEnd)
     val adapter = remember { PracticalQueueAdapter(context) }
-    var previousCurrentEntryId by remember { mutableStateOf<Long?>(null) }
+    val latestSnapshot by rememberUpdatedState(snapshot)
     var previousLocateRequest by remember { mutableStateOf(locateRequest) }
     var previousQueueTopRequest by remember { mutableStateOf(queueTopRequest) }
     var previousOpenRequest by remember { mutableStateOf(0) }
+
+    // Pending while the list still owes the current song a placement; set again
+    // by every new open cycle, and on creation because a fresh list always means
+    // a drawer is opening. The placement deliberately waits for a viewport at
+    // least one row tall: the drawer grows its panel frame by frame, so this list
+    // is created with a sliver of space, and a scroll issued then is swallowed by
+    // the next layout — which is why the drawer used to open on the queue's first
+    // row.
+    var locatePending by remember { mutableStateOf(true) }
+    // Rows are laid out 72dp tall in the adapter below.
+    val rowHeightPx = remember(context) { 72f * context.resources.displayMetrics.density }
+    // The glide below is a view-system animation, so it does not follow
+    // Compose's own animation scale; reduced motion has to be honoured here
+    // explicitly. See placeQueueInstantly.
+    val reducedMotion = LocalMiniMusicReducedMotion.current
+    // Follows the queue while the drawer is open: a song change re-centres on
+    // the new now-playing row, so the drawer stays truthful without the user
+    // touching it. Comparing entry ids (not positions) keeps a reorder or a
+    // position tick from triggering it.
+    var previousCurrentEntryId by remember { mutableStateOf(snapshot.currentEntryId) }
+
+    /**
+     * Offset that lands a row in the middle of the viewport, but never invents
+     * a gap above the queue's own first row: the list can only show as much
+     * history as it actually has, so a current song near the top still starts
+     * flush.
+     */
+    fun centeredAnchorOffset(view: RecyclerView, position: Int): Int =
+        queueAnchorOffset(view.height, rowHeightPx, adapter.itemCount, position)
+
+    fun locateCurrentEntryIfReady(view: RecyclerView) {
+        if (!locatePending || view.height < rowHeightPx) return
+        val layout = view.layoutManager as? LinearLayoutManager ?: return
+        val position = latestSnapshot.resolvedVisiblePosition
+        if (position < 0) return
+        locatePending = false
+        view.stopScroll()
+        layout.scrollToPositionWithOffset(position, centeredAnchorOffset(view, position))
+    }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
     // boundary prevents rows from painting over the Queue title or controls.
     Spacer(modifier = Modifier.height(8.dp))
     androidx.compose.material3.HorizontalDivider(
-        color = artColors.onSurfaceVariant.copy(alpha = 0.28f)
+        color = artColors.outlineVariant
     )
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -788,14 +825,9 @@ private fun ColumnScope.QueueDrawerList(
                 onTopCloseDrag = latestOnTopCloseDrag,
                 onTopCloseDragEnd = latestOnTopCloseDragEnd
             ).apply {
-                val initialLayout = LinearLayoutManager(viewContext)
-                layoutManager = initialLayout
+                layoutManager = LinearLayoutManager(viewContext)
                 setHasFixedSize(true)
                 setItemViewCacheSize(8)
-                val initialPosition = snapshot.resolvedVisiblePosition
-                if (initialPosition >= 0) {
-                    initialLayout.scrollToPositionWithOffset(initialPosition, 0)
-                }
                 overScrollMode = View.OVER_SCROLL_NEVER
                 clipToPadding = true
                 itemAnimator = DefaultItemAnimator().apply {
@@ -805,6 +837,14 @@ private fun ColumnScope.QueueDrawerList(
                     changeDuration = 140L
                     supportsChangeAnimations = false
                 }
+            }
+            // Scroll to the current song only once this view is tall enough to
+            // hold a row. Asking earlier is what silently failed: with no usable
+            // viewport the layout manager consumes the pending position and lays
+            // out nothing, so the list settles at row 0 and stays there as the
+            // drawer finishes opening.
+            recyclerView.addOnLayoutChangeListener { view, _, top, _, bottom, _, _, _, _ ->
+                if (view is RecyclerView && bottom - top > 0) locateCurrentEntryIfReady(view)
             }
             val touchHelper = ItemTouchHelper(adapter.MoveCallback())
             adapter.startDrag = { holder -> touchHelper.startDrag(holder) }
@@ -820,14 +860,11 @@ private fun ColumnScope.QueueDrawerList(
             if (openRequest != previousOpenRequest) {
                 previousOpenRequest = openRequest
                 recyclerView.stopScroll()
-                recyclerView.post {
-                    recyclerView.stopScroll()
-                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
-                    val currentPosition = snapshot.resolvedVisiblePosition
-                    if (currentPosition >= 0) {
-                        layout.scrollToPositionWithOffset(currentPosition, 0)
-                    }
-                }
+                locatePending = true
+                // If the drawer is already tall enough (a drag-open that has
+                // grown past a row, or a reopen), place it now; otherwise the
+                // layout listener above does it as soon as the panel allows.
+                recyclerView.post { locateCurrentEntryIfReady(recyclerView) }
             }
             if (locateRequest != previousLocateRequest) {
                 previousLocateRequest = locateRequest
@@ -837,7 +874,28 @@ private fun ColumnScope.QueueDrawerList(
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     val currentPosition = snapshot.resolvedVisiblePosition
                     if (currentPosition >= 0) {
-                        animateQueueScroll(recyclerView, currentPosition)
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, currentPosition, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, currentPosition, rowHeightPx)
+                        }
+                    }
+                }
+            }
+            if (snapshot.currentEntryId != previousCurrentEntryId) {
+                previousCurrentEntryId = snapshot.currentEntryId
+                val currentPosition = snapshot.resolvedVisiblePosition
+                // Only when the drawer is in repose: never yank the list out
+                // from under a scroll or a drag the user is performing.
+                if (currentPosition >= 0 &&
+                    recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE
+                ) {
+                    recyclerView.post {
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, currentPosition, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, currentPosition, rowHeightPx)
+                        }
                     }
                 }
             }
@@ -848,7 +906,11 @@ private fun ColumnScope.QueueDrawerList(
                     recyclerView.stopScroll()
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
                     if (adapter.itemCount > 0) {
-                        animateQueueScroll(recyclerView, 0)
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, 0, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, 0, rowHeightPx)
+                        }
                     }
                 }
             }
@@ -856,25 +918,111 @@ private fun ColumnScope.QueueDrawerList(
     )
 }
 
-/** Matches the library locate motion: stage long jumps, then glide the final tail. */
-private fun animateQueueScroll(recyclerView: RecyclerView, targetPosition: Int) {
+/**
+ * Where a row's top should sit inside the queue viewport so it reads as
+ * "centred", clamped to positions the list can actually reach.
+ *
+ * A row can only be pushed down the viewport as far as it has history above it
+ * (otherwise the glide would try to scroll before the queue's first row) and
+ * only as far as it has songs below it (otherwise it would try to scroll past
+ * the last row). Without those two clamps the smooth scroller chases an
+ * unreachable position forever and jams wherever it runs out of content, which
+ * is exactly what left the bottom of the queue unreachable.
+ */
+private fun queueAnchorOffset(
+    viewportPx: Int,
+    rowHeightPx: Float,
+    itemCount: Int,
+    position: Int
+): Int {
+    if (viewportPx <= 0 || rowHeightPx <= 0f || itemCount <= 0 || position < 0) return 0
+    val centered = ((viewportPx - rowHeightPx) / 2f).toInt()
+    // Highest the row's top may sit, given the rows that exist above it.
+    val highest = (position * rowHeightPx).toInt().coerceAtLeast(0)
+    // Lowest it may sit and still have the rest of the queue fill the viewport
+    // below it.
+    val rowsBelow = ((itemCount - position) * rowHeightPx).toInt()
+    val lowest = (viewportPx - rowsBelow).coerceIn(0, highest)
+    return centered.coerceIn(lowest, highest)
+}
+
+/**
+ * Matches the library locate motion — stage long jumps, then glide the final
+ * tail — but settles the target row in the middle of the viewport rather than
+ * at its top edge, so the drawer shows the current song with the songs already
+ * played above it and what is coming below. The scroller clamps itself at the
+ * list's own ends, so near the top or bottom the glide simply stops flush.
+ */
+/**
+ * The reduced-motion counterpart of [animateQueueScroll]: the same destination,
+ * reached without travelling. A RecyclerView smooth scroll is a view-system
+ * animation, so unlike the Compose motion in this drawer it does not follow the
+ * platform's animation scale — without this branch the queue would keep sweeping
+ * across long lists even with reduced motion requested.
+ */
+private fun placeQueueInstantly(
+    recyclerView: RecyclerView,
+    targetPosition: Int,
+    rowHeightPx: Float
+) {
+    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
+    val viewportPx = recyclerView.height - recyclerView.paddingTop - recyclerView.paddingBottom
+    val offset = queueAnchorOffset(
+        viewportPx = viewportPx,
+        rowHeightPx = rowHeightPx,
+        itemCount = recyclerView.adapter?.itemCount ?: 0,
+        position = targetPosition
+    )
+    layout.scrollToPositionWithOffset(targetPosition, offset)
+}
+
+private fun animateQueueScroll(
+    recyclerView: RecyclerView,
+    targetPosition: Int,
+    rowHeightPx: Float
+) {
     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
     val first = layout.findFirstVisibleItemPosition()
-    fun glideToStart() {
+    fun glideToTarget() {
         val scroller = object : LinearSmoothScroller(recyclerView.context) {
+            private fun itemCountOrZero(): Int =
+                recyclerView.adapter?.itemCount ?: 0
+
             override fun getVerticalSnapPreference(): Int = SNAP_TO_START
+
+            // Where the target row's top should end up, in viewport
+            // coordinates. Everything here is a delta *to* that position:
+            // SmoothScroller negates whatever this returns to get its scroll
+            // direction, so an inverted sign would walk the row away from the
+            // offset instead of onto it — which is what sent Locate past the
+            // end of the queue and Queue to a random row mid-list.
+            override fun calculateDtToFit(
+                viewStart: Int,
+                viewEnd: Int,
+                boxStart: Int,
+                boxEnd: Int,
+                snapPreference: Int
+            ): Int {
+                val offset = queueAnchorOffset(
+                    viewportPx = boxEnd - boxStart,
+                    rowHeightPx = rowHeightPx,
+                    itemCount = itemCountOrZero(),
+                    position = targetPosition
+                )
+                return (boxStart + offset) - viewStart
+            }
         }
         scroller.targetPosition = targetPosition
         layout.startSmoothScroll(scroller)
     }
     if (first < 0 || abs(targetPosition - first) <= 10) {
-        glideToStart()
+        glideToTarget()
         return
     }
     val staged = (targetPosition + if (targetPosition > first) -6 else 6)
         .coerceIn(0, (recyclerView.adapter?.itemCount ?: 1) - 1)
     layout.scrollToPositionWithOffset(staged, 0)
-    recyclerView.post { glideToStart() }
+    recyclerView.post { glideToTarget() }
 }
 
 private class QueueRecyclerView(
@@ -1315,21 +1463,21 @@ private class PracticalQueueAdapter(
             onStartDrag: () -> Unit
         ) {
             val resolved = colors ?: return
-            // Keep every state fully opaque. The current row carries the
-            // scheme's tertiary container — a distinct vivid hue that marks
-            // the now-playing track in both light and dark (PixelPlayer's
-            // queue treatment); history uses a quieter tonal blend so played
-            // rows recede without alpha/transparency.
+            // Keep every state fully opaque, and keep each state inside one
+            // role family so the scheme guarantees its contrast. The current
+            // song uses the primary container — the same family the library
+            // marks its playing row with — ordinary rows sit on the surface
+            // role, and history recedes toward a container tone without alpha.
             val rowArgb = if (isCurrent) {
-                resolved.tertiaryContainer.toArgb()
+                resolved.primaryContainer.toArgb()
             } else {
                 resolved.surface.toArgb()
             }
             val opaqueHistoryColor = if (isHistory) {
                 ColorUtils.blendARGB(
                     resolved.surface.toArgb(),
-                    resolved.surfaceVariant.toArgb(),
-                    0.46f
+                    resolved.surfaceContainerHigh.toArgb(),
+                    0.55f
                 )
             } else {
                 rowArgb
@@ -1355,7 +1503,7 @@ private class PracticalQueueAdapter(
             val titleArgb = if (isHistory) {
                 ColorUtils.blendARGB(resolved.onSurface.toArgb(), opaqueHistoryColor, 0.28f)
             } else if (isCurrent) {
-                resolved.onTertiaryContainer.toArgb()
+                resolved.onPrimaryContainer.toArgb()
             } else {
                 resolved.onSurface.toArgb()
             }
@@ -1363,17 +1511,17 @@ private class PracticalQueueAdapter(
                 ColorUtils.blendARGB(resolved.onSurfaceVariant.toArgb(), opaqueHistoryColor, 0.36f)
             } else if (isCurrent) {
                 ColorUtils.blendARGB(
-                    resolved.onTertiaryContainer.toArgb(),
+                    resolved.onPrimaryContainer.toArgb(),
                     resolved.onSurfaceVariant.toArgb(),
                     0.18f
                 )
             } else {
                 resolved.onSurfaceVariant.toArgb()
             }
-            // PixelPlayer's queue art tiles: current song on the tertiary
-            // container, every other row on surfaceContainerHigh.
+            // Art tiles stay in their row's family: the current song on the
+            // primary container, every other row on a neutral container.
             (artwork.background as? GradientDrawable)?.setColor(
-                if (isCurrent) resolved.tertiaryContainer.toArgb() else resolved.surfaceContainerHigh.toArgb()
+                if (isCurrent) resolved.primaryContainer.toArgb() else resolved.surfaceContainerHigh.toArgb()
             )
             title.setTextColor(titleArgb)
             artist.setTextColor(artistArgb)

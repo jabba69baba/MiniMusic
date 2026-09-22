@@ -131,11 +131,14 @@ import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.ui.components.FlatMusicSlider
 import com.example.minimusic.ui.components.LandscapeQueueContent
+import com.example.minimusic.ui.components.LandscapeQueueSlot
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.QueueDrawer
 import com.example.minimusic.ui.components.QueueDrawerCollapsedHeight
 import com.example.minimusic.ui.theme.ArtColorRoles
+import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
+import com.example.minimusic.ui.theme.MiniMusicType
 import com.example.minimusic.ui.theme.lerpTo
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import com.example.minimusic.ui.viewmodel.SleepTimerState
@@ -361,12 +364,13 @@ fun PlayerScreen(
                     onCycleRepeat = onCycleRepeat,
                     onOpenLyrics = onOpenLyrics,
                     onSwipeToMiniplayer = onSwipeToMiniplayer,
-                    landscapeQueueContent = { open, queueModifier ->
+                    landscapeQueueContent = { slot, queueModifier ->
                         LandscapeQueueContent(
                             modifier = queueModifier,
+                            slot = slot,
                             snapshot = queueSnapshot,
                             artColors = artColors,
-                            isOpen = open,
+                            isOpen = queueOpen,
                             onOpenChange = ::setQueueOpen,
                             onEntryClick = onQueueEntryClick,
                             onReorderEntry = onReorderQueue,
@@ -429,7 +433,9 @@ private fun SleepTimerButton(
                     )
                     Text(
                         text = formatRemaining(sleepTimerState.remainingMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        // Counts down once a second: tabular figures keep the
+                        // digits from resizing the chip around them on every tick.
+                        style = MiniMusicType.tabular(MaterialTheme.typography.labelMedium),
                         color = artColors.onPrimaryContainer
                     )
                 }
@@ -587,8 +593,10 @@ private fun SleepTimerSwitchRow(
             Text(
                 text = label,
                 color = if (checked) artColors.onPrimaryContainer else artColors.onSurface,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
+                // The row's own container color reports the switch state, so
+                // the label stays at its role's weight instead of bolding the
+                // body scale to fake the emphasis.
+                style = MaterialTheme.typography.bodyLarge
             )
             Switch(
                 checked = checked,
@@ -752,6 +760,20 @@ private fun VerticalMetadataStrip(
 ) {
     val density = LocalDensity.current
     val windowHeightPx = with(density) { windowHeight.toPx() }
+    // The strip is the app's tightest text box, so its roles are chosen to fit
+    // it rather than the other way round. Portrait gives it 72dp with a 16dp
+    // top padding, which holds headlineSmall (30dp) plus bodyLarge (24dp).
+    // Landscape gives it 48dp with no top padding at all, and those two lines
+    // need 52dp there — the artist line was being clipped by the strip's own
+    // bounds. The supporting line steps down to bodySmall in that box so the
+    // pair fits with room to spare (46dp of 48dp).
+    val compactStrip = windowHeight < 56.dp
+    val titleStyle = MaterialTheme.typography.headlineSmall
+    val artistStyle = if (compactStrip) {
+        MaterialTheme.typography.bodySmall
+    } else {
+        MaterialTheme.typography.bodyLarge
+    }
     val window = remember(focusedIndex, queue.size) {
         if (queue.isEmpty()) {
             IntArray(0)
@@ -781,7 +803,7 @@ private fun VerticalMetadataStrip(
                 ) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = titleStyle,
                         color = artColors.onBackground,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
@@ -803,8 +825,13 @@ private fun VerticalMetadataStrip(
                     )
                     Text(
                         text = song.artist,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = artColors.onPrimaryContainer.copy(alpha = 0.7f),
+                        style = artistStyle,
+                        // Secondary text on a background surface takes the
+                        // surface's own secondary role. The line previously
+                        // mixed a *container* role (onPrimaryContainer) at 70%
+                        // alpha over the background, which is not a pairing the
+                        // palette guarantees contrast for.
+                        color = artColors.onSurfaceVariant,
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -834,7 +861,7 @@ private fun NowPlayingPanel(
     onCycleRepeat: () -> Unit,
     onOpenLyrics: () -> Unit,
     onSwipeToMiniplayer: () -> Unit,
-    landscapeQueueContent: @Composable (Boolean, Modifier) -> Unit = { _, _ -> },
+    landscapeQueueContent: @Composable (LandscapeQueueSlot, Modifier) -> Unit = { _, _ -> },
     isLandscape: Boolean = false,
     artworkShadowEnabled: Boolean = true,
     artworkShadowDp: Int = 6,
@@ -887,6 +914,9 @@ private fun NowPlayingPanel(
     // cover and title for a split second" flash on shuffle.
     var renderedQueue by remember { mutableStateOf(queue) }
     var lastQueue by remember { mutableStateOf<List<Song>?>(null) }
+    // With reduced motion on, a track change repositions the strip without
+    // travelling across it — the same destination, reached without the sweep.
+    val reducedMotion = LocalMiniMusicReducedMotion.current
 
     LaunchedEffect(targetIndex, queue) {
         if (queue.isEmpty() || targetIndex !in queue.indices) return@LaunchedEffect
@@ -913,6 +943,7 @@ private fun NowPlayingPanel(
             // (shuffle landing far away, wrap) snap instead of flying across
             // the queue.
             distance > 1.5f -> carouselProgress.snapTo(target)
+            reducedMotion -> carouselProgress.snapTo(target)
             else -> carouselProgress.animateTo(target, MiniMusicMotion.carouselSpatial())
         }
         if (queueChanged) {
@@ -1074,7 +1105,10 @@ private fun NowPlayingPanel(
                 ) {
                     Text(
                         formatDuration(playbackState.positionMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        // A running playhead is the spec's clock case: tabular
+                        // figures stop the digits counting up from nudging the
+                        // duration off the far edge on every tick.
+                        style = MiniMusicType.tabular(MaterialTheme.typography.labelMedium),
                         color = artColors.onPrimaryContainer
                     )
 
@@ -1106,7 +1140,7 @@ private fun NowPlayingPanel(
 
                     Text(
                         formatDuration(playbackState.durationMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MiniMusicType.tabular(MaterialTheme.typography.labelMedium),
                         color = artColors.onPrimaryContainer
                     )
                 }
@@ -1250,9 +1284,13 @@ private fun NowPlayingPanel(
                         Spacer(modifier = Modifier.height(landscapeControlSectionGap))
                         functionBlock(Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(landscapeFunctionSectionGap))
-                        if (landscapeQueueVisible && !queueOpen) {
+                        if (landscapeQueueVisible) {
+                            // The bar keeps its 72dp slot in this column in
+                            // both states, so the player's layout never moves.
+                            // It slides out of that slot and fades while the
+                            // sheet rises over the pane.
                             landscapeQueueContent(
-                                false,
+                                LandscapeQueueSlot.BAR,
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 8.dp)
@@ -1260,9 +1298,9 @@ private fun NowPlayingPanel(
                             )
                         }
                     }
-                    if (landscapeQueueVisible && queueOpen) {
+                    if (landscapeQueueVisible) {
                         landscapeQueueContent(
-                            true,
+                            LandscapeQueueSlot.SHEET,
                             Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 8.dp)
@@ -1452,11 +1490,23 @@ private fun PlayPauseButton(
         AnimatedContent(
             targetState = isPlaying,
             transitionSpec = {
-                (androidx.compose.animation.fadeIn(tween(130)) + androidx.compose.animation.scaleIn(
-                    initialScale = 0.82f, animationSpec = MiniMusicMotion.selectionEffects()
-                )) togetherWith (androidx.compose.animation.fadeOut(tween(90)) + androidx.compose.animation.scaleOut(
-                    targetScale = 0.92f, animationSpec = MiniMusicMotion.fastEffects()
-                ))
+                // The icon's alpha and its size are different kinds of property,
+                // so they keep different specs on purpose — alpha is an effects
+                // property and must never overshoot, size is spatial and may —
+                // but both now come from the token file and settle on the
+                // *fast* role together. They previously ran 130ms/90ms raw
+                // tweens against a spring, so the icon finished fading at a
+                // different moment from when it stopped growing.
+                (androidx.compose.animation.fadeIn(MiniMusicMotion.fastEffects()) +
+                    androidx.compose.animation.scaleIn(
+                        initialScale = 0.82f,
+                        animationSpec = MiniMusicMotion.fastSpatial()
+                    )) togetherWith
+                    (androidx.compose.animation.fadeOut(MiniMusicMotion.fastEffects()) +
+                        androidx.compose.animation.scaleOut(
+                            targetScale = 0.92f,
+                            animationSpec = MiniMusicMotion.fastSpatial()
+                        ))
             },
             label = "playPauseMorph"
         ) { playing ->

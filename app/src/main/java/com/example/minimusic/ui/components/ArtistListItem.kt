@@ -64,7 +64,7 @@ fun ArtistListItem(artist: Artist, onClick: () -> Unit, modifier: Modifier = Mod
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${artist.songCount} tracks • ${artist.albumCount} albums",
+                    text = "${artist.songCount} songs • ${artist.albumCount} albums",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

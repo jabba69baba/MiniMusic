@@ -53,7 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -229,7 +229,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsSwitchRow(
                         title = "Crossfade",
-                        subtitle = "Blend adjacent tracks · not active yet",
+                        subtitle = "Blend adjacent songs · not active yet",
                         checked = settings.crossfadeEnabled,
                         onCheckedChange = onCrossfadeEnabledChange
                     )
@@ -257,7 +257,7 @@ fun SettingsScreen(
                 SettingsSectionHeader("Library", Icons.Filled.LibraryMusic)
                 SettingsGroup {
                     SettingsSliderRow(
-                        title = "Track minimum length",
+                        title = "Song minimum length",
                         subtitle = if (settings.minDurationSeconds == 0) "No minimum" else "${settings.minDurationSeconds} seconds",
                         value = settings.minDurationSeconds.toFloat(),
                         valueRange = 0f..60f,
@@ -457,7 +457,19 @@ private fun SettingsSliderRow(
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(subtitle, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            // The current value of a control is the label role's job — the spec
+            // shows a music player's timecode in label style — rather than a
+            // second bodyLarge in the very same onSurface color, separated from
+            // its own title by nothing but weight.
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                }
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Slider(

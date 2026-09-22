@@ -105,8 +105,40 @@ object MiniMusicMotion {
     /** Emphasized easing for elements leaving the screen (accelerate). */
     val navExitEasing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 
+    /**
+     * Dialogs (the song Details surface) open and close on one shared
+     * curvature and duration. A dialog is a small component that both starts
+     * and ends on screen, so unlike screen transitions its two directions must
+     * read as a single motion rather than a decelerate/accelerate pair.
+     */
+    const val dialogDurationMillis = 220
+
+    /** Standard M3 easing, used for both dialog directions. */
+    val dialogEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
     /** Screen-transition duration at 1x animator scale. */
     const val navTransitionDurationMillis = 400
+
+    /**
+     * Duration of a forward/backward hierarchy push or pop.
+     *
+     * Shorter than [navTransitionDurationMillis] on purpose. That token is the
+     * full-height lyrics card's travel, where a longer journey is right; a
+     * screen push moves a third of the width and overlaps an existing screen,
+     * and the guide's forward/backward pattern is the app's most frequent
+     * transition, which is exactly where 400ms reads as sluggish.
+     */
+    const val navForwardDurationMillis = 300
+
+    /**
+     * Skeleton-to-content handoff. The guide sanctions a *short* fade for the
+     * one case where overlapping layers are intended: *"Once content is loaded,
+     * it quickly fades in on top of the skeleton loader."*
+     */
+    const val contentHandoffMillis = 180
+
+    /** Skeleton placeholder pulse period; shared with the details dialog. */
+    const val skeletonPulseMillis = 1200
 
     fun <T> fastEffectsSpring(): FiniteAnimationSpec<T> = fastEffects()
 
