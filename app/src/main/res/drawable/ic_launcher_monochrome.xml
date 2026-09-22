@@ -1,7 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed-icon layer: the same vinyl as the adaptive icon, reduced to the
-     shape that survives a single-colour mask — disc, groove cuts, spindle.
-     Regenerate with tools/make_icon.py. -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_launcher_vinyl_glyph"
-    android:gravity="fill" />
+<!-- Themed-icon layer: the vinyl reduced to the shape that survives a
+     single-colour mask — disc with groove cuts and a white spindle.
+     Vector; replaces the old keyed bitmap. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Disc -->
+    <path
+        android:pathData="M54,23 a31,31 0 1,0 0.01,0 Z"
+        android:fillColor="#FFFFFFFF" />
+
+    <!-- Groove cuts (punched out via evenOdd) -->
+    <path
+        android:pathData="M54,29 a25,25 0 1,0 0.01,0 Z M54,31 a23,23 0 1,1 0.01,0 Z
+                          M54,35 a19,19 0 1,0 0.01,0 Z M54,37 a17,17 0 1,1 0.01,0 Z
+                          M54,41 a13,13 0 1,0 0.01,0 Z M54,42.5 a11.5,11.5 0 1,1 0.01,0 Z"
+        android:fillColor="#00000000"
+        android:fillType="evenOdd" />
+
+    <!-- Label and spindle stay solid -->
+    <path
+        android:pathData="M54,44 a10,10 0 1,0 0.01,0 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M54,52 a2,2 0 1,0 0.01,0 Z"
+        android:fillColor="#FF000000" />
+</vector>

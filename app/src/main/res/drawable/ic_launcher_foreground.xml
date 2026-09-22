@@ -1,6 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive-icon foreground: the vinyl artwork, cropped to its tile, with the
-     black frame keyed out. Regenerate with tools/make_icon.py. -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_launcher_vinyl_foreground"
-    android:gravity="fill" />
+<!-- Adaptive-icon foreground: the vinyl record as pure vectors.
+
+     108dp layer; the launcher shows the central ~66dp, so the artwork is
+     drawn inside a 66dp safe circle centred at 54,54. Geometry:
+       - vinyl disc      r=33  (dark, with a half-tone split and grooves)
+       - centre label    r=12  (mid gray) + white spindle dot r=2.5
+       - long diagonal shadow cast to the lower-left, under the disc.
+     Replaces the old keyed-bitmap foreground whose scaling bugged the
+     launcher on several devices. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Long shadow: translucent disc + wedge cast toward the lower-left.
+         The opaque disc drawn above covers the overlap. -->
+    <path
+        android:pathData="M54,54 m-33,0 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0 Z M26,60 L6,108 L60,108 Z"
+        android:fillColor="#2E000000" />
+
+    <!-- Vinyl disc -->
+    <path
+        android:pathData="M54,21 a33,33 0 1,0 0.01,0 Z"
+        android:fillColor="#1E1E1E" />
+
+    <!-- Right half of the disc one step lighter (the source art's half-tone split) -->
+    <path
+        android:pathData="M54,21 a33,33 0 0,1 0,66 Z"
+        android:fillColor="#2A2A2A" />
+
+    <!-- Groove rings -->
+    <path
+        android:pathData="M54,26 a28,28 0 1,0 0.01,0 Z M54,27.5 a26.5,26.5 0 1,1 0.01,0 Z"
+        android:fillColor="#3A3A3A"
+        android:fillType="evenOdd" />
+    <path
+        android:pathData="M54,31 a23,23 0 1,0 0.01,0 Z M54,32.5 a21.5,21.5 0 1,1 0.01,0 Z"
+        android:fillColor="#3A3A3A"
+        android:fillType="evenOdd" />
+    <path
+        android:pathData="M54,36 a18,18 0 1,0 0.01,0 Z M54,37.5 a16.5,16.5 0 1,1 0.01,0 Z"
+        android:fillColor="#3A3A3A"
+        android:fillType="evenOdd" />
+    <path
+        android:pathData="M54,41 a13,13 0 1,0 0.01,0 Z M54,42 a12,12 0 1,1 0.01,0 Z"
+        android:fillColor="#3A3A3A"
+        android:fillType="evenOdd" />
+
+    <!-- Dark rim ring just inside the disc edge -->
+    <path
+        android:pathData="M54,21 a33,33 0 1,0 0.01,0 Z M54,25 a29,29 0 1,1 0.01,0 Z"
+        android:fillColor="#111111"
+        android:fillType="evenOdd" />
+
+    <!-- Centre label -->
+    <path
+        android:pathData="M54,42 a12,12 0 1,0 0.01,0 Z"
+        android:fillColor="#9C9C9C" />
+
+    <!-- Spindle dot -->
+    <path
+        android:pathData="M54,51.5 a2.5,2.5 0 1,0 0.01,0 Z"
+        android:fillColor="#FFFFFF" />
+</vector>

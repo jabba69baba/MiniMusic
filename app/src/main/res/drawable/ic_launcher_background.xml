@@ -1,15 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive-icon background: the cream field the record sits on.
+<!-- Adaptive-icon background: the light-gray field the record sits on.
 
-     This is the whole reason the icon is two layers. An adaptive icon's
-     background has to reach every edge of the 108dp layer, because the launcher
-     crops it to whatever shape it likes — so it is a field, generated here as a
-     gradient, never the artwork's own square tile. Cream in the middle, easing
-     to a slightly deeper cream at the corners; only the central 72dp is ever
-     seen, so the recorded edge colour is read as a vignette, not as an edge.
-
-     The gradient's radius reaches the layer's corner (sqrt(54² + 54²) ≈ 76.4),
-     and centerColor holds the middle flat until half that distance. -->
+     An adaptive icon's background must reach every edge of the 108dp layer
+     because the launcher crops it to any shape. Radial gray gradient —
+     lighter in the middle, easing darker toward the corners; only the
+     central 66dp is ever visible, so the corners read as a vignette. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -24,9 +19,9 @@
                 android:centerX="54"
                 android:centerY="54"
                 android:gradientRadius="76.4"
-                android:startColor="#F6F0E6"
-                android:centerColor="#F3ECDF"
-                android:endColor="#E0D4C3" />
+                android:startColor="#D2D2D2"
+                android:centerColor="#CACACA"
+                android:endColor="#B2B2B2" />
         </aapt:attr>
     </path>
 </vector>
