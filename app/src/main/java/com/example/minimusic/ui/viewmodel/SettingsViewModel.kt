@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.minimusic.BuildConfig
 import com.example.minimusic.MainApplication
 import com.example.minimusic.data.AppSettings
+import com.example.minimusic.data.PaletteStyle
 import com.example.minimusic.data.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         repository.setThemeMode(mode)
     }
 
+    fun setAlbumArtPaletteStyle(style: PaletteStyle) = viewModelScope.launch {
+        repository.setAlbumArtPaletteStyle(style)
+    }
+
     fun setAmoledBlackMode(enabled: Boolean) = viewModelScope.launch {
         repository.setAmoledBlackMode(enabled)
     }
@@ -50,6 +55,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setCenteredTitle(enabled: Boolean) = viewModelScope.launch {
         repository.setCenteredTitle(enabled)
+    }
+
+    fun setPlayerArtworkShadowEnabled(enabled: Boolean) = viewModelScope.launch {
+        repository.setPlayerArtworkShadowEnabled(enabled)
+    }
+
+    fun setPlayerArtworkShadowDp(dp: Int) = viewModelScope.launch {
+        repository.setPlayerArtworkShadowDp(dp)
     }
 
     fun setStopOnDismiss(enabled: Boolean) = viewModelScope.launch {

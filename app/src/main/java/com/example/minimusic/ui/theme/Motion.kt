@@ -79,23 +79,20 @@ object MiniMusicMotion {
      * documented exception to the "spatial may overshoot" rule — full-bleed
      * art frames pay per-frame measure/clip through the whole settle tail, so
      * a bouncy default spatial reads as lag on track switches. Same reasoning
-     * as PixelPlayer's carousel, reimplemented on our tokens. Stiffness 300
-     * settles the full-width travel in roughly half a second: deliberately
-     * slower than default spatial so the switch reads clearly. The seekbar
-     * rewind shares this exact spec, so bar and art move as one choreography
-     * (damping 1.0 also satisfies the effects no-overshoot rule, which is
-     * what lets a positional token drive a progress value).
+     * as PixelPlayer's carousel, reimplemented on our tokens (their spec is
+     * spring(NoBouncy, StiffnessMediumLow) — stiffness 300, identical).
+     * Stiffness 300 settles the full-width travel in roughly half a second:
+     * deliberately slower than default spatial so the switch reads clearly.
+     *
+     * This is the ONE track-change clock: the art film strip, the
+     * title/artist film strip, and the seekbar rewind all animate on this
+     * exact spec, so bar, art, and text settle together as one choreography
+     * on every track change, next or previous (damping 1.0 also satisfies
+     * the effects no-overshoot rule, which is what lets a positional token
+     * drive a progress value).
      */
     fun <T> carouselSpatial(): FiniteAnimationSpec<T> =
         spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f)
-
-    /**
-     * Single-layer track handoffs use two sequential legs. This faster
-     * critically-damped token keeps their total travel close to the existing
-     * seekbar rewind without changing the seekbar's shared carousel clock.
-     */
-    fun <T> trackHandoffSpatial(): FiniteAnimationSpec<T> =
-        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 1200f)
 
     // Screen transitions use emphasized *tweens*, not springs: M3 container
     // motion is easing-based while springs stay reserved for components.

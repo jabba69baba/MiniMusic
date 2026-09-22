@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalView
 import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.components.performMiniMusicHaptic
 import com.example.minimusic.data.AppSettings
+import com.example.minimusic.data.PaletteStyle
 import com.example.minimusic.data.ThemeMode
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.viewmodel.LibraryUiState
@@ -78,9 +79,12 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onAlbumArtPaletteStyleChange: (PaletteStyle) -> Unit,
     onAmoledBlackModeChange: (Boolean) -> Unit,
     onShowAudioQualityBadgeChange: (Boolean) -> Unit,
     onCenteredTitleChange: (Boolean) -> Unit,
+    onPlayerArtworkShadowEnabledChange: (Boolean) -> Unit,
+    onPlayerArtworkShadowDpChange: (Int) -> Unit,
     onResumeOnLaunchChange: (Boolean) -> Unit,
     onStopOnDismissChange: (Boolean) -> Unit,
     onHapticFeedbackChange: (Boolean) -> Unit,
@@ -136,6 +140,19 @@ fun SettingsScreen(
                         onSelect = onThemeModeChange
                     )
                     SettingsDivider()
+                    SettingsChoiceRow(
+                        title = "Album art palette",
+                        subtitle = "Color style derived from the playing track's art",
+                        options = listOf(
+                            PaletteStyle.EXPRESSIVE to "Expressive",
+                            PaletteStyle.FRUIT_SALAD to "Fruit Salad",
+                            PaletteStyle.TONAL_SPOT to "Tonal Spot",
+                            PaletteStyle.VIBRANT to "Vibrant"
+                        ),
+                        selected = settings.albumArtPaletteStyle,
+                        onSelect = onAlbumArtPaletteStyleChange
+                    )
+                    SettingsDivider()
                     SettingsSwitchRow(
                         title = "AMOLED dark mode",
                         subtitle = "Use pure-black surfaces in Dark mode",
@@ -160,6 +177,23 @@ fun SettingsScreen(
                         subtitle = "Center the player title and artist",
                         checked = settings.centeredTitle,
                         onCheckedChange = onCenteredTitleChange
+                    )
+                    SettingsDivider()
+                    SettingsSwitchRow(
+                        title = "Player Artwork Shadow",
+                        subtitle = "Elevate the player artwork with a soft shadow",
+                        checked = settings.playerArtworkShadowEnabled,
+                        onCheckedChange = onPlayerArtworkShadowEnabledChange
+                    )
+                    SettingsDivider()
+                    SettingsSliderRow(
+                        title = "Shadow strength",
+                        subtitle = "${settings.playerArtworkShadowDp} dp",
+                        value = settings.playerArtworkShadowDp.toFloat(),
+                        valueRange = 2f..10f,
+                        steps = 3,
+                        enabled = settings.playerArtworkShadowEnabled,
+                        onValueChange = { onPlayerArtworkShadowDpChange(it.toInt()) }
                     )
                 }
             }

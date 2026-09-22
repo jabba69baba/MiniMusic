@@ -42,6 +42,11 @@ class PlayerController(private val context: Context) {
     private var connectionGeneration = 0L
     private var currentQueue: List<Song> = emptyList()
     private var currentQueueEntries: List<QueueEntry> = emptyList()
+    // Last entry that resolved cleanly by media id. During a timeline change
+    // (shuffle toggle) the current media item can be briefly null; resolving
+    // to this instead of guessing from the new timeline index over the stale
+    // cached list prevents flashing a random track as the current one.
+    private var lastResolvedCurrentEntry: QueueEntry? = null
     /** Logical Shuffle button state; may be false while native shuffle carries a manual order. */
     private var shuffleActive = false
     /** Explicit display traversal after a manual move in a generated shuffled queue. */
@@ -385,26 +390,92 @@ class PlayerController(private val context: Context) {
      * right after the current track without disturbing the rest of the queue.
      * If nothing is playing yet, falls back to starting a fresh single-song queue.
      */
+    /**
+     * Inserts [song] at [targetPosition] of the *displayed* queue.
+     *
+     * The old implementation inserted at [MediaController.currentMediaItemIndex]
+     * — a TIMELINE index — both into the controller and into our entry list.
+     * With shuffle on those orderings disagree, and the unvalidated index made
+     * addMediaItem(index, item) reject the command outright, so the song
+     * neither appeared in the queue nor played next. Positions now come from
+     * the displayed (user-visible) queue, and placement reuses the same
+     * machinery as drag-reorder:
+     * - unshuffled: one validated insert at the display position
+     *   (coerced against the controller's own count, so never out of range)
+     * - shuffled: append, then an explicit shuffle-order command makes the
+     *   traversal (and the displayed queue) follow the new order.
+     */
+    private fun appendAndPlace(song: Song, targetPosition: Int) {
+        val c = controller ?: return
+        if (currentQueue.isEmpty()) {
+            playQueue(listOf(song), 0)
+            return
+        }
+        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
+        val displayBefore = manualQueueOrderEntryIds
+            ?.mapNotNull { id -> currentQueueEntries.firstOrNull { it.entryId == id } }
+            ?: if (c.shuffleModeEnabled) nativePlaybackOrder(c) else currentQueueEntries
+        val position = targetPosition.coerceIn(0, displayBefore.size)
+        val item = song.toMediaItem(mediaId = entry.entryId.toString())
+
+        runTimelineMutation {
+            if (c.shuffleModeEnabled) {
+                // Physical position is irrelevant under shuffle: append, then
+                // make the traversal follow the desired displayed order —
+                // exactly what a manual move does.
+                c.addMediaItem(item)
+                currentQueueEntries = currentQueueEntries + entry
+                currentQueue = currentQueueEntries.map { it.song }
+                val newDisplay = displayBefore.toMutableList().apply { add(position, entry) }
+                manualQueueOrderEntryIds = newDisplay.map { it.entryId }
+                val physicalOrder = manualQueueOrderEntryIds.orEmpty().mapNotNull { id ->
+                    currentQueueEntries.indexOfFirst { it.entryId == id }
+                        .takeIf { it >= 0 }
+                }.toIntArray()
+                if (physicalOrder.size == currentQueueEntries.size) {
+                    val args = Bundle().apply {
+                        putIntArray(MusicService.EXTRA_SHUFFLE_ORDER, physicalOrder)
+                    }
+                    c.sendCustomCommand(applyShuffleOrderCommand, args)
+                        .addListener({ refreshCurrentItem() }, MoreExecutors.directExecutor())
+                }
+            } else {
+                // Display order == physical order. Insert at the validated
+                // position — a single command, so the timeline event that
+                // follows lands in the final state.
+                val insertAt = position.coerceIn(0, c.mediaItemCount)
+                c.addMediaItem(insertAt, item)
+                currentQueueEntries = currentQueueEntries.toMutableList().apply { add(insertAt, entry) }
+                currentQueue = currentQueueEntries.map { it.song }
+            }
+            refreshCurrentItem()
+        }
+    }
+
+    /**
+     * Queues [song] to play immediately after the current one, in the
+     * displayed order (works with shuffle on: the shuffled traversal is
+     * re-ordered so the new item comes right after the current song).
+     */
     fun playNext(song: Song) {
         val c = controller ?: return
         if (currentQueue.isEmpty()) {
             playQueue(listOf(song), 0)
             return
         }
-        val insertAt = (c.currentMediaItemIndex + 1).coerceIn(0, currentQueueEntries.size)
-        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
-        c.addMediaItem(insertAt, song.toMediaItem(mediaId = entry.entryId.toString()))
-        currentQueueEntries = currentQueueEntries.toMutableList().apply { add(insertAt, entry) }
-        manualQueueOrderEntryIds = manualQueueOrderEntryIds?.toMutableList()?.apply {
-            add(entry.entryId)
-        }
-        currentQueue = currentQueueEntries.map { it.song }
-        refreshCurrentItem()
+        val display = manualQueueOrderEntryIds
+            ?.mapNotNull { id -> currentQueueEntries.firstOrNull { it.entryId == id } }
+            ?: if (c.shuffleModeEnabled) nativePlaybackOrder(c) else currentQueueEntries
+        val currentEntry = resolveCurrentEntry(c)
+        val currentPos = currentEntry
+            ?.let { e -> display.indexOfFirst { it.entryId == e.entryId } }
+            ?: -1
+        appendAndPlace(song, if (currentPos >= 0) currentPos + 1 else display.size)
     }
 
     /**
-     * Appends [song] to the end of the current queue. If nothing is playing yet,
-     * falls back to starting a fresh single-song queue.
+     * Appends [song] to the end of the current (displayed) queue. If nothing
+     * is playing yet, falls back to starting a fresh single-song queue.
      */
     fun addToQueue(song: Song) {
         val c = controller ?: return
@@ -412,15 +483,7 @@ class PlayerController(private val context: Context) {
             playQueue(listOf(song), 0)
             return
         }
-        val entry = QueueEntry(entryId = nextQueueEntryId++, song = song)
-        c.addMediaItem(
-            currentQueueEntries.size,
-            song.toMediaItem(mediaId = entry.entryId.toString())
-        )
-        currentQueueEntries = currentQueueEntries + entry
-        manualQueueOrderEntryIds = manualQueueOrderEntryIds?.plus(entry.entryId)
-        currentQueue = currentQueueEntries.map { it.song }
-        refreshCurrentItem()
+        appendAndPlace(song, Int.MAX_VALUE)
     }
 
     fun toggleShuffle() {
@@ -433,6 +496,10 @@ class PlayerController(private val context: Context) {
             manualQueueOrderEntryIds = null
             c.shuffleModeEnabled = enabled
             shuffleActive = enabled
+            // Toggling shuffle makes Media3 re-derive its playback state;
+            // hold isPlaying across that re-derivation exactly like a track
+            // transition, or the play/pause button morphs for a frame.
+            holdPlaybackStateAcrossTransition()
             _uiState.value = _uiState.value.copy(isShuffled = enabled)
             if (enabled) {
                 c.sendCustomCommand(freshShuffleCommand, Bundle())
@@ -568,7 +635,14 @@ class PlayerController(private val context: Context) {
             if (controllerEntries.size == c.mediaItemCount) {
                 currentQueueEntries = controllerEntries
                 currentQueue = controllerEntries.map { it.song }
+                refreshCurrentItem()
+                return
             }
+            // The timeline mid-change (shuffle toggle) can't be fully mapped
+            // yet. Refreshing from the stale cache would flash a random
+            // track as the current one; keep the last consistent state —
+            // the next settled timeline event re-syncs.
+            return
         }
 
         refreshCurrentItem()
@@ -595,6 +669,7 @@ class PlayerController(private val context: Context) {
             shuffleActive = c.shuffleModeEnabled
         }
         val currentEntry = resolveCurrentEntry(c)
+            ?.takeIf { it in currentQueueEntries }
         val currentTimelineIndex = currentEntry?.let { currentQueueEntries.indexOf(it) } ?: -1
         val currentSong = currentEntry?.song
         val displayEntries = manualQueueOrderEntryIds
@@ -602,6 +677,12 @@ class PlayerController(private val context: Context) {
             ?: if (c.shuffleModeEnabled) nativePlaybackOrder(c) else currentQueueEntries
         val displayQueue = displayEntries.map { it.song }
         val displayIndex = currentEntry?.let { displayEntries.indexOf(it) } ?: -1
+        // Never publish a half-baked state (mid-shuffle timeline): if the
+        // queue is non-empty but the current song can't be located inside
+        // the display list, keep the previous consistent emission; the next
+        // settled event re-publishes with the real order. Publishing instead
+        // is what flashed a random track as the current one for a second.
+        if (currentQueue.isNotEmpty() && (currentEntry == null || displayIndex < 0)) return
         val history = displayIndex.takeIf { it > 0 }
             ?.let { displayEntries.take(it) }
             ?: emptyList()
@@ -693,8 +774,16 @@ class PlayerController(private val context: Context) {
 
     private fun resolveCurrentEntry(c: Player): QueueEntry? {
         val mediaId = c.currentMediaItem?.mediaId
-        return currentQueueEntries.firstOrNull { it.entryId.toString() == mediaId }
-            ?: currentQueueEntries.getOrNull(c.currentMediaItemIndex)
+        val resolved = currentQueueEntries.firstOrNull { it.entryId.toString() == mediaId }
+        if (resolved != null) {
+            lastResolvedCurrentEntry = resolved
+        }
+        // No position-based fallback: during a shuffle toggle the timeline
+        // index has already moved to the NEW order while currentQueueEntries
+        // can still hold the OLD one, so [currentMediaItemIndex] into the
+        // cached list returned a random track for a second. Keeping the last
+        // cleanly resolved entry is always the correct song in that window.
+        return resolved ?: lastResolvedCurrentEntry
     }
 
     private fun startPositionTicker() {

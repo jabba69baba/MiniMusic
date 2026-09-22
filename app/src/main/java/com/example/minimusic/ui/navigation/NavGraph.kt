@@ -393,10 +393,13 @@ fun MiniMusicNavGraph(
                 onBack = { navController.popBackStack() },
                 onDynamicColorChange = settingsViewModel::setDynamicColorEnabled,
                 onThemeModeChange = settingsViewModel::setThemeMode,
+                onAlbumArtPaletteStyleChange = settingsViewModel::setAlbumArtPaletteStyle,
                 onAmoledBlackModeChange = settingsViewModel::setAmoledBlackMode,
                 onResumeOnLaunchChange = settingsViewModel::setResumeOnLaunch,
                 onShowAudioQualityBadgeChange = settingsViewModel::setShowAudioQualityBadge,
                 onCenteredTitleChange = settingsViewModel::setCenteredTitle,
+                onPlayerArtworkShadowEnabledChange = settingsViewModel::setPlayerArtworkShadowEnabled,
+                onPlayerArtworkShadowDpChange = settingsViewModel::setPlayerArtworkShadowDp,
                 onStopOnDismissChange = settingsViewModel::setStopOnDismiss,
                 onHapticFeedbackChange = settingsViewModel::setHapticFeedback,
                 onCrossfadeEnabledChange = settingsViewModel::setCrossfadeEnabled,
@@ -476,6 +479,7 @@ fun MiniMusicNavGraph(
                         playbackFlow = playerViewModel.uiState,
                         lyricsState = lyricsState,
                         onSeekTo = playerViewModel::seekTo,
+                        albumArtPaletteStyle = appSettings.albumArtPaletteStyle,
                         // Back always lands on the player card: pop to PLAYER
                         // when it's in the stack (tap/drag-open path), else
                         // rebuild it above Home (drag-open path has no PLAYER
@@ -497,6 +501,7 @@ fun MiniMusicNavGraph(
                     playbackFlow = playerViewModel.uiState,
                     lyricsState = lyricsState,
                     onSeekTo = playerViewModel::seekTo,
+                    albumArtPaletteStyle = appSettings.albumArtPaletteStyle,
                     onBack = {
                         val popped =
                             navController.popBackStack(Routes.PLAYER, inclusive = false)
@@ -580,6 +585,9 @@ fun MiniMusicNavGraph(
                     queueSnapshot = queueSnapshot,
                     showAudioQualityBadge = appSettings.showAudioQualityBadge,
                     centeredTitle = appSettings.centeredTitle,
+                    albumArtPaletteStyle = appSettings.albumArtPaletteStyle,
+                    artworkShadowEnabled = appSettings.playerArtworkShadowEnabled,
+                    artworkShadowDp = appSettings.playerArtworkShadowDp,
                     sleepTimerState = sleepTimerState,
                     onBack = { navController.popBackStack() },
                     onSwipeToMiniplayer = {},
@@ -627,7 +635,8 @@ fun MiniMusicNavGraph(
                     onTogglePlayPause = playerViewModel::togglePlayPause,
                     onSkipNext = playerViewModel::skipToNext,
                     onClick = ::openPlayerWithSheetTransition,
-                    onSwipeToPlayer = {}
+                    onSwipeToPlayer = {},
+                    albumArtPaletteStyle = appSettings.albumArtPaletteStyle
                 )
                 }
             }

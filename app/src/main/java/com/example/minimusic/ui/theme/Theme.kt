@@ -20,10 +20,13 @@ private val LightColors = lightColorScheme()
 private val DarkColors = darkColorScheme()
 
 /**
- * App-wide Material 3 Expressive theme. Android 12+ uses wallpaper-derived
- * Monet roles; older devices use the complete warm-neutral fallback above.
- * Every screen receives the same primary/secondary/tertiary and surface-role
- * contract, while the player may add its album-art accent locally.
+ * App-wide Material 3 Expressive theme. Android 12+ uses the system's own
+ * wallpaper-derived Monet scheme (the wallpaper's Tonal Spot); older devices
+ * use the complete warm-neutral fallback above. Every screen receives the
+ * same primary/secondary/tertiary and surface-role contract, while the player
+ * may add its album-art accent locally — the album-art palette style (Tonal
+ * Spot / Vibrant / Expressive / Fruit Salad) is intentionally limited to
+ * album-art-derived components so the app chrome stays the device's identity.
  *
  * The motion scheme is the official expressive physics scheme
  * ([MotionScheme.expressive]): spatial springs may overshoot, effects springs
