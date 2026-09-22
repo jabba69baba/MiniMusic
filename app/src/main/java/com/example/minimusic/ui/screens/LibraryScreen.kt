@@ -424,9 +424,13 @@ fun LibraryScreen(
                             PillButton(
                                 onClick = {
                                     if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    // Shuffle changes playback only. Do not
-                                    // cancel an active LazyColumn fling or
-                                    // user drag when the control is tapped.
+                                    // Shuffle changes playback only, but it DOES
+                                    // re-anchor the list through the jump-to-current
+                                    // locate that follows the new queue — an active
+                                    // fling fighting that locate is what jittered.
+                                    // Stop the scroll first, same as Locate.
+                                    stopSongScrollRequest++
+                                    jumpToCurrentRequest++
                                     if (filteredSongs.isNotEmpty()) {
                                         val startSong = filteredSongs.random()
                                         onShufflePlayFrom(startSong, filteredSongs)

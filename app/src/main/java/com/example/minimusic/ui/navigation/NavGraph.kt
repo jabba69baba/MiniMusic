@@ -98,10 +98,12 @@ fun MiniMusicNavGraph(
     val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
 
     LaunchedEffect(libraryState.allSongs, appSettings.resumeOnLaunch) {
-        if (libraryState.allSongs.isNotEmpty()) {
+        // Resume-on-launch OFF means a genuinely fresh start: no restored queue,
+        // no restored track — the library opens empty of playback state.
+        if (appSettings.resumeOnLaunch && libraryState.allSongs.isNotEmpty()) {
             playerViewModel.restoreLastSession(
                 libraryState.allSongs,
-                playOnLaunch = appSettings.resumeOnLaunch
+                playOnLaunch = true
             )
         }
     }
@@ -597,15 +599,17 @@ private fun pushExit(reduced: Boolean): ExitTransition {
 }
 
 private fun backEnter(reduced: Boolean): EnterTransition {
+    // The Library layer already sits beneath the NavHost, so a returning
+    // destination does not need a fade to appear — sliding it in from the
+    // leading edge as an opaque surface reads as the reverse of the push.
+    // A fade here is what made the back transition look translucent: the
+    // incoming screen blended with the stale layer underneath.
     val spec = tween<IntOffset>(
         MiniMusicMotion.navForwardDurationMillis,
         easing = MiniMusicMotion.navEnterEasing
     )
-    val fade = fadeIn(
-        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navEnterEasing)
-    )
-    return if (reduced) fade
-    else fade + slideInHorizontally(animationSpec = spec) { -it / 6 }
+    return if (reduced) EnterTransition
+    else slideInHorizontally(animationSpec = spec) { -it / 6 }
 }
 
 private fun backExit(reduced: Boolean): ExitTransition {

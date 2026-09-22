@@ -680,9 +680,12 @@ class PlayerController(private val context: Context) {
         // Never publish a half-baked state (mid-shuffle timeline): if the
         // queue is non-empty but the current song can't be located inside
         // the display list, keep the previous consistent emission; the next
-        // settled event re-publishes with the real order. Publishing instead
-        // is what flashed a random track as the current one for a second.
-        if (currentQueue.isNotEmpty() && (currentEntry == null || displayIndex < 0)) return
+        // settled event re-publishes with the real order. The guard only
+        // applies when something was already playing — on a fresh playQueue
+        // tap there is no prior emission to protect, and blocking here is
+        // what made the first tap appear dead.
+        val hadPriorState = _uiState.value.currentSong != null
+        if (hadPriorState && currentQueue.isNotEmpty() && (currentEntry == null || displayIndex < 0)) return
         val history = displayIndex.takeIf { it > 0 }
             ?.let { displayEntries.take(it) }
             ?: emptyList()
@@ -777,13 +780,24 @@ class PlayerController(private val context: Context) {
         val resolved = currentQueueEntries.firstOrNull { it.entryId.toString() == mediaId }
         if (resolved != null) {
             lastResolvedCurrentEntry = resolved
+            return resolved
         }
         // No position-based fallback: during a shuffle toggle the timeline
         // index has already moved to the NEW order while currentQueueEntries
         // can still hold the OLD one, so [currentMediaItemIndex] into the
-        // cached list returned a random track for a second. Keeping the last
-        // cleanly resolved entry is always the correct song in that window.
-        return resolved ?: lastResolvedCurrentEntry
+        // cached list returned a random track for a second.
+        // The stale-entry fallback is also scoped: it must be an entry of the
+        // CURRENT queue. Holding one from a previous queue (e.g. right after
+        // playQueue replaced the list but before the timeline event arrived)
+        // published a song the user never clicked — and because refreshCurrentItem
+        // then refused to overwrite a resolvable current entry, the tap appeared
+        // to do nothing at all.
+        val stale = lastResolvedCurrentEntry
+        return if (stale != null && currentQueueEntries.any { it.entryId == stale.entryId }) {
+            stale
+        } else {
+            currentQueueEntries.getOrNull(c.currentMediaItemIndex)
+        }
     }
 
     private fun startPositionTicker() {

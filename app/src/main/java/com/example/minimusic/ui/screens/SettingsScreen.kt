@@ -15,12 +15,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -270,7 +271,10 @@ fun SettingsScreen(
                         headlineContent = { Text("Rescan library") },
                         trailingContent = {
                             if (libraryState.isLoading) {
-                                CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+                                // M3 Expressive loading indicator: the animated
+                                // wavy loading shape, not the static circular
+                                // progress spinner.
+                                LoadingIndicator(modifier = Modifier.padding(8.dp).size(36.dp))
                             } else {
                                 IconButton(onClick = onRescanLibrary) {
                                     Icon(Icons.Filled.Refresh, contentDescription = "Rescan library")
