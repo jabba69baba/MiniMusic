@@ -72,6 +72,7 @@ import com.example.minimusic.ui.viewmodel.LibraryUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,

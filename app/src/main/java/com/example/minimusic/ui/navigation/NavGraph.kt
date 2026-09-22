@@ -608,7 +608,7 @@ private fun backEnter(reduced: Boolean): EnterTransition {
         MiniMusicMotion.navForwardDurationMillis,
         easing = MiniMusicMotion.navEnterEasing
     )
-    return if (reduced) EnterTransition
+    return if (reduced) EnterTransition.None
     else slideInHorizontally(animationSpec = spec) { -it / 6 }
 }
 
