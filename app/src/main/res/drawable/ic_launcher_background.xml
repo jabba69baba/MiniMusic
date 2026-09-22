@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Adaptive-icon background: the light-gray field the record sits on.
-
-     An adaptive icon's background must reach every edge of the 108dp layer
-     because the launcher crops it to any shape. Radial gray gradient —
-     lighter in the middle, easing darker toward the corners; only the
-     central 66dp is ever visible, so the corners read as a vignette. -->
+     A flat-to-vignette radial gradient; only the central 72dp is ever seen
+     after the launcher masks it. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -20,8 +17,8 @@
                 android:centerY="54"
                 android:gradientRadius="76.4"
                 android:startColor="#D2D2D2"
-                android:centerColor="#CACACA"
-                android:endColor="#B2B2B2" />
+                android:centerColor="#CCCCCC"
+                android:endColor="#B3B3B3" />
         </aapt:attr>
     </path>
 </vector>

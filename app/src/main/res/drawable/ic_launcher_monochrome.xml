@@ -1,31 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed-icon layer: the vinyl reduced to the shape that survives a
-     single-colour mask — disc with groove cuts and a white spindle.
-     Vector; replaces the old keyed bitmap. -->
+<!-- Themed-icon layer: the vinyl reduced to a single-colour silhouette —
+     disc with groove rings punched out (evenOdd), label and spindle intact.
+     Adaptive-icon monochrome layers are alpha-masked, so only the geometry
+     matters. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Disc -->
+    <!-- Disc with groove rings cut out (even-odd annuli) -->
     <path
-        android:pathData="M54,23 a31,31 0 1,0 0.01,0 Z"
+        android:fillType="evenOdd"
+        android:pathData="M54,30 a24,24 0 1,0 0.01,0 Z
+                          M54,36 a18,18 0 1,1 0.01,0 Z M54,37.6 a16.4,16.4 0 1,0 0.01,0 Z
+                          M54,40 a14,14 0 1,1 0.01,0 Z M54,41.6 a12.4,12.4 0 1,0 0.01,0 Z
+                          M54,44 a10,10 0 1,1 0.01,0 Z"
         android:fillColor="#FFFFFFFF" />
 
-    <!-- Groove cuts (punched out via evenOdd) -->
+    <!-- Label -->
     <path
-        android:pathData="M54,29 a25,25 0 1,0 0.01,0 Z M54,31 a23,23 0 1,1 0.01,0 Z
-                          M54,35 a19,19 0 1,0 0.01,0 Z M54,37 a17,17 0 1,1 0.01,0 Z
-                          M54,41 a13,13 0 1,0 0.01,0 Z M54,42.5 a11.5,11.5 0 1,1 0.01,0 Z"
-        android:fillColor="#00000000"
-        android:fillType="evenOdd" />
-
-    <!-- Label and spindle stay solid -->
-    <path
-        android:pathData="M54,44 a10,10 0 1,0 0.01,0 Z"
+        android:pathData="M54,47 a7,7 0 1,0 0.01,0 Z"
         android:fillColor="#FFFFFFFF" />
+
+    <!-- Spindle hole -->
     <path
-        android:pathData="M54,52 a2,2 0 1,0 0.01,0 Z"
+        android:pathData="M54,52.4 a1.6,1.6 0 1,0 0.01,0 Z"
         android:fillColor="#FF000000" />
 </vector>
