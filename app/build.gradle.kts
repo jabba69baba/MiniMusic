@@ -30,14 +30,20 @@ android {
         release {
             // Auxio/Gramophone recipe: R8 + resource shrinking is the entire
             // reason they ship at 10-11MB with equal-or-larger feature sets.
-            // Our debug APK carries ~80MB of unshaken dex (unused icons,
-            // Compose/Media3 modules); this strips it for release only.
             isMinifyEnabled = true
             isShrinkResources = true
-            // CI test releases are signed with the generated debug key so the
-            // release-variant APK remains installable without committing a
-            // private signing key. This does not alter playback or UI code.
-            signingConfig = signingConfigs.getByName("debug")
+            // TEST BUILDS ONLY: CI signs with the debug key so the release-variant
+            // APK is installable without a private signing key. Before any public
+            // distribution, override this with a real keystore (do NOT ship a
+            // debug-signed release — Play Store and update signatures will
+            // conflict with any properly signed build later).
+            if (System.getenv("CI_TEST_RELEASE") != null || System.getenv("GITHUB_SHA") != null) {
+                signingConfig = signingConfigs.getByName("debug")
+            } else {
+                // Local releases are unsigned unless a keystore is configured;
+                // Android Studio's Generate Signed Bundle flow applies its own key.
+                isDebuggable = false
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

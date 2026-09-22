@@ -5,15 +5,24 @@ import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
+import com.example.minimusic.data.SettingsRepository
 import com.example.minimusic.widget.MiniMusicWidgetProvider
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Background service that owns the single ExoPlayer instance and exposes it through
@@ -36,6 +45,13 @@ class MusicService : MediaSessionService() {
     private val freshShuffleCommand = SessionCommand(ACTION_FRESH_SHUFFLE, Bundle())
     private val applyShuffleOrderCommand = SessionCommand(ACTION_APPLY_SHUFFLE_ORDER, Bundle())
     private var mediaSession: MediaSession? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val monoProcessor = MonoAudioProcessor()
+    private lateinit var settingsRepository: SettingsRepository
+    private var crossfadeEngine: CrossfadeEngine? = null
+
+    /** Late-bound: assigned in onCreate right after the player is built. */
+    private var activePlayer: Player? = null
 
     private val sessionCallback = object : MediaSession.Callback {
         override fun onConnect(
@@ -93,7 +109,20 @@ class MusicService : MediaSessionService() {
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
-        val player = ExoPlayer.Builder(this)
+        val crossfadeEngine = CrossfadeEngine(
+            positionProvider = { activePlayer?.currentPosition?.coerceAtLeast(0L) ?: 0L }
+        )
+        this.crossfadeEngine = crossfadeEngine
+        val renderersFactory = DefaultRenderersFactory(this)
+            .setEnableAudioFloatOutput(false)
+            .setAudioSinkProvider {
+                DefaultAudioSink.Builder(this)
+                    .setAudioProcessorChain(
+                        DefaultAudioSink.DefaultAudioProcessorChain(monoProcessor, crossfadeEngine)
+                    )
+                    .build()
+            }
+        val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true) // pause when headphones are unplugged
             .build()
@@ -101,9 +130,21 @@ class MusicService : MediaSessionService() {
                 repeatMode = Player.REPEAT_MODE_OFF
             }
             .also { exoPlayer ->
+                activePlayer = exoPlayer
                 exoPlayer.addListener(object : Player.Listener {
                     override fun onEvents(player: Player, events: Player.Events) {
                         MiniMusicWidgetProvider.requestUpdate(this@MusicService)
+                        // Re-derive the fade window for the current item; duration
+                        // becomes known once the media source is prepared.
+                        if (events.contains(Player.EVENT_TIMELINE_CHANGED) ||
+                            events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
+                            events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)
+                        ) {
+                            crossfadeEngine.configure(
+                                enabledSecondsMs = crossfadeEngine.currentFadeMs,
+                                currentDurationMs = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: 0L
+                            )
+                        }
                     }
                 })
             }
@@ -112,6 +153,20 @@ class MusicService : MediaSessionService() {
             .setCallback(sessionCallback)
             .build()
         MiniMusicWidgetProvider.updateFromPlayer(this, player)
+
+        // Apply the persisted Audio settings the moment the player exists, then
+        // keep applying them live whenever the user toggles a setting.
+        settingsRepository = SettingsRepository(this)
+        serviceScope.launch {
+            settingsRepository.settings.collect { settings ->
+                monoProcessor.enabled = settings.monoAudio
+                val fadeSecondsMs = if (settings.crossfadeEnabled) settings.crossfadeSeconds * 1000L else 0L
+                crossfadeEngine.configure(
+                    enabledSecondsMs = fadeSecondsMs,
+                    currentDurationMs = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: 0L
+                )
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -128,8 +183,27 @@ class MusicService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player
+        // Stop-on-dismiss: when the user swipes the app away, either keep playing
+        // (default) or stop and tear down the foreground service per the setting.
+        val stopOnDismiss = runCatching {
+            kotlinx.coroutines.runBlocking { settingsRepository.settings.first().stopOnDismiss }
+        }.getOrDefault(false)
+        if (stopOnDismiss && (player == null || !player.playWhenReady || player.mediaItemCount == 0)) {
+            stopSelf()
+        } else if (stopOnDismiss) {
+            player?.pause()
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         isRunning = false
+        serviceScope.cancel()
+        activePlayer = null
+        crossfadeEngine = null
         mediaSession?.run {
             player.release()
             release()

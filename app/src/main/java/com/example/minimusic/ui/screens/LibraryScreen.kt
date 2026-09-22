@@ -94,13 +94,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -972,10 +967,6 @@ private fun SlidingCategoryControl(
     }
 }
 
-/** Fixed width for the complete Songs/Artists/Albums selector pill so
- *  switching labels never changes the control’s footprint. */
-private val SelectorPillWidth = 142.dp
-private val ControlSegmentWidth = 46.dp
 
 /**
  * A single segment of a multi-part pill control — several of these sit in a
@@ -1046,81 +1037,6 @@ private fun sortOrderOf(field: SortField, ascending: Boolean): SongSortOrder = w
     SortField.ALBUM -> if (ascending) SongSortOrder.ALBUM_A_Z else SongSortOrder.ALBUM_Z_A
     SortField.DURATION -> if (ascending) SongSortOrder.DURATION_SHORTEST else SongSortOrder.DURATION_LONGEST
     SortField.DATE_ADDED -> if (ascending) SongSortOrder.DATE_ADDED_OLDEST else SongSortOrder.DATE_ADDED_NEWEST
-}
-
-@Composable
-private fun LibraryTabMenu(
-    expanded: Boolean,
-    selected: LibraryTab,
-    onDismiss: () -> Unit,
-    onSelect: (LibraryTab) -> Unit
-) {
-    if (!expanded) return
-    val tabs = listOf(
-        LibraryTab.SONGS,
-        LibraryTab.ARTISTS,
-        LibraryTab.ALBUMS
-    )
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        modifier = Modifier.width(SelectorPillWidth)
-    ) {
-        tabs.forEach { tab ->
-            val selectedRow = selected == tab
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = tab.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = null,
-                        tint = if (selectedRow) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                },
-                trailingIcon = {
-                    if (selectedRow) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = androidx.compose.material3.MenuDefaults.itemColors(
-                    textColor = if (selectedRow) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    leadingIconColor = if (selectedRow) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    trailingIconColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier.background(
-                    if (selectedRow) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                ),
-                onClick = {
-                    onSelect(tab)
-                    onDismiss()
-                }
-            )
-        }
-    }
 }
 
 @Composable
