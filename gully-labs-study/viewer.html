@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gully Labs — Culture as Capital · Deck</title>
+<style>
+ body{margin:0;background:#221B15;font:15px/1.55 Calibri,Segoe UI,sans-serif;color:#F4EFE6}
+ header{position:fixed;top:0;left:0;right:0;padding:10px 18px;background:#171009;display:flex;gap:14px;align-items:center;z-index:2}
+ header b{font:italic 20px Georgia,serif}
+ header span{color:#8A8177;font-size:12px;letter-spacing:1px;text-transform:uppercase}
+ main{max-width:1150px;margin:64px auto 30px;padding:0 16px}
+ img{width:100%;border:1px solid #8C6248;display:block}
+ #notes{background:#2b221a;border-left:3px solid #8C6248;padding:12px 16px;margin-top:12px;color:#d8cfc2;min-height:60px}
+ #notes i{color:#C9A227}
+ nav{display:flex;gap:10px;align-items:center;margin:12px 0}
+ button{background:none;border:1px solid #8C6248;color:#F4EFE6;padding:6px 14px;cursor:pointer;font:12px Calibri;letter-spacing:1px}
+ button:hover{background:#8C6248}
+ #cnt{color:#8A8177;letter-spacing:1px}
+ #dots{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap}
+ #dots a{width:10px;height:10px;border:1px solid #8C6248;display:inline-block;cursor:pointer}
+ #dots a.on{background:#8C6248}
+</style></head><body>
+<header><b>Gully Labs</b><span>culture as capital · brand study &amp; strategic analysis · 4 speakers · 11 min</span></header>
+<main><img id="im" alt="slide"><div id="notes"></div>
+<nav><button id="p">← PREV</button><span id="cnt"></span><button id="n">NEXT →</button><span id="dots"></span></nav>
+</main>
+<script>
+const S=[{"n": 1, "img": "deck_min/preview/slide_01.png", "notes": "OPEN (Aisha, 30 sec). Do not read the title. Say: 'Nike sells a swoosh. Gully Labs sells a street in Delhi. Same category, different strategy question - can culture be a defensible advantage?' Point at the photo: two founders, one manifesto. Hand to slide 2."}, {"n": 2, "img": "deck_min/preview/slide_02.png", "notes": "Aisha, 45 sec. Run the show of hands FIRST, count out loud - that gap is the case. Then the four sections and who speaks when; do not read the syllabus line, say it is mapped in the written study. End on the italic question, read slowly."}, {"n": 3, "img": "deck_min/preview/slide_03.png", "notes": "Aisha, 60 sec. Three claims, not a node-by-node timeline: (1) 20 lakh to 2.9 crore to 16 crore expected - 80x in two years off a tiny base; (2) they own factory AND store, against everyone's advice; (3) their X following is 3,640 - reach is reels and word of mouth, which matters later. Flag the bestseller price Rs 8,900 - Air Force 1 territory."}, {"n": 4, "img": "deck_min/preview/slide_04.png", "notes": "Aisha, 60 sec. Framing line: 'A mission is a statement; a policy is the rule that stops you breaking it.' Give one example per policy type, do not read all four. Land the culture point: the manifesto does the work an SOP manual does at a big firm - and slide 13 shows the day that stopped being enough."}, {"n": 5, "img": "deck_min/preview/slide_05.png", "notes": "Aisha, 60 sec. Do not read the rows. Deliver only the implication column for P, E and L. The killer fact is GST: Sep 2025 cut footwear under Rs 2,500 to 5% but left everything above at 18%, and 100% of Gully Labs' range is above. End on the italic net read."}, {"n": 6, "img": "deck_min/preview/slide_06.png", "notes": "Rohan, 55 sec. Walk the five steps once, then the ladder: '100 rupees in, 11 left - the whole business case on one line.' Two claims: 56% gross proves pricing works; 35% marketing proves the brand doesn't pull. Remember-line: they ran out of karigars before they ran out of demand."}, {"n": 7, "img": "deck_min/preview/slide_07.png", "notes": "Rohan, 80 sec. Move 1 - the orange-underline fact: they are the most expensive Indian sneaker company that is not a volume player. Move 2 - ask the room which force is strongest, wait, reveal buyer power: switching cost is literally zero. Close on the italic verdict."}, {"n": 8, "img": "deck_min/preview/slide_08.png", "notes": "Rohan, 80 sec. 4Ps in one breath: premium product, premium price, owned place, community promotion - four Ps pointing the same way is what consistency looks like. SWOT: one item per quadrant out loud - factory; 11%; diaspora; Comet's balance sheet. Hand to Meera."}, {"n": 9, "img": "deck_min/preview/slide_09.png", "notes": "Meera, 55 sec. One idea: three growth strategies at once and one refused - read the red row aloud. Levels in one breath: where / how / who. Finish on the tension box; it sets up evaluation."}, {"n": 10, "img": "deck_min/preview/slide_10.png", "notes": "Meera, 65 sec. Quiz first: 'Where do socks and jerseys sit?' - question mark now, dog if unfocused; accessories only work if they lift AOV. Then the marks-line about BCG vs GE. Don't explain the matrices; the room knows them."}, {"n": 11, "img": "deck_min/preview/slide_11.png", "notes": "Meera, 65 sec. Three beats: name two challenges (craft scaling, Rs 85 lakh); design thinking - first product was a Rs 1,000 prototype of a Rs 6,000 shoe; blue ocean - read the four actions. If long, skip the bars and say 'capacity first, brand second'."}, {"n": 12, "img": "deck_min/preview/slide_12.png", "notes": "Kabir, 55 sec. Open with the why-BSC line. Read one row per quadrant. Be explicit: disclosed baselines vs our proposed targets - examiners reward that distinction."}, {"n": 13, "img": "deck_min/preview/slide_13.png", "notes": "Kabir, 65 sec. Open with the fraud story - true and memorable. Syllabus point: that was an operational-control failure; the strategic question is whether trust-culture survives 150 employees - you need both at different frequencies. Skim the audit; land the triggers line."}, {"n": 14, "img": "deck_min/preview/slide_14.png", "notes": "Kabir, 60 sec. Vote first, count, say 'yes, conditionally'. One sentence per recommendation. Closing argument from the verdict column: culture is a moat only because of factory + karigars + store. That is the line the examiner remembers."}, {"n": 15, "img": "deck_min/preview/slide_15.png", "notes": "Kabir, 15 sec + Q&A. Thank the room, invite questions; if silent, ask the verdict question yourself. Keep the five backups ready - funding and GST are the likeliest probes."}];let i=0;
+function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
+function show(){const s=S[i];document.getElementById('im').src=s.img;
+document.getElementById('notes').innerHTML='<i>'+s.n+' / 15 · speaker notes</i><br>'+esc(s.notes);
+document.getElementById('cnt').textContent=(i+1)+' / 15';
+[...document.querySelectorAll('#dots a')].forEach((a,k)=>a.className=k===i?'on':'');}
+S.forEach((s,k)=>{const a=document.createElement('a');a.title='slide '+(k+1);a.onclick=()=>{i=k;show()};document.getElementById('dots').appendChild(a)});
+document.getElementById('p').onclick=()=>{i=(i+14)%15;show()};
+document.getElementById('n').onclick=()=>{i=(i+1)%15;show()};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){i=(i+1)%15;show()}if(e.key==='ArrowLeft'){i=(i+14)%15;show()}});
+show();
+</script></body></html>
