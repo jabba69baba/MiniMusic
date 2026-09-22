@@ -1,5 +1,6 @@
 package com.example.minimusic.playback
 
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import java.nio.ByteBuffer
 
@@ -15,15 +16,17 @@ class MonoAudioProcessor : BaseAudioProcessor() {
 
     private var channelCount = 0
 
-    override fun onConfigure(inputAudioFormat: androidx.media3.common.audio.AudioProcessor.AudioFormat): androidx.media3.common.audio.AudioProcessor.AudioFormat {
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         channelCount = inputAudioFormat.channelCount
-        return if (enabled && channelCount >= 2) inputAudioFormat
-        else androidx.media3.common.audio.AudioProcessor.AudioFormat.NOT_SET_SPECIFIED
+        // Always accept the format; queueInput passes through when disabled.
+        return inputAudioFormat
     }
+
+    override fun isActive(): Boolean = enabled && channelCount >= 2
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
-        if (!enabled || channelCount < 2) {
+        if (!isActive()) {
             val out = replaceOutputBuffer(remaining)
             out.put(inputBuffer).flip()
             return

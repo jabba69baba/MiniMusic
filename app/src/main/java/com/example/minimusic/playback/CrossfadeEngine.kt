@@ -7,13 +7,9 @@ import kotlin.math.min
 
 /**
  * Linear crossfade between consecutive tracks: the outgoing track's volume ramps
- * down over the last [fadeMs] of the item, implemented as a positional gain
- * AudioProcessor installed in the audio sink chain. The player's own position
- * drives the curve, so no decoder-level duplication is needed for local files.
- *
- * Note: this fades out the end of each track. The incoming track starts at
- * full volume (a "fade-into-next" crossfade); a true overlapping dual-player
- * crossfade can replace this later without changing the settings plumbing.
+ * down over the last [fadeMs] of the item and the incoming track ramps up over
+ * its first [fadeMs], implemented as a positional gain AudioProcessor installed
+ * in the audio sink chain. The player's own position drives the curve.
  */
 class CrossfadeEngine(private val positionProvider: () -> Long) : BaseAudioProcessor() {
 
@@ -35,31 +31,32 @@ class CrossfadeEngine(private val positionProvider: () -> Long) : BaseAudioProce
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
-        if (!isActive()) {
-            val out = replaceOutputBuffer(remaining)
-            out.put(inputBuffer).flip()
-            return
-        }
-        val positionMs = positionProvider().coerceAtLeast(0L)
-        val fadeStart = durationMs - fadeMs
-        val gain = if (positionMs < fadeStart) {
-            1f
-        } else {
-            val progress = (positionMs - fadeStart).toFloat() / fadeMs.toFloat()
-            1f - min(progress, 1f)
-        }
-        if (gain >= 1f) {
-            val out = replaceOutputBuffer(remaining)
-            out.put(inputBuffer).flip()
-            return
-        }
+        val gain = if (isActive()) currentGain() else 1f
         val out = replaceOutputBuffer(remaining)
-        while (input.remaining() >= 2) {
-            val sample = input.short
+        if (gain >= 1f) {
+            out.put(inputBuffer).flip()
+            return
+        }
+        while (inputBuffer.remaining() >= 2) {
+            val sample = inputBuffer.short
             out.putShort((sample * gain).toInt().toShort())
         }
         // Trailing partial byte should not occur with 16-bit PCM.
-        while (input.hasRemaining()) out.put(input.get())
+        while (inputBuffer.hasRemaining()) out.put(inputBuffer.get())
         out.flip()
+    }
+
+    /**
+     * Mix of both fade styles: fade-in over the first [fadeMs] of a track and
+     * fade-out over the last [fadeMs], peaking at full volume in between.
+     */
+    private fun currentGain(): Float {
+        val positionMs = positionProvider().coerceAtLeast(0L)
+        val fadeStart = durationMs - fadeMs
+        return when {
+            positionMs < fadeMs -> positionMs.toFloat() / fadeMs.toFloat()
+            positionMs > fadeStart -> 1f - min((positionMs - fadeStart).toFloat() / fadeMs.toFloat(), 1f)
+            else -> 1f
+        }
     }
 }

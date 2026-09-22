@@ -7,6 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.MediaSession
@@ -113,15 +114,19 @@ class MusicService : MediaSessionService() {
             positionProvider = { activePlayer?.currentPosition?.coerceAtLeast(0L) ?: 0L }
         )
         this.crossfadeEngine = crossfadeEngine
-        val renderersFactory = DefaultRenderersFactory(this)
-            .setEnableAudioFloatOutput(false)
-            .setAudioSinkProvider {
-                DefaultAudioSink.Builder(this)
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
                     .setAudioProcessorChain(
                         DefaultAudioSink.DefaultAudioProcessorChain(monoProcessor, crossfadeEngine)
                     )
                     .build()
             }
+        }.setEnableAudioFloatOutput(false)
         val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true) // pause when headphones are unplugged

@@ -861,6 +861,9 @@ private fun BoxScope.ArtistsScrollbarOverlay(
     )
 }
 
+/** Fixed width for each Locate/Shuffle/Sort control segment. */
+private val ControlSegmentWidth = 46.dp
+
 /** Fixed height shared by every [PillButton] segment across both control
  *  groups — without this, a segment with a text label (taller intrinsic
  *  line-height) and an icon-only segment can each size their own Row
