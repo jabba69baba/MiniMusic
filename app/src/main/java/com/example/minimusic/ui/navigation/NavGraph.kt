@@ -614,60 +614,37 @@ fun MiniMusicNavGraph(
  * 4. **Reduced motion collapses to the fade alone**, per the guide's first
  *    characteristic.
  */
-// Nav slides use the M3 emphasized tween (standard+accelerate curves,
-// 300/250ms) — NextPlayer and the material.io spec both use easing tweens
-// for route transitions; springs on full-width slides either crawl their
-// settle tail ("stuck") or rush. Enter uses emphasized-decelerate, exit
-// emphasized-accelerate, the standard pairing.
-private const val NavEnterMs = 300
-private const val NavExitMs = 250
+// Nav slides use M3 emphasized tween — both enter and exit share ONE
+// duration (300ms) so surfaces land together. Previous 300/250 split caused
+// stutter: outgoing stopped while incoming still travelled.
+private const val NavDurationMs = 300
 
 private fun navEnterSpec() = tween<IntOffset>(
-    NavEnterMs, easing = MiniMusicMotion.navEnterEasing
+    NavDurationMs, easing = MiniMusicMotion.navEnterEasing
 )
 
 private fun navExitSpec() = tween<IntOffset>(
-    NavExitMs, easing = MiniMusicMotion.navExitEasing
+    NavDurationMs, easing = MiniMusicMotion.navExitEasing
 )
 
 private fun pushEnter(reduced: Boolean): EnterTransition {
-    // No fade on enter: the incoming surface must stay fully opaque over the
-    // composed Library base layer or it reads translucent (the "settings
-    // opens over the library" bug). Slide only.
     return if (reduced) EnterTransition.None
     else slideInHorizontally(animationSpec = navEnterSpec()) { it / 4 }
 }
 
 private fun pushExit(reduced: Boolean): ExitTransition {
-    // No fade on exit: the Library base layer is always composed underneath
-    // the NavHost, so fading the outgoing surface lets it bleed through and
-    // reads as a translucent overlay (the reported bug). The surface slides
-    // away opaque instead; reduced motion holds it still.
     return if (reduced) ExitTransition.None
     else slideOutHorizontally(animationSpec = navExitSpec()) { -it / 6 }
 }
 
 private fun backEnter(reduced: Boolean): EnterTransition {
-    // The Library layer already sits beneath the NavHost, so a returning
-    // destination does not need a fade to appear — sliding it in from the
-    // leading edge as an opaque surface reads as the reverse of the push.
-    // A fade here is what made the back transition look translucent: the
-    // incoming screen blended with the stale layer underneath.
-    //
-    // Back reuses the EXIT spec deliberately: the returning screen travels
-    // the same leading-edge path the outgoing push-exit used, and a 300/250
-    // duration split (enter slower than exit) meant the two surfaces landed
-    // out of sync — the outgoing screen stopped while the incoming one was
-    // still travelling, which read as stutter (user-reported).
+    // Mirrors pushExit distance, now same 300ms duration — no stutter
     return if (reduced) EnterTransition.None
     else slideInHorizontally(animationSpec = navExitSpec()) { -it / 6 }
 }
 
 private fun backExit(reduced: Boolean): ExitTransition {
-    // Same rule as pushExit: opaque slide, never a fade over the live
-    // Library layer underneath — the fade was the translucent-overlay bug.
-    // Mirrors pushEnter exactly (distance it/4, same duration), so the
-    // receding screen tracks the incoming one frame for frame.
+    // Mirrors pushEnter distance with same duration
     return if (reduced) ExitTransition.None
     else slideOutHorizontally(animationSpec = navEnterSpec()) { it / 4 }
 }

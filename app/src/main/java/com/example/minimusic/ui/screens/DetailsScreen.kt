@@ -71,6 +71,7 @@ import com.example.minimusic.data.SongDetails
 import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
+import com.example.minimusic.ui.theme.GoogleSansFlexFamily
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -223,7 +224,7 @@ fun DetailsScreen(
                 ) {
                     Text(
                         text = "Details",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(fontFamily = GoogleSansFlexFamily),
                         color = scheme.onSurface
                     )
 
@@ -344,7 +345,7 @@ private fun DetailIdentity(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = GoogleSansFlexFamily),
                     color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -359,7 +360,7 @@ private fun DetailIdentity(
                 )
                 Text(
                     text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = GoogleSansFlexFamily),
                     color = scheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -403,7 +404,7 @@ private fun DetailCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = GoogleSansFlexFamily),
                     color = scheme.onSurfaceVariant
                 )
                 // A card whose value is still being read from the file shows the
@@ -433,14 +434,10 @@ private fun DetailCard(
                 }
                 Text(
                     value,
-                    // Plain bodyLarge: fontFeatureSettings("tnum") made the
-                    // whole dialog render in the platform fallback font on
-                    // several devices (user-reported "what font even is
-                    // that"). The values are short and rarely tick here, so
-                    // proportional digits are fine and the app's real family
-                    // comes back.
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = scheme.onSurfaceVariant,
+                    // Explicit family: previous tnum feature forced fallback font
+                    // on some devices (user-reported "what font even is that").
+                    style = MaterialTheme.typography.bodyLarge.copy(fontFamily = GoogleSansFlexFamily),
+                    color = scheme.onSurface,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
