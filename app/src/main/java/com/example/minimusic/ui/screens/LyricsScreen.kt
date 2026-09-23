@@ -229,7 +229,6 @@ fun LyricsScreen(
                 text = "No embedded lyrics found",
                 color = artColors.onBackground,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 40.dp)
             )
@@ -248,7 +247,6 @@ fun LyricsScreen(
                         text = "Lyrics could not be displayed",
                         color = artColors.onBackground,
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 40.dp)
                     )
@@ -343,7 +341,7 @@ fun LyricsScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 28.sp
+                                            lineHeight = 30.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -374,7 +372,7 @@ fun LyricsScreen(
                                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                                             fontSize = 22.sp,
                                             letterSpacing = (-0.1).sp,
-                                            lineHeight = 28.sp
+                                            lineHeight = 30.sp
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()

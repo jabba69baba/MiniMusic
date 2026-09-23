@@ -649,18 +649,9 @@ private fun SongsTab(
                     val staged = (index + if (index > listState.firstVisibleItemIndex) -LocateGlideTail else LocateGlideTail)
                         .coerceIn(0, songs.size - 1)
                     listState.scrollToItem(index = staged, scrollOffset = 0)
-                    listState.animateScrollToItem(
-                        index = index,
-                        // Center the active row in the viewport instead of
-                        // pinning it to the top edge. Clamped so rows near the
-                        // list start/end stay flush (no invented blank space).
-                        scrollOffset = locateCenteredOffset(listState, index, songs.size)
-                    )
+                    locateCentered(listState, index, songs.size)
                 } else {
-                    listState.animateScrollToItem(
-                        index = index,
-                        scrollOffset = locateCenteredOffset(listState, index, songs.size)
-                    )
+                    locateCentered(listState, index, songs.size)
                 }
             }
         }
@@ -826,25 +817,31 @@ private val ListPrefetchWindow = LazyLayoutCacheWindow(ahead = 800.dp, behind = 
 private const val LocateAnimateThreshold = 40
 
 /**
- * Scroll offset that lands the target row in the middle of the viewport —
- * the same centering the queue drawer uses — clamped by what the list can
- * actually reach (no blank space before the first row or after the last).
- * Estimated from the last observed row height; exact enough for uniform rows.
+ * Scroll so the target row sits in the MIDDLE of the viewport — the same
+ * centering the queue drawer uses. scrollToItem only takes positive offsets
+ * (item top at-or-above the viewport start), so centering is expressed as
+ * [rowsAbove] whole rows plus a remainder offset: scroll to the row that
+ * many rows earlier, with the remainder pushing the target down into place.
+ * Clamped so rows near the list start stay flush (no invented blank space);
+ * the end of the list clamps itself.
  */
-private fun locateCenteredOffset(
+private suspend fun locateCentered(
     listState: androidx.compose.foundation.lazy.LazyListState,
     index: Int,
     itemCount: Int
-): Int {
+) {
     val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-    if (viewport <= 0) return 0
     val rows = listState.layoutInfo.visibleItemsInfo
-    val rowPx = rows.firstOrNull()?.size ?: rows.lastOrNull()?.size ?: return 0
-    if (rowPx <= 0) return 0
-    val centered = ((viewport - rowPx) / 2f).toInt()
-    val highest = (index * rowPx).coerceAtLeast(0)
-    val lowest = (viewport - (itemCount - index) * rowPx).coerceIn(0, highest)
-    return centered.coerceIn(lowest, highest)
+    val rowPx = rows.firstOrNull()?.size ?: rows.lastOrNull()?.size ?: 0
+    if (viewport <= 0 || rowPx <= 0) {
+        listState.animateScrollToItem(index = index)
+        return
+    }
+    val centered = ((viewport - rowPx) / 2f).toInt().coerceAtLeast(0)
+    // Never ask for more rows above than exist.
+    val rowsAbove = (centered / rowPx).coerceAtMost(index)
+    val anchor = index - rowsAbove
+    listState.animateScrollToItem(index = anchor, scrollOffset = rowsAbove * rowPx)
 }
 /** Rows covered by the closing glide after a long-distance locate jump. */
 private const val LocateGlideTail = 20

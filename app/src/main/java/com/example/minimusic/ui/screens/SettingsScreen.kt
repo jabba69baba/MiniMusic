@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -282,10 +281,23 @@ fun SettingsScreen(
                                 // wavy loading shape.
                                 LoadingIndicator(modifier = Modifier.padding(8.dp).size(36.dp))
                             } else {
-                                // No icon at all — a fully-rounded tonal button
-                                // (M3E shape language) does the inviting.
-                                FilledTonalButton(onClick = onRescanLibrary) {
-                                    Text("Rescan")
+                                // M3E shape icon in a plain icon button. The
+                                // confirmation is a toast (material.io snackbar
+                                // guidance for non-blocking confirmations), not
+                                // an in-place state change.
+                                IconButton(onClick = {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Scanning…",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                    onRescanLibrary()
+                                }) {
+                                    Icon(
+                                        Icons.Filled.LibraryMusic,
+                                        contentDescription = "Rescan library",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
                                 }
                             }
                         }

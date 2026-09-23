@@ -9,9 +9,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.core.Animatable
-import kotlinx.coroutines.CancellationException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -110,35 +107,15 @@ fun MiniMusicNavGraph(
     }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
-    // Details is excluded on purpose: it is a dialog window, which receives
-    // back before this handler ever could, and its own open/close animation
-    // must not be re-driven by the graph's predictive-back transform.
-    val predictiveBackRoute = currentRoute == Routes.SETTINGS ||
-        currentRoute == Routes.ALBUM || currentRoute == Routes.ARTIST
-    val predictiveBackProgress = remember { Animatable(0f) }
+    // The system predictive-back gesture is left to the platform: the custom
+    // handler only intercepted the gesture to drive a transform that then
+    // fought the NavHost transition (the "back feels broken" bug). With no
+    // interception, the system's own predictive animation plays and the
+    // pop runs the standard backEnter/backExit slides.
     // Every transition below branches on this: with reduced motion on, the
     // guide asks for fades instead of the sliding, so the recipes collapse to
     // their fade component and keep the same timing.
     val reducedMotion = LocalMiniMusicReducedMotion.current
-
-    PredictiveBackHandler(enabled = predictiveBackRoute) { progress ->
-        var completed = false
-        try {
-            progress.collect { event ->
-                predictiveBackProgress.snapTo(event.progress)
-            }
-            completed = true
-        } catch (_: CancellationException) {
-            // A cancelled edge gesture returns the current destination to rest.
-        } finally {
-            if (completed) {
-                navController.popBackStack()
-                predictiveBackProgress.snapTo(0f)
-            } else {
-                predictiveBackProgress.animateTo(0f, animationSpec = tween(180))
-            }
-        }
-    }
 
     fun openPlayer() {
         if (navController.currentDestination?.route != Routes.PLAYER) {
@@ -154,7 +131,6 @@ fun MiniMusicNavGraph(
         val sheetState = rememberPlayerSheetMotionState(scope)
         var queueDrawerOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         val fullHeightPx = with(density) { maxHeight.toPx() }
-        val fullWidthPx = with(density) { maxWidth.toPx() }
         val navigationBarHeightPx = WindowInsets.navigationBars.getBottom(density).toFloat()
         val miniPlayerHeightPx = with(density) { MiniPlayerReservedHeight.toPx() } + navigationBarHeightPx
         val isLandscape = maxWidth > maxHeight && maxHeight >= 320.dp
@@ -264,16 +240,12 @@ fun MiniMusicNavGraph(
                 } else {
                     androidx.compose.ui.Modifier
                 }
-            )
-            .graphicsLayer {
-                // Keep the previous Library layer visible underneath while
-                // an approved destination follows the predictive-back edge.
-                val progress = predictiveBackProgress.value
-                translationX = progress * fullWidthPx * 0.18f
-                scaleX = 1f - progress * 0.04f
-                scaleY = 1f - progress * 0.04f
-            }
-            .zIndex(3f),
+            ),
+        // Standard NavHost transitions only — the custom predictive-back
+        // graphicsLayer transform that used to sit here drove scale+translate
+        // on every frame WHILE the route transition also animated, and the
+        // two fighting is what made back feel broken. NextPlayer and the
+        // material.io guidance both rely on the transition alone.
         enterTransition = { pushEnter(reducedMotion) },
         exitTransition = { pushExit(reducedMotion) },
         popEnterTransition = { backEnter(reducedMotion) },

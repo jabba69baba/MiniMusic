@@ -207,20 +207,43 @@ class PlayerController(private val context: Context) {
         // Keep caller order as the base; native shuffle randomizes traversal.
         // Sorting here only destroyed album/sort order for no benefit.
         val safeIndex = startIndex.coerceIn(0, songs.lastIndex)
-        val newEntries = songs.map { song ->
-            QueueEntry(entryId = nextQueueEntryId++, song = song)
+        scope.launch(Dispatchers.Default) {
+            // Building MediaItems for a large library is real CPU work; doing
+            // it on the main thread inside the tap is what hitched the fling
+            // even with the deferred emission.
+            val newEntries = songs.map { song ->
+                QueueEntry(entryId = 0, song = song)
+            }
+            val mediaItems = newEntries.map { entry ->
+                entry.song.toMediaItem(mediaId = "")
+            }
+            mainHandler.post { applyShufflePlayback(c, newEntries, mediaItems, safeIndex) }
         }
-        val mediaItems = newEntries.map { entry ->
-            entry.song.toMediaItem(mediaId = entry.entryId.toString())
-        }
+    }
+
+    private fun applyShufflePlayback(
+        c: androidx.media3.session.MediaController,
+        entriesRaw: List<QueueEntry>,
+        mediaItemsRaw: List<androidx.media3.common.MediaItem>,
+        startIndex: Int
+    ) {
+        // Entry ids are assigned here on the main thread in submission order.
+        val newEntries = entriesRaw.mapIndexed { i, e -> e.copy(entryId = nextQueueEntryId + i) }
+            .zip(mediaItemsRaw) { entry, item -> entry to item }
+            .map { (entry, item) ->
+                entry to item.buildUpon().setMediaId(entry.entryId.toString()).build()
+            }
+        nextQueueEntryId += newEntries.size
+        val mediaItems = newEntries.map { it.second }
+        val newEntriesFinal = newEntries.map { it.first }
 
         runTimelineMutation {
-            currentQueueEntries = newEntries
-            currentQueue = newEntries.map { it.song }
+            currentQueueEntries = newEntriesFinal
+            currentQueue = newEntriesFinal.map { it.song }
             manualQueueOrderEntryIds = null
             shuffleActive = true
             pendingSeekPositionMs = null
-            c.setMediaItems(mediaItems, safeIndex, 0L)
+            c.setMediaItems(mediaItems, startIndex, 0L)
             c.shuffleModeEnabled = true
             c.prepare()
             c.play()

@@ -612,19 +612,23 @@ private fun SleepTimerSwitchRow(
                 colors = androidx.compose.material3.SwitchColors(
                     checkedThumbColor = artColors.onPrimary,
                     checkedTrackColor = artColors.primary,
-                    checkedBorderColor = Color.Transparent,
+                    // Border = outline role, NOT the saturated accent: the
+                    // Monet-derived primary bled into the ring and read as an
+                    // over-saturated halo. outlineVariant is the palette's
+                    // designated hairline tone.
+                    checkedBorderColor = artColors.outlineVariant,
                     checkedIconColor = artColors.onPrimary,
                     uncheckedThumbColor = artColors.onSurfaceVariant,
                     uncheckedTrackColor = artColors.surfaceVariant,
-                    uncheckedBorderColor = Color.Transparent,
+                    uncheckedBorderColor = artColors.outlineVariant,
                     uncheckedIconColor = artColors.onSurfaceVariant,
                     disabledCheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledCheckedTrackColor = artColors.surfaceVariant,
-                    disabledCheckedBorderColor = Color.Transparent,
+                    disabledCheckedBorderColor = artColors.outlineVariant.copy(alpha = 0.3f),
                     disabledCheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledUncheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledUncheckedTrackColor = artColors.surfaceVariant,
-                    disabledUncheckedBorderColor = Color.Transparent,
+                    disabledUncheckedBorderColor = artColors.outlineVariant.copy(alpha = 0.3f),
                     disabledUncheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f)
                 )
             )
@@ -693,6 +697,11 @@ private fun QueueArtStrip(
             IntArray(hi - lo + 1) { lo + it }
         }
     }
+    // Identity key per window slot: a reorder (shuffle) changes which song
+    // lives at each index, and without this key Compose reuses the slot's
+    // composition — one frame of the PREVIOUS slot occupant before the new
+    // song's content lands. Keying by song id forces a clean swap.
+    val keyedWindow = window.map { it to queue[it].id }
 
     Box(
         modifier = modifier
@@ -702,7 +711,7 @@ private fun QueueArtStrip(
         // Wait for the first measured width so the three window items don't
         // all draw at x=0 (stacked) for a frame.
         if (viewportWidthPx > 0) {
-            for (index in window) {
+            for ((index, songId) in keyedWindow) {
                 val song = queue[index]
                 Box(
                     modifier = Modifier
@@ -711,6 +720,7 @@ private fun QueueArtStrip(
                             translationX = (index - progress.value) * viewportWidthPx
                         }
                 ) {
+                    key(songId) {
                     if (song.albumArtUri == null) {
                         // PixelPlayer's placeholder icon tone (0.2 on the
                         // primary-container canvas).
@@ -743,6 +753,7 @@ private fun QueueArtStrip(
                         )
                     }
                 }
+                } // key(songId): clean slot swap on reorder
             }
         }
     }
@@ -941,6 +952,23 @@ private fun NowPlayingPanel(
             targetIndex
         } else {
             queue.indexOfFirst { it.id == song.id }.takeIf { it >= 0 } ?: return@LaunchedEffect
+        }
+        // A reorder (shuffle toggle) publishes a NEW list instance with the
+        // SAME current song at a DIFFERENT index. The display index therefore
+        // cannot be trusted as the strip anchor until the queue reference
+        // itself has been swapped in — anchoring on the index first is what
+        // composed the new list at the old slot and flashed a random song.
+        // Reorder: swap the list and snap onto the song's real index in one
+        // snapshot, atomically.
+        if (lastQueue !== queue && renderedQueue !== queue) {
+            val songIndex = queue.indexOfFirst { it.id == song.id }
+            if (songIndex >= 0) {
+                renderedQueue = queue
+                focusedIndex = songIndex
+                carouselProgress.snapTo(songIndex.toFloat())
+                lastQueue = queue
+                return@LaunchedEffect
+            }
         }
         val target = targetIndex.toFloat()
         val distance = abs(carouselProgress.value - target)

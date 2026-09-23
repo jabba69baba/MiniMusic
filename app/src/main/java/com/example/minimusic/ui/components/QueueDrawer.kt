@@ -788,8 +788,6 @@ private fun ColumnScope.QueueDrawerList(
      * history as it actually has, so a current song near the top still starts
      * flush.
      */
-    fun centeredAnchorOffset(view: RecyclerView, position: Int): Int =
-        queueAnchorOffset(view.height, rowHeightPx, adapter.itemCount, position)
 
     fun locateCurrentEntryIfReady(view: RecyclerView) {
         // Require a viewport tall enough to actually centre a row (three rows):
@@ -797,12 +795,17 @@ private fun ColumnScope.QueueDrawerList(
         // viewport computed a ~0px offset — the active song pinned to the TOP
         // of the list instead of the middle, and locatePending never re-ran.
         if (!locatePending || view.height < rowHeightPx * 3) return
-        val layout = view.layoutManager as? LinearLayoutManager ?: return
         val position = latestSnapshot.resolvedVisiblePosition
         if (position < 0) return
         locatePending = false
         view.stopScroll()
-        layout.scrollToPositionWithOffset(position, centeredAnchorOffset(view, position))
+        // Same motion and same landing offset as the Locate action, so the
+        // position the drawer opens at matches what Locate produces.
+        if (reducedMotion) {
+            placeQueueInstantly(view, position, rowHeightPx)
+        } else {
+            animateQueueScroll(view, position, rowHeightPx)
+        }
     }
 
     // Keep the RecyclerView visually below the fixed drawer header; this

@@ -70,15 +70,20 @@ private fun role(
 )
 
 val MiniMusicTypography = Typography(
-    displayLarge = role(FontWeight.Bold, 57, 64, -0.25),
-    displayMedium = role(FontWeight.Bold, 45, 52, 0.0),
-    displaySmall = role(FontWeight.Bold, 36, 44, 0.0),
-    headlineLarge = role(FontWeight.Bold, 32, 40, 0.0),
-    headlineMedium = role(FontWeight.Bold, 28, 36, 0.0),
-    headlineSmall = role(FontWeight.Bold, 24, 30, 0.0),
-    titleLarge = role(FontWeight.Medium, 20, 26, 0.0),
-    titleMedium = role(FontWeight.SemiBold, 16, 22, 0.15),
-    titleSmall = role(FontWeight.SemiBold, 14, 20, 0.1),
+    // Vivi Music's pattern: keep Google's Sans Flex family everywhere, rely
+    // on the DEFAULT M3 role weights (headline/display Normal, title Medium,
+    // label Medium) and let the M3 size/line-height scale carry hierarchy —
+    // no forced Bold on headline roles (which reads heavy and uneven at
+    // small-optical sizes).
+    displayLarge = role(FontWeight.Normal, 57, 64, -0.25),
+    displayMedium = role(FontWeight.Normal, 45, 52, 0.0),
+    displaySmall = role(FontWeight.Normal, 36, 44, 0.0),
+    headlineLarge = role(FontWeight.Normal, 32, 40, 0.0),
+    headlineMedium = role(FontWeight.Normal, 28, 36, 0.0),
+    headlineSmall = role(FontWeight.Normal, 24, 32, 0.0),
+    titleLarge = role(FontWeight.Medium, 22, 28, 0.0),
+    titleMedium = role(FontWeight.Medium, 16, 24, 0.15),
+    titleSmall = role(FontWeight.Medium, 14, 20, 0.1),
     bodyLarge = role(FontWeight.Normal, 16, 24, 0.5),
     bodyMedium = role(FontWeight.Normal, 14, 20, 0.25),
     bodySmall = role(FontWeight.Normal, 12, 16, 0.4),
