@@ -70,9 +70,14 @@ object MiniMusicMotion {
     fun <T> defaultSpatial(): FiniteAnimationSpec<T> =
         spring(dampingRatio = 0.8f, stiffness = 380f)
 
-    /** `md.sys.motion.spring.slow.spatial` — full-screen positional movement. */
+    /**
+     * `md.sys.motion.spring.slow.spatial` — full-screen positional movement.
+     * Stiffness 380 (not 200): below ~300 a full-width slide's long settle
+     * tail reads as stuck, and mid-flight back-swipes compound the stall into
+     * a freeze. 380 still lands gently but finishes decisively.
+     */
     fun <T> slowSpatial(): FiniteAnimationSpec<T> =
-        spring(dampingRatio = 0.8f, stiffness = 200f)
+        spring(dampingRatio = 0.85f, stiffness = 380f)
 
     /**
      * Carousel programmatic travel: critically-damped, no overshoot. A

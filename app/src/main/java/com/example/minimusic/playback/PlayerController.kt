@@ -64,6 +64,8 @@ class PlayerController(private val context: Context) {
      */
     private var holdCurrentItemUntilMs: Long = 0L
 
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     private val freshShuffleCommand = SessionCommand(
         MusicService.ACTION_FRESH_SHUFFLE,
         Bundle()
@@ -222,7 +224,12 @@ class PlayerController(private val context: Context) {
             c.shuffleModeEnabled = true
             c.prepare()
             c.play()
-            refreshCurrentItem()
+            // Defer the state emission to the next frame: publishing the new
+            // queue synchronously inside the tap recomposes the visible list
+            // mid-fling — the micro-jitter. One frame later the fling has
+            // yielded its current mutation and the list absorbs the swap
+            // without a visible hitch.
+            mainHandler.post { refreshCurrentItem() }
         }
     }
 

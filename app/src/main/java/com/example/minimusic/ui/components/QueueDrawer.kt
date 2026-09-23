@@ -792,7 +792,11 @@ private fun ColumnScope.QueueDrawerList(
         queueAnchorOffset(view.height, rowHeightPx, adapter.itemCount, position)
 
     fun locateCurrentEntryIfReady(view: RecyclerView) {
-        if (!locatePending || view.height < rowHeightPx) return
+        // Require a viewport tall enough to actually centre a row (three rows):
+        // the drawer's panel grows frame by frame, and locating in a sliver
+        // viewport computed a ~0px offset — the active song pinned to the TOP
+        // of the list instead of the middle, and locatePending never re-ran.
+        if (!locatePending || view.height < rowHeightPx * 3) return
         val layout = view.layoutManager as? LinearLayoutManager ?: return
         val position = latestSnapshot.resolvedVisiblePosition
         if (position < 0) return

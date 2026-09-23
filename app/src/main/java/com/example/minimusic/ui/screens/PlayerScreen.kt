@@ -612,19 +612,19 @@ private fun SleepTimerSwitchRow(
                 colors = androidx.compose.material3.SwitchColors(
                     checkedThumbColor = artColors.onPrimary,
                     checkedTrackColor = artColors.primary,
-                    checkedBorderColor = artColors.primary,
+                    checkedBorderColor = Color.Transparent,
                     checkedIconColor = artColors.onPrimary,
                     uncheckedThumbColor = artColors.onSurfaceVariant,
                     uncheckedTrackColor = artColors.surfaceVariant,
-                    uncheckedBorderColor = artColors.primary,
+                    uncheckedBorderColor = Color.Transparent,
                     uncheckedIconColor = artColors.onSurfaceVariant,
                     disabledCheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledCheckedTrackColor = artColors.surfaceVariant,
-                    disabledCheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledCheckedBorderColor = Color.Transparent,
                     disabledCheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledUncheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledUncheckedTrackColor = artColors.surfaceVariant,
-                    disabledUncheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                    disabledUncheckedBorderColor = Color.Transparent,
                     disabledUncheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f)
                 )
             )
