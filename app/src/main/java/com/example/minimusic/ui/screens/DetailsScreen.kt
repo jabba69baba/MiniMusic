@@ -197,14 +197,14 @@ fun DetailsScreen(
                     .graphicsLayer {
                         val progress = revealed.value
                         alpha = progress
-                        // Android enter/exit expands a component along one axis;
-                        // a uniform scale is the iOS treatment and reads as a
-                        // z-axis move, "which doesn't match M3's reduced
-                        // elevation model". The card therefore opens by growing
-                        // vertically from its centre — same 220ms, same easing,
-                        // same single driver as the scrim — rather than zooming
-                        // up from 92%.
-                        scaleY = 0.94f + 0.06f * progress
+                        // Standard M3E dialog motion: a fade plus a small,
+                        // UNIFORM scale from 0.85 — the one-axis vertical
+                        // expand read as a stretch and double-drove with the
+                        // scrim, which is the "weird expanding" feel. Uniform
+                        // scale keeps the card's proportions fixed.
+                        val scale = 0.85f + 0.15f * progress
+                        scaleX = scale
+                        scaleY = scale
                     }
                     // Swallow taps on the card so only the scrim dismisses.
                     .clickable(
@@ -348,7 +348,7 @@ private fun DetailIdentity(
                     style = MaterialTheme.typography.titleLarge,
                     color = scheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Clip,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
                         .basicMarquee(
@@ -360,13 +360,13 @@ private fun DetailIdentity(
                 )
                 Text(
                     text = song.artist,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Clip,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp)
+                        .padding(top = 4.dp)
                         .basicMarquee(
                             iterations = Int.MAX_VALUE,
                             repeatDelayMillis = 900,
@@ -403,7 +403,7 @@ private fun DetailCard(
                 modifier = Modifier.size(24.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
+                Text(label, style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
                 // A card whose value is still being read from the file shows the
                 // skeleton pattern in miniature: the placeholder pulses, and the
                 // real value then replaces it. Nothing moves and no spinner

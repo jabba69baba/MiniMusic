@@ -9,10 +9,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Long diagonal shadow cast down-left from the disc -->
+    <!-- Long diagonal shadow cast from behind the disc toward the lower-left
+         corner, like the artwork: the shadow's top edge starts tangent to the
+         disc (center 54,54, r=24, at the 225° tangent points) and widens
+         toward the corner. Drawn UNDER the disc. -->
     <path
-        android:pathData="M34.5,67.5 L11,101 L62,101 L57.5,74.5 Z"
-        android:fillColor="#14000000" />
+        android:pathData="M35.6,63.6 A24,24 0 0,0 42.4,75.6 L15,101 L11,101 Z"
+        android:fillColor="#1E000000" />
 
     <!-- Disc body -->
     <path

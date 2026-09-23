@@ -239,7 +239,13 @@ fun MiniMusicNavGraph(
             onSkipNext = playerViewModel::skipToNext,
             onSkipPrevious = playerViewModel::skipToPrevious,
             onOpenPlayer = ::openPlayer,
-            onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+            onOpenSettings = {
+                navController.navigate(Routes.SETTINGS) {
+                    // launchSingleTop: tapping the settings gear while Settings
+                    // is open must never stack another copy on top.
+                    launchSingleTop = true
+                }
+            },
             onRetryLoad = libraryViewModel::loadLibrary
         )
         }
@@ -591,11 +597,12 @@ private fun pushExit(reduced: Boolean): ExitTransition {
         MiniMusicMotion.navForwardDurationMillis,
         easing = MiniMusicMotion.navExitEasing
     )
-    val fade = fadeOut(
-        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navExitEasing)
-    )
-    return if (reduced) fade
-    else fade + slideOutHorizontally(animationSpec = spec) { -it / 6 }
+    // No fade on exit: the Library base layer is always composed underneath
+    // the NavHost, so fading the outgoing surface lets it bleed through and
+    // reads as a translucent overlay (the reported bug). The surface slides
+    // away opaque instead; reduced motion holds it still.
+    return if (reduced) ExitTransition.None
+    else slideOutHorizontally(animationSpec = spec) { -it / 6 }
 }
 
 private fun backEnter(reduced: Boolean): EnterTransition {
@@ -617,9 +624,8 @@ private fun backExit(reduced: Boolean): ExitTransition {
         MiniMusicMotion.navForwardDurationMillis,
         easing = MiniMusicMotion.navExitEasing
     )
-    val fade = fadeOut(
-        tween(MiniMusicMotion.navForwardDurationMillis, easing = MiniMusicMotion.navExitEasing)
-    )
-    return if (reduced) fade
-    else fade + slideOutHorizontally(animationSpec = spec) { it / 3 }
+    // Same rule as pushExit: opaque slide, never a fade over the live
+    // Library layer underneath — the fade was the translucent-overlay bug.
+    return if (reduced) ExitTransition.None
+    else slideOutHorizontally(animationSpec = spec) { it / 3 }
 }

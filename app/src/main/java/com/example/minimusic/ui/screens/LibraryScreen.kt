@@ -424,13 +424,10 @@ fun LibraryScreen(
                             PillButton(
                                 onClick = {
                                     if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    // Shuffle changes playback only, but it DOES
-                                    // re-anchor the list through the jump-to-current
-                                    // locate that follows the new queue — an active
-                                    // fling fighting that locate is what jittered.
-                                    // Stop the scroll first, same as Locate.
-                                    stopSongScrollRequest++
-                                    jumpToCurrentRequest++
+                                    // Shuffle changes playback in the background
+                                    // only: it must NOT stop an active fling or
+                                    // re-anchor the list (that's Locate's job).
+                                    // Scrolling continues undisturbed.
                                     if (filteredSongs.isNotEmpty()) {
                                         val startSong = filteredSongs.random()
                                         onShufflePlayFrom(startSong, filteredSongs)

@@ -725,6 +725,13 @@ private fun QueueArtStrip(
                                 .memoryCachePolicy(CachePolicy.ENABLED)
                                 .build()
                         }
+                        // Placeholder tone behind the image so the frame is
+                        // never transparent while the bitmap decodes.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(artColors.surfaceContainer)
+                        )
                         AsyncImage(
                             model = artLoadRequest,
                             contentDescription = null,
@@ -1379,11 +1386,12 @@ private fun animateArtColorRoles(target: ArtColorRoles): ArtColorRoles {
         fromRoles = fromRoles.lerpTo(toRoles, progress.value)
         toRoles = target
         progress.snapTo(0f)
-        // One critically-damped effects spring drives the whole roles lerp —
-        // color must never overshoot (M3E effects rule).
+        // One critically-damped slow-effects spring drives the whole roles
+        // lerp: full-screen color transitions use the slow token (M3E effects
+        // rule, no overshoot) so a track change eases instead of stomping.
         progress.animateTo(
             targetValue = 1f,
-            animationSpec = MiniMusicMotion.defaultEffects()
+            animationSpec = MiniMusicMotion.slowEffects()
         )
     }
 

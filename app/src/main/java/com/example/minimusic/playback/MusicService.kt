@@ -164,7 +164,7 @@ class MusicService : MediaSessionService() {
         settingsRepository = SettingsRepository(this)
         serviceScope.launch {
             settingsRepository.settings.collect { settings ->
-                monoProcessor.enabled = settings.monoAudio
+                monoProcessor.setEnabled(settings.monoAudio)
                 val fadeSecondsMs = if (settings.crossfadeEnabled) settings.crossfadeSeconds * 1000L else 0L
                 crossfadeEngine.configure(
                     enabledSecondsMs = fadeSecondsMs,
