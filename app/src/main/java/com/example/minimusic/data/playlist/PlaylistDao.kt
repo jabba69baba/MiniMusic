@@ -26,28 +26,28 @@ interface PlaylistDao {
     suspend fun insertPlaylist(playlist: Playlist): Long
 
     @Query("DELETE FROM playlists WHERE id = :id")
-    suspend fun deletePlaylist(id: Long): Int
+    suspend fun deletePlaylist(id: Long)
 
     @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId")
-    suspend fun clearSongs(playlistId: Long): Int
+    suspend fun clearSongs(playlistId: Long)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertSongs(songs: List<PlaylistSong>): Int
+    suspend fun insertSongs(songs: List<PlaylistSong>)
 
     /** Replaces the playlist's songs with the given ordered ids. */
     @Transaction
-    suspend fun setSongs(playlistId: Long, songIds: List<Long>): Int {
+    suspend fun setSongs(playlistId: Long, songIds: List<Long>) {
         clearSongs(playlistId)
-        return insertSongs(songIds.mapIndexed { index, songId ->
+        insertSongs(songIds.mapIndexed { index, songId ->
             PlaylistSong(playlistId = playlistId, songId = songId, position = index)
         })
     }
 
     /** Appends songs at the end of the playlist's current order. */
     @Transaction
-    suspend fun appendSongs(playlistId: Long, songIds: List<Long>): Int {
+    suspend fun appendSongs(playlistId: Long, songIds: List<Long>) {
         val current = rawSongIds(playlistId)
-        return insertSongs(songIds.mapIndexed { index, songId ->
+        insertSongs(songIds.mapIndexed { index, songId ->
             PlaylistSong(playlistId = playlistId, songId = songId, position = current.size + index)
         })
     }
