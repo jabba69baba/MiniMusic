@@ -34,7 +34,7 @@ class MonoAudioProcessor : BaseAudioProcessor() {
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         channelCount = inputAudioFormat.channelCount
-        return if (isActive()) inputAudioFormat.copyWithChannelCount(1)
+        return if (isActive()) AudioProcessor.AudioFormat(inputAudioFormat.sampleRate, 1, inputAudioFormat.encoding)
         else inputAudioFormat
     }
 
