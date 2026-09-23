@@ -324,7 +324,15 @@ fun MiniMusicNavGraph(
                 currentSongId = currentSong?.id,
                 onBack = { navController.popBackStack() },
                 onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
-                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
+                onPlayAll = { playerViewModel.playQueue(songs, 0) },
+                onShuffleAll = {
+                    if (songs.isNotEmpty()) {
+                        playerViewModel.startShufflePlayback(songs, songs.indices.random())
+                    }
+                },
+                headerArtUri = songs.firstOrNull()?.albumArtUri,
+                headerSubtitle = songs.firstOrNull()?.artist
             )
         }
 
@@ -341,7 +349,13 @@ fun MiniMusicNavGraph(
                 currentSongId = currentSong?.id,
                 onBack = { navController.popBackStack() },
                 onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
-                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
+                onPlayAll = { playerViewModel.playQueue(songs, 0) },
+                onShuffleAll = {
+                    if (songs.isNotEmpty()) {
+                        playerViewModel.startShufflePlayback(songs, songs.indices.random())
+                    }
+                }
             )
         }
 
