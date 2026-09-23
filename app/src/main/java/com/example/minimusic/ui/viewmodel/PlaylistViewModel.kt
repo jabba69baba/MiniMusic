@@ -62,11 +62,4 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             dao.setSongs(playlistId, remaining)
         }
     }
-
-    /**
-     * Synchronous snapshot for playback actions from menus. Fine on short
-     * lists; dao reads are indexed queries on a tiny local database.
-     */
-    fun songsForPlaylistOnce(playlistId: Long): List<Long> =
-        runBlocking { dao.rawSongIds(playlistId) }
 }

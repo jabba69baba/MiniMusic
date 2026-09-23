@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
@@ -1076,7 +1077,7 @@ private fun ExpandingCategoryControl(
                     .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS)
+                val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS, LibraryTab.PLAYLISTS)
                 tabs.forEachIndexed { index, tab ->
                     val active = tab == selected
                     val weight by animateFloatAsState(
@@ -1285,6 +1286,7 @@ private fun CategorySortMenu(
             AlbumSortOrder.ARTIST_A_Z, AlbumSortOrder.ARTIST_Z_A -> SortField.ARTIST
             AlbumSortOrder.SONGS_MOST, AlbumSortOrder.SONGS_FEWEST -> SortField.SONGS
         }
+        LibraryTab.PLAYLISTS -> SortField.NAME
     }
     val ascending = when (tab) {
         LibraryTab.SONGS -> songSortOrder in setOf(
@@ -1304,6 +1306,7 @@ private fun CategorySortMenu(
             AlbumSortOrder.ARTIST_A_Z,
             AlbumSortOrder.SONGS_FEWEST
         )
+        LibraryTab.PLAYLISTS -> true
     }
 
     fun apply(field: SortField, asc: Boolean) {
@@ -1312,6 +1315,7 @@ private fun CategorySortMenu(
             LibraryTab.SONGS -> onSongSort(sortOrderOf(field, asc))
             LibraryTab.ARTISTS -> onArtistSort(artistSortOrderOf(field, asc))
             LibraryTab.ALBUMS -> onAlbumSort(albumSortOrderOf(field, asc))
+            LibraryTab.PLAYLISTS -> Unit
         }
     }
 
@@ -1333,6 +1337,7 @@ private fun CategorySortMenu(
             SortField.ARTIST to "Artist",
             SortField.SONGS to "Songs"
         )
+        LibraryTab.PLAYLISTS -> emptyList()
     }
 
     AlertDialog(
@@ -1345,6 +1350,7 @@ private fun CategorySortMenu(
                     LibraryTab.SONGS -> "Sort songs"
                     LibraryTab.ARTISTS -> "Sort artists"
                     LibraryTab.ALBUMS -> "Sort albums"
+                    LibraryTab.PLAYLISTS -> "Sort playlists"
                 }
             )
         },
@@ -1505,6 +1511,7 @@ private fun LibrarySkeleton(
             LibraryTab.SONGS -> SongListSkeleton()
             LibraryTab.ARTISTS -> ArtistListSkeleton()
             LibraryTab.ALBUMS -> AlbumGridSkeleton()
+            LibraryTab.PLAYLISTS -> SongListSkeleton()
         }
         // Same reserved space the real lists leave, so the mini player never
         // sits on top of a placeholder that the content will not sit under.
