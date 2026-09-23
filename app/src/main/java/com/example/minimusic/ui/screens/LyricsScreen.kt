@@ -69,7 +69,12 @@ private data class DisplayLyricLine(
 )
 
 private val LrcTimestampRegex = Regex(
-    "^(\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?])(.*)$"
+    "\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]"
+)
+
+/** Strips ALL leading timestamp tags from a line, leaving the lyric text. */
+private val LrcTimestampPrefixRegex = Regex(
+    "^(?:\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?])+", RegexOption.IGNORE_CASE
 )
 
 private const val READING_BAND_FRACTION = 0.36f
@@ -79,25 +84,29 @@ private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
     return text.lines()
         .filter { it.isNotBlank() }
         .flatMap { rawLine ->
-            val match = LrcTimestampRegex.matchEntire(rawLine.trim())
-            if (match == null) {
-                listOf(DisplayLyricLine(rawLine.trim()))
+            val line = rawLine.trim()
+            // LRC lines can carry multiple timestamps:
+            // "[00:12.00][01:45.20] text" repeats the line at both times.
+            val stamps = LrcTimestampRegex.findAll(line).toList()
+            if (stamps.isEmpty()) {
+                listOf(DisplayLyricLine(line))
             } else {
-                val minutes = match.groupValues[2].toLong()
-                val seconds = match.groupValues[3].toLong()
-                val fractionText = match.groupValues[4]
-                val fractionMs = when (fractionText.length) {
-                    1 -> fractionText.toLong() * 100L
-                    2 -> fractionText.toLong() * 10L
-                    3 -> fractionText.toLong()
-                    else -> 0L
-                }
-                listOf(
+                val body = line.replace(LrcTimestampPrefixRegex, "").trim().ifBlank { "…" }
+                stamps.map { match ->
+                    val minutes = match.groupValues[2].toLong()
+                    val seconds = match.groupValues[3].toLong()
+                    val fractionText = match.groupValues[4]
+                    val fractionMs = when (fractionText.length) {
+                        1 -> fractionText.toLong() * 100L
+                        2 -> fractionText.toLong() * 10L
+                        3 -> fractionText.toLong()
+                        else -> 0L
+                    }
                     DisplayLyricLine(
-                        text = match.groupValues[5].trim().ifBlank { "…" },
+                        text = body,
                         startMs = minutes * 60_000L + seconds * 1_000L + fractionMs
                     )
-                )
+                }
             }
         }
         .sortedWith(compareBy<DisplayLyricLine> { it.startMs == null }.thenBy { it.startMs ?: Long.MAX_VALUE })

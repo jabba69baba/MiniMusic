@@ -141,7 +141,11 @@ class MusicRepository(private val context: Context) {
                 Artist(
                     name = artist,
                     songCount = songsByArtist.size,
-                    albumCount = songsByArtist.map { it.albumId }.distinct().size
+                    albumCount = songsByArtist.map { it.albumId }.distinct().size,
+                    // Representative art: the artist's first song that has a
+                    // cover. MediaStore's own artist thumbnails use the same
+                    // first-album fallback, fully offline.
+                    artUri = songsByArtist.firstOrNull { it.albumArtUri != null }?.albumArtUri
                 )
             }
             .sortedBy { it.name.lowercase() }

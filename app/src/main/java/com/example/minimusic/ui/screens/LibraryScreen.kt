@@ -124,6 +124,7 @@ import com.example.minimusic.ui.components.AlbumGridSkeleton
 import com.example.minimusic.ui.components.ArtistListSkeleton
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
+import com.example.minimusic.ui.components.PlaylistPickerDialog
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.components.SongListSkeleton
 import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
@@ -147,7 +148,8 @@ import kotlinx.coroutines.launch
 private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     SONGS("Songs", Icons.Filled.MusicNote),
     ARTISTS("Artists", Icons.Filled.Person),
-    ALBUMS("Albums", Icons.Filled.Album)
+    ALBUMS("Albums", Icons.Filled.Album),
+    PLAYLISTS("Playlists", Icons.Filled.QueueMusic)
 }
 
 /** The library drawer's shape: rounded only at the top, flat everywhere else —
@@ -171,6 +173,12 @@ fun LibraryScreen(
     onShufflePlayFrom: (Song, List<Song>) -> Unit,
     onDeleteSong: (Song) -> Unit,
     onOpenDetails: (Song) -> Unit = {},
+    onAddToPlaylist: (Song) -> Unit = {},
+    playlists: List<com.example.minimusic.data.playlist.Playlist> = emptyList(),
+    onAddSongToPlaylist: (com.example.minimusic.data.playlist.Playlist, Song) -> Unit = { _, _ -> },
+    onPlaylistClick: (com.example.minimusic.data.playlist.Playlist) -> Unit = {},
+    onCreatePlaylistAndAdd: (String, Song) -> Unit = { _, _ -> },
+    onCreatePlaylist: (String) -> Unit = {},
     onRetryDelete: (Song) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
@@ -229,6 +237,8 @@ fun LibraryScreen(
     var pendingRetrySong by remember { mutableStateOf<Song?>(null) }
     val currentOnRetryDelete = rememberUpdatedState(onRetryDelete)
     val snackbarHostState = remember { SnackbarHostState() }
+    var showPlaylistPicker by remember { mutableStateOf(false) }
+    var pickerSong by remember { mutableStateOf<Song?>(null) }
 
     val deletePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -448,7 +458,7 @@ fun LibraryScreen(
                     }
 
                     CategorySortMenu(
-                        expanded = sortMenuExpanded,
+                        expanded = sortMenuExpanded && selectedTab != LibraryTab.PLAYLISTS,
                         tab = selectedTab,
                         songSortOrder = uiState.sortOrder,
                         artistSortOrder = artistSortOrder,
@@ -525,7 +535,8 @@ fun LibraryScreen(
                                         onAddToQueue = onAddToQueue,
                                         onShufflePlayFrom = { song -> onShufflePlayFrom(song, filteredSongs) },
                                         onDelete = onDeleteSong,
-                                        onOpenDetails = onOpenDetails
+                                        onOpenDetails = onOpenDetails,
+                                        onAddToPlaylist = onAddToPlaylist
                                     )
                                     LibraryTab.ALBUMS -> AlbumsTab(
                                         albums = sortedAlbums,
@@ -536,6 +547,12 @@ fun LibraryScreen(
                                         artists = sortedArtists,
                                         bottomContentPadding = footerHeight,
                                         onArtistClick = onArtistClick
+                                    )
+                                    LibraryTab.PLAYLISTS -> PlaylistsTab(
+                                        playlists = playlists,
+                                        bottomContentPadding = footerHeight,
+                                        onPlaylistClick = onPlaylistClick,
+                                        onCreatePlaylist = onCreatePlaylist
                                     )
                                     }
                                 }
@@ -551,6 +568,26 @@ fun LibraryScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = footerHeight + 12.dp)
         )
+        if (showPlaylistPicker && pickerSong != null) {
+            PlaylistPickerDialog(
+                playlists = playlists,
+                songTitle = pickerSong?.title ?: "",
+                onDismiss = { showPlaylistPicker = false; pickerSong = null },
+                onPickPlaylist = { playlist ->
+                    onAddSongToPlaylist(playlist, pickerSong ?: return@PlaylistPickerDialog)
+                    showPlaylistPicker = false
+                    pickerSong = null
+                },
+                onCreatePlaylist = { name, onCreated ->
+                    // Create and immediately add the pending song; the created
+                    // snapshot is only for closing the dialog.
+                    onCreatePlaylistAndAdd(name, pickerSong ?: return@PlaylistPickerDialog)
+                    onCreated(com.example.minimusic.data.playlist.Playlist(id = -1, name = name, createdAtSeconds = 0))
+                    showPlaylistPicker = false
+                    pickerSong = null
+                }
+            )
+        }
     }
 }
 
@@ -590,7 +627,8 @@ private fun SongsTab(
     onAddToQueue: (Song) -> Unit,
     onShufflePlayFrom: (Song) -> Unit,
     onDelete: (Song) -> Unit,
-    onOpenDetails: (Song) -> Unit
+    onOpenDetails: (Song) -> Unit,
+    onAddToPlaylist: (Song) -> Unit = {}
 ) {
     val listState = rememberLazyListState(cacheWindow = ListPrefetchWindow)
     val scrollScope = rememberCoroutineScope()
@@ -681,6 +719,7 @@ private fun SongsTab(
                     onShufflePlayFrom = onShufflePlayFrom,
                     onDelete = onDelete,
                     onOpenDetails = onOpenDetails,
+                    onAddToPlaylist = onAddToPlaylist,
                     // Reorder glide on sort/search changes (Metrolist pattern:
                     // stable keys + contentType above, animateItem on the row).
                     // Fades stay null: newly-composed rows must not spend

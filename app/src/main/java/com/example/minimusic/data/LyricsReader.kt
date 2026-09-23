@@ -83,6 +83,8 @@ class LyricsReader(private val context: Context) {
         val majorVersion = header[3].toInt() and 0xFF
         var remaining = synchsafeToInt(header[6], header[7], header[8], header[9])
 
+        var usltResult: String? = null
+
         while (remaining > 10) {
             val frameHeader = ByteArray(10)
             val read = readFully(input, frameHeader)
@@ -103,12 +105,65 @@ class LyricsReader(private val context: Context) {
             if (frameId == "USLT") {
                 val body = ByteArray(frameSize)
                 readFully(input, body)
-                return decodeUslt(body)
+                if (usltResult == null) usltResult = decodeUslt(body)
+                // Keep scanning: a SYLT frame later in the file is preferred
+                // (synced lyrics beat plain text).
+            } else if (frameId == "SYLT") {
+                // Synchronized lyrics: decode to LRC-style "[mm:ss.xx] line"
+                // text, which the display layer already times.
+                val body = ByteArray(frameSize)
+                readFully(input, body)
+                // Prefer SYLT when it decodes to usable timed lines; otherwise
+                // keep scanning so a plain USLT can still be found.
+                decodeSylt(body)?.let { return it }
             } else {
                 skipFully(input, frameSize.toLong())
             }
         }
-        return null
+        return usltResult
+    }
+
+    /**
+     * ID3v2 SYLT → LRC-style text. Layout: [encoding:1][language:3][timestamp
+     * format:1][content type:1][descriptor, null-terminated][sync entries].
+     * Each entry: null-terminated text + 4-byte big-endian timestamp in ms
+     * (format 2) or ticks (format 1 — rare; skipped to milliseconds is not
+     * possible without the MPEG frame rate, so format 1 entries are dropped).
+     */
+    private fun decodeSylt(body: ByteArray): String? {
+        if (body.size < 7) return null
+        val charset = when (body[0].toInt() and 0xFF) {
+            1 -> Charsets.UTF_16
+            2 -> Charsets.UTF_16BE
+            3 -> Charsets.UTF_8
+            else -> Charsets.ISO_8859_1
+        }
+        val nullWidth = if (charset == Charsets.UTF_16 || charset == Charsets.UTF_16BE) 2 else 1
+        val timestampIsMs = body[6].toInt() == 2
+        var pos = indexAfterNullTerminator(body, 7, nullWidth)
+
+        val entries = mutableListOf<Pair<Long, String>>()
+        while (pos + 4 + nullWidth <= body.size) {
+            val textEnd = indexAfterNullTerminator(body, pos, nullWidth)
+            if (textEnd < 0 || textEnd + 4 > body.size) break
+            val text = String(body, pos, textEnd - nullWidth - pos, charset).trim()
+            val stamp = ((body[textEnd].toInt() and 0xFF) shl 24) or
+                ((body[textEnd + 1].toInt() and 0xFF) shl 16) or
+                ((body[textEnd + 2].toInt() and 0xFF) shl 8) or
+                (body[textEnd + 3].toInt() and 0xFF)
+            pos = textEnd + 4
+            if (text.isNotBlank() && timestampIsMs) entries += stamp.toLong() to text
+        }
+        if (entries.isEmpty()) return null
+        entries.sortBy { it.first }
+        val lrc = entries.joinToString("\n") { (ms, text) ->
+            val m = ms / 60_000
+            val s = (ms % 60_000) / 1000
+            val f = (ms % 1000) / 10
+            String.format(java.util.Locale.US, "[%02d:%02d.%02d]%s", m, s, f, text)
+        }
+        // Timestamps must survive cleaning: strip only metadata lines.
+        return cleanLyricsText(lrc)
     }
 
     private fun decodeUslt(body: ByteArray): String? {

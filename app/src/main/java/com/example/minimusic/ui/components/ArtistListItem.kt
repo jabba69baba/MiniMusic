@@ -1,6 +1,7 @@
 package com.example.minimusic.ui.components
 
 import androidx.compose.foundation.background
+import com.example.minimusic.ui.components.AlbumArtImage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,11 +51,23 @@ fun ArtistListItem(artist: Artist, onClick: () -> Unit, modifier: Modifier = Mod
                     .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = artist.name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+                if (artist.artUri != null) {
+                    // Representative art (first album cover) — falls back to
+                    // the initial letter while decoding or on failure.
+                    AlbumArtImage(
+                        model = artist.artUri,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        iconSize = 0.dp
+                    )
+                } else {
+                    Text(
+                        text = artist.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(

@@ -47,6 +47,9 @@ fun SongListItem(
     onShufflePlayFrom: (Song) -> Unit = {},
     onDelete: (Song) -> Unit = {},
     onOpenDetails: (Song) -> Unit = {},
+    onAddToPlaylist: (Song) -> Unit = {},
+    /** Optional extra trailing action (e.g. remove-from-playlist X button). */
+    trailingContent: @Composable (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val containerColor = if (isPlaying) {
@@ -131,6 +134,7 @@ fun SongListItem(
                         modifier = Modifier.padding(6.dp)
                     )
                 }
+                trailingContent?.invoke()
                 if (menuExpanded) {
                     SongContextMenu(
                         song = song,
@@ -141,7 +145,8 @@ fun SongListItem(
                         onAddToQueue = onAddToQueue,
                         onShufflePlayFrom = onShufflePlayFrom,
                         onDelete = onDelete,
-                        onOpenDetails = onOpenDetails
+                        onOpenDetails = onOpenDetails,
+                        onAddToPlaylist = onAddToPlaylist
                     )
                 }
             }

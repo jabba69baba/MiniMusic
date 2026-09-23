@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Share
@@ -43,7 +44,8 @@ fun SongContextMenu(
     onAddToQueue: (Song) -> Unit,
     onShufflePlayFrom: (Song) -> Unit,
     onDelete: (Song) -> Unit,
-    onOpenDetails: (Song) -> Unit = {}
+    onOpenDetails: (Song) -> Unit = {},
+    onAddToPlaylist: (Song) -> Unit = {}
 ) {
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -68,6 +70,11 @@ fun SongContextMenu(
             text = { Text("Shuffle from here") },
             leadingIcon = { Icon(Icons.Filled.Shuffle, contentDescription = null) },
             onClick = { onShufflePlayFrom(song); onDismiss() }
+        )
+        DropdownMenuItem(
+            text = { Text("Add to playlist") },
+            leadingIcon = { Icon(Icons.Filled.PlaylistAdd, contentDescription = null) },
+            onClick = { onDismiss(); onAddToPlaylist(song) }
         )
         DropdownMenuItem(
             text = { Text("Details") },

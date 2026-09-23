@@ -48,12 +48,14 @@ import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.screens.LyricsScreen
+import com.example.minimusic.ui.screens.PlaylistDetailScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
+import com.example.minimusic.ui.viewmodel.PlaylistViewModel
 import kotlinx.coroutines.launch
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
@@ -71,17 +73,21 @@ private object Routes {
     fun album(albumId: Long) = "album/$albumId"
     fun artist(artistName: String) = "artist/${java.net.URLEncoder.encode(artistName, "UTF-8")}"
     fun details(songId: Long) = "details/$songId"
+    const val PLAYLIST = "playlist/{playlistId}"
+    fun playlist(playlistId: Long) = "playlist/$playlistId"
 }
 
 @Composable
 fun MiniMusicNavGraph(
     libraryViewModel: LibraryViewModel,
+    playlistViewModel: PlaylistViewModel,
     playerViewModel: PlayerViewModel,
     settingsViewModel: SettingsViewModel,
     openPlayerFromWidget: Boolean = false,
     navController: NavHostController = rememberNavController()
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
+    val playlists by playlistViewModel.observeAll().collectAsState(initial = emptyList())
     // Sliced so the 20 Hz position ticker never recomposes this graph: only an
     // actual track change flows down. Player/MiniPlayer/Lyrics collect the full
     // playback flow themselves, scoped to their own subtrees.
@@ -207,6 +213,17 @@ fun MiniMusicNavGraph(
                 playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
             },
             onDeleteSong = libraryViewModel::deleteSong,
+            playlists = playlists,
+            onAddSongToPlaylist = { playlist, song ->
+                playlistViewModel.addSongsToPlaylist(playlist.id, listOf(song.id))
+            },
+            onPlaylistClick = { playlist -> navController.navigate(Routes.playlist(playlist.id)) },
+            onCreatePlaylistAndAdd = { name, song ->
+                playlistViewModel.createPlaylist(name) { id ->
+                    playlistViewModel.addSongsToPlaylist(id, listOf(song.id))
+                }
+            },
+            onCreatePlaylist = playlistViewModel::createPlaylistNameOnly,
             onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
             onRetryDelete = libraryViewModel::deleteSong,
             onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
@@ -327,7 +344,38 @@ fun MiniMusicNavGraph(
                     if (songs.isNotEmpty()) {
                         playerViewModel.startShufflePlayback(songs, songs.indices.random())
                     }
-                }
+                },
+                // Representative art: first song with a cover (MediaStore's
+                // own artist-thumbnail fallback pattern).
+                headerArtUri = songs.firstOrNull { it.albumArtUri != null }?.albumArtUri
+            )
+        }
+
+        composable(
+            route = Routes.PLAYLIST,
+            arguments = listOf(navArgument("playlistId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
+            PlaylistDetailScreen(
+                playlistId = playlistId,
+                playlistViewModel = playlistViewModel,
+                allSongs = libraryState.allSongs,
+                currentSongId = currentSong?.id,
+                onBack = { navController.popBackStack() },
+                onPlaySong = { songs, song ->
+                    playerViewModel.playQueue(songs, songs.indexOf(song))
+                },
+                onShuffleAll = { songs ->
+                    if (songs.isNotEmpty()) {
+                        playerViewModel.startShufflePlayback(songs, songs.indices.random())
+                    }
+                },
+                onRemoveSong = { songId -> playlistViewModel.removeSongFromPlaylist(playlistId, songId) },
+                onDeletePlaylist = {
+                    playlistViewModel.deletePlaylist(playlistId)
+                    navController.popBackStack()
+                },
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
             )
         }
 

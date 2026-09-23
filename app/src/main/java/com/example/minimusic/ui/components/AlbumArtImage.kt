@@ -90,6 +90,9 @@ fun AlbumArtImage(
 
 @Composable
 private fun MissingAlbumArtIcon(size: Dp) {
+    // A non-positive size means the caller draws its own fallback letter —
+    // don't stack a music note on top of it.
+    if (size <= 0.dp) return
     Icon(
         imageVector = Icons.Filled.MusicNote,
         contentDescription = null,

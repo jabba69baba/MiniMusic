@@ -130,6 +130,10 @@ class MusicService : MediaSessionService() {
         val player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true) // pause when headphones are unplugged
+            // setPauseAtEndOfMediaItems is intentionally NOT enabled: the sleep
+            // timer needs to pause after exactly one song (PlayerController's
+            // pauseAtNextTransition), not after every item. ExoPlayer's default
+            // gapless transition between prepared adjacent items is kept as-is.
             .build()
             .apply {
                 repeatMode = Player.REPEAT_MODE_OFF
