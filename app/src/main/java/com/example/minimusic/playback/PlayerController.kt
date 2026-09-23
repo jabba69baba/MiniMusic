@@ -54,6 +54,16 @@ class PlayerController(private val context: Context) {
     private var nextQueueEntryId = 1L
     private var timelineMutationDepth = 0
     private var syncRequestedAfterMutation = false
+    /**
+     * While Media3 applies a fresh shuffle order (setShuffleOrder),
+     * currentMediaItem can transiently report the new order's first item —
+     * a random track — before the next settled event restores the real one.
+     * Publishing those intermediate resolutions is the "current song changes
+     * to a random song and back" flash. For a short window after issuing a
+     * fresh shuffle the UI keeps the previous current item.
+     */
+    private var holdCurrentItemUntilMs: Long = 0L
+
     private val freshShuffleCommand = SessionCommand(
         MusicService.ACTION_FRESH_SHUFFLE,
         Bundle()
@@ -502,6 +512,7 @@ class PlayerController(private val context: Context) {
             holdPlaybackStateAcrossTransition()
             _uiState.value = _uiState.value.copy(isShuffled = enabled)
             if (enabled) {
+                holdCurrentItemUntilMs = System.currentTimeMillis() + 1000L
                 c.sendCustomCommand(freshShuffleCommand, Bundle())
                     .addListener({ refreshCurrentItem() }, MoreExecutors.directExecutor())
             } else {
@@ -668,8 +679,15 @@ class PlayerController(private val context: Context) {
         if (manualQueueOrderEntryIds == null) {
             shuffleActive = c.shuffleModeEnabled
         }
-        val currentEntry = resolveCurrentEntry(c)
-            ?.takeIf { it in currentQueueEntries }
+        val holdWindowActive = System.currentTimeMillis() < holdCurrentItemUntilMs
+        val currentEntry = if (holdWindowActive) {
+            // Fresh-shuffle window: trust the last GOOD resolution over the
+            // player's transient currentMediaItem.
+            lastResolvedCurrentEntry?.takeIf { it in currentQueueEntries }
+                ?: resolveCurrentEntry(c)?.takeIf { it in currentQueueEntries }
+        } else {
+            resolveCurrentEntry(c)?.takeIf { it in currentQueueEntries }
+        }
         val currentTimelineIndex = currentEntry?.let { currentQueueEntries.indexOf(it) } ?: -1
         val currentSong = currentEntry?.song
         val displayEntries = manualQueueOrderEntryIds
