@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -281,25 +280,13 @@ fun SettingsScreen(
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Rescan library") },
-                        trailingContent = {
-                            if (libraryState.isLoading) {
-                                // M3 Expressive loading indicator: the animated
-                                // wavy loading shape.
-                                LoadingIndicator(modifier = Modifier.padding(8.dp).size(36.dp))
-                            } else {
-                                // M3E pill button, no icon. Confirmation is a
-                                // snackbar (material.io: non-blocking feedback).
-                                Button(
-                                    onClick = {
-                                        onRescanLibrary()
-                                        rescanScope.launch {
-                                            snackbarHostState.showSnackbar("Scanning…")
-                                        }
-                                    },
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
-                                ) {
-                                    Text("Scan")
-                                }
+                        // Whole row is the tap target; feedback is ONLY the
+                        // snackbar — no spinner, no shape animation, per the
+                        // original request.
+                        modifier = Modifier.clickable {
+                            onRescanLibrary()
+                            rescanScope.launch {
+                                snackbarHostState.showSnackbar("Scanning…")
                             }
                         }
                     )

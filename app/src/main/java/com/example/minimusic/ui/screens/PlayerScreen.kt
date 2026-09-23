@@ -581,10 +581,11 @@ private fun SleepTimerSwitchRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        // Neutral container in both states: the row tinting to the accent
-        // color when checked was louder than M3E wants — the switch itself
-        // reports state.
-        color = artColors.surfaceVariant
+        // Neutral container in both states; the hairline border is what marks
+        // the row as a control at all — surfaceVariant alone sits too close to
+        // the sheet background to read (user-reported).
+        color = artColors.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, artColors.outlineVariant)
     ) {
         Row(
             modifier = Modifier

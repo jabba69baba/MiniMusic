@@ -877,10 +877,8 @@ private suspend fun locateCentered(
         listState.animateScrollToItem(index = index)
         return
     }
-    // ~58% of the way down the viewport: the active row sits just below
-    // center with one more row of upcoming content visible above it, per
-    // the reference screenshots.
-    val centered = (((viewport - rowPx) * 0.58f)).toInt().coerceAtLeast(0)
+    // Dead center of the viewport: half the leftover space above the row.
+    val centered = (((viewport - rowPx) * 0.5f)).toInt().coerceAtLeast(0)
     // Never ask for more rows above than exist.
     val rowsAbove = (centered / rowPx).coerceAtMost(index)
     val anchor = index - rowsAbove

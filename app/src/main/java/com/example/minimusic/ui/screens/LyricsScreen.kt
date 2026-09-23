@@ -93,9 +93,10 @@ private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
             } else {
                 val body = line.replace(LrcTimestampPrefixRegex, "").trim().ifBlank { "…" }
                 stamps.map { match ->
-                    val minutes = match.groupValues[2].toLong()
-                    val seconds = match.groupValues[3].toLong()
-                    val fractionText = match.groupValues[4]
+                    // Regex groups: 1 = minutes, 2 = seconds, 3 = fraction.
+                    val minutes = match.groupValues[1].toLong()
+                    val seconds = match.groupValues[2].toLong()
+                    val fractionText = match.groupValues[3]
                     val fractionMs = when (fractionText.length) {
                         1 -> fractionText.toLong() * 100L
                         2 -> fractionText.toLong() * 10L

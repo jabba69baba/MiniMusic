@@ -72,7 +72,6 @@ import com.example.minimusic.data.readSongDetails
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.theme.MiniMusicMotion
-import com.example.minimusic.ui.theme.MiniMusicType
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -434,12 +433,13 @@ private fun DetailCard(
                 }
                 Text(
                     value,
-                    // Tabular figures across the whole card: duration, sample
-                    // rate, bitrate and file size are a column of values read
-                    // against each other, which is the spec's case for
-                    // monospaced digits. Non-numeric values are unaffected —
-                    // the feature only equalises digit advances.
-                    style = MiniMusicType.tabular(MaterialTheme.typography.bodyLarge),
+                    // Plain bodyLarge: fontFeatureSettings("tnum") made the
+                    // whole dialog render in the platform fallback font on
+                    // several devices (user-reported "what font even is
+                    // that"). The values are short and rarely tick here, so
+                    // proportional digits are fine and the app's real family
+                    // comes back.
+                    style = MaterialTheme.typography.bodyLarge,
                     color = scheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,

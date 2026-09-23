@@ -930,9 +930,8 @@ private fun queueAnchorOffset(
     position: Int
 ): Int {
     if (viewportPx <= 0 || rowHeightPx <= 0f || itemCount <= 0 || position < 0) return 0
-    // ~58% down the viewport, matching the library's Locate position (one
-    // extra upcoming row visible above the active row).
-    val centered = (((viewportPx - rowHeightPx) * 0.58f)).toInt()
+    // Dead center of the viewport, matching the library's Locate position.
+    val centered = (((viewportPx - rowHeightPx) * 0.5f)).toInt()
     // Highest the row's top may sit, given the rows that exist above it.
     val highest = (position * rowHeightPx).toInt().coerceAtLeast(0)
     // Lowest it may sit and still have the rest of the queue fill the viewport

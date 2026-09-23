@@ -653,13 +653,21 @@ private fun backEnter(reduced: Boolean): EnterTransition {
     // leading edge as an opaque surface reads as the reverse of the push.
     // A fade here is what made the back transition look translucent: the
     // incoming screen blended with the stale layer underneath.
+    //
+    // Back reuses the EXIT spec deliberately: the returning screen travels
+    // the same leading-edge path the outgoing push-exit used, and a 300/250
+    // duration split (enter slower than exit) meant the two surfaces landed
+    // out of sync — the outgoing screen stopped while the incoming one was
+    // still travelling, which read as stutter (user-reported).
     return if (reduced) EnterTransition.None
-    else slideInHorizontally(animationSpec = navEnterSpec()) { -it / 6 }
+    else slideInHorizontally(animationSpec = navExitSpec()) { -it / 6 }
 }
 
 private fun backExit(reduced: Boolean): ExitTransition {
     // Same rule as pushExit: opaque slide, never a fade over the live
     // Library layer underneath — the fade was the translucent-overlay bug.
+    // Mirrors pushEnter exactly (distance it/4, same duration), so the
+    // receding screen tracks the incoming one frame for frame.
     return if (reduced) ExitTransition.None
-    else slideOutHorizontally(animationSpec = navExitSpec()) { it / 4 }
+    else slideOutHorizontally(animationSpec = navEnterSpec()) { it / 4 }
 }
