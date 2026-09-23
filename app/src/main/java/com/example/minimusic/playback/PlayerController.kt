@@ -511,8 +511,8 @@ class PlayerController(private val context: Context) {
             // transition, or the play/pause button morphs for a frame.
             holdPlaybackStateAcrossTransition()
             _uiState.value = _uiState.value.copy(isShuffled = enabled)
+            holdCurrentItemUntilMs = System.currentTimeMillis() + 3000L
             if (enabled) {
-                holdCurrentItemUntilMs = System.currentTimeMillis() + 1000L
                 c.sendCustomCommand(freshShuffleCommand, Bundle())
                     .addListener({ refreshCurrentItem() }, MoreExecutors.directExecutor())
             } else {
@@ -567,6 +567,10 @@ class PlayerController(private val context: Context) {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // A real track transition (auto-advance or user skip) always ends
+            // the fresh-shuffle hold: the player's currentMediaItem is now
+            // authoritative again.
+            holdCurrentItemUntilMs = 0L
             val pauseAfterTransition = pauseAtNextTransition
             pauseAtNextTransition = false
             // Queue history is derived from the active entry's position in the
