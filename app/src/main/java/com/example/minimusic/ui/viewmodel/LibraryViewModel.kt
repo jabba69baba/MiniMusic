@@ -197,6 +197,27 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         filterAndSortSongs(songs, currentState.searchQuery, currentState.sortOrder)
                     )
                 }
+                // Keep the skeleton up until the first screenful of artwork is
+                // warm in the memory cache too: publishing the list while its
+                // tiles are still decoding is exactly the "loading tiles" look
+                // the skeleton is supposed to cover.
+                val appContext = getApplication<Application>()
+                val artUris = songs.asSequence()
+                    .mapNotNull { it.albumArtUri }
+                    .distinct()
+                    .take(64)
+                    .toList()
+                artUris.forEach { uri ->
+                    runCatching {
+                        coil.request.ImageRequest.Builder(appContext)
+                            .data(uri)
+                            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                            .size(96)
+                            .build()
+                            .let { MiniMusicImageLoader.get(appContext).enqueue(it) }
+                    }
+                }
                 _uiState.value = currentState.copy(
                     isLoading = false,
                     loadError = null,

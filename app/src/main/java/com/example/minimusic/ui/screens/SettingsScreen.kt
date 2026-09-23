@@ -56,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,7 @@ import com.example.minimusic.data.ThemeMode
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.viewmodel.LibraryUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,18 +105,21 @@ fun SettingsScreen(
 ) {
     val totalDurationMs = libraryState.allSongs.sumOf { it.durationMs }
     val context = LocalContext.current
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val rescanScope = rememberCoroutineScope()
     val totalSizeBytes by produceState<Long?>(initialValue = null, libraryState.allSongs) {
         value = withContext(Dispatchers.IO) {
             libraryState.allSongs.sumOf { songSizeBytes(context, it) }
         }
     }
 
-    Column(
+    androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
+        Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -281,23 +286,18 @@ fun SettingsScreen(
                                 // wavy loading shape.
                                 LoadingIndicator(modifier = Modifier.padding(8.dp).size(36.dp))
                             } else {
-                                // M3E shape icon in a plain icon button. The
-                                // confirmation is a toast (material.io snackbar
-                                // guidance for non-blocking confirmations), not
-                                // an in-place state change.
-                                IconButton(onClick = {
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        "Scanning…",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                    onRescanLibrary()
-                                }) {
-                                    Icon(
-                                        Icons.Filled.LibraryMusic,
-                                        contentDescription = "Rescan library",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
+                                // M3E pill button, no icon. Confirmation is a
+                                // snackbar (material.io: non-blocking feedback).
+                                Button(
+                                    onClick = {
+                                        onRescanLibrary()
+                                        rescanScope.launch {
+                                            snackbarHostState.showSnackbar("Scanning…")
+                                        }
+                                    },
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
+                                ) {
+                                    Text("Scan")
                                 }
                             }
                         }
@@ -344,6 +344,11 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+        androidx.compose.material3.SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+        )
     }
 }
 

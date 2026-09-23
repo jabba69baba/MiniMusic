@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
@@ -567,17 +566,28 @@ fun MiniMusicNavGraph(
  * 4. **Reduced motion collapses to the fade alone**, per the guide's first
  *    characteristic.
  */
-// Nav slides use soft, gentle springs (slow spatial: low stiffness, no
-// overshoot) instead of hard tweens — the tween's abrupt start/end is what
-// made open/close feel jittery and stilted.
-private fun navSlideSpec(): FiniteAnimationSpec<IntOffset> = MiniMusicMotion.slowSpatial()
+// Nav slides use the M3 emphasized tween (standard+accelerate curves,
+// 300/250ms) — NextPlayer and the material.io spec both use easing tweens
+// for route transitions; springs on full-width slides either crawl their
+// settle tail ("stuck") or rush. Enter uses emphasized-decelerate, exit
+// emphasized-accelerate, the standard pairing.
+private const val NavEnterMs = 300
+private const val NavExitMs = 250
+
+private fun navEnterSpec() = tween<IntOffset>(
+    NavEnterMs, easing = MiniMusicMotion.navEnterEasing
+)
+
+private fun navExitSpec() = tween<IntOffset>(
+    NavExitMs, easing = MiniMusicMotion.navExitEasing
+)
 
 private fun pushEnter(reduced: Boolean): EnterTransition {
     // No fade on enter: the incoming surface must stay fully opaque over the
     // composed Library base layer or it reads translucent (the "settings
     // opens over the library" bug). Slide only.
     return if (reduced) EnterTransition.None
-    else slideInHorizontally(animationSpec = navSlideSpec()) { it / 3 }
+    else slideInHorizontally(animationSpec = navEnterSpec()) { it / 4 }
 }
 
 private fun pushExit(reduced: Boolean): ExitTransition {
@@ -586,7 +596,7 @@ private fun pushExit(reduced: Boolean): ExitTransition {
     // reads as a translucent overlay (the reported bug). The surface slides
     // away opaque instead; reduced motion holds it still.
     return if (reduced) ExitTransition.None
-    else slideOutHorizontally(animationSpec = navSlideSpec()) { -it / 6 }
+    else slideOutHorizontally(animationSpec = navExitSpec()) { -it / 6 }
 }
 
 private fun backEnter(reduced: Boolean): EnterTransition {
@@ -596,12 +606,12 @@ private fun backEnter(reduced: Boolean): EnterTransition {
     // A fade here is what made the back transition look translucent: the
     // incoming screen blended with the stale layer underneath.
     return if (reduced) EnterTransition.None
-    else slideInHorizontally(animationSpec = navSlideSpec()) { -it / 6 }
+    else slideInHorizontally(animationSpec = navEnterSpec()) { -it / 6 }
 }
 
 private fun backExit(reduced: Boolean): ExitTransition {
     // Same rule as pushExit: opaque slide, never a fade over the live
     // Library layer underneath — the fade was the translucent-overlay bug.
     return if (reduced) ExitTransition.None
-    else slideOutHorizontally(animationSpec = navSlideSpec()) { it / 3 }
+    else slideOutHorizontally(animationSpec = navExitSpec()) { it / 4 }
 }

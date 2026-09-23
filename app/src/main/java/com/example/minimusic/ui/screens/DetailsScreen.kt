@@ -81,10 +81,10 @@ import java.util.Locale
  * info cards. Keeping it single-sourced is what removes the dead space that
  * used to sit between the artwork and the first card.
  */
-private val DetailSectionGap = 20.dp
+private val DetailSectionGap = 24.dp
 
 /** Gap between the info cards themselves. */
-private val DetailCardGap = 8.dp
+private val DetailCardGap = 10.dp
 
 /**
  * Dim behind the card. The dialog draws this itself (see the Dialog call in
@@ -390,9 +390,8 @@ private fun DetailCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         color = scheme.surfaceVariant
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+    ) {            Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -403,7 +402,11 @@ private fun DetailCard(
                 modifier = Modifier.size(24.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = scheme.onSurfaceVariant
+                )
                 // A card whose value is still being read from the file shows the
                 // skeleton pattern in miniature: the placeholder pulses, and the
                 // real value then replaces it. Nothing moves and no spinner
@@ -436,12 +439,12 @@ private fun DetailCard(
                     // against each other, which is the spec's case for
                     // monospaced digits. Non-numeric values are unaffected —
                     // the feature only equalises digit advances.
-                    style = MiniMusicType.tabular(MaterialTheme.typography.bodyMedium),
+                    style = MiniMusicType.tabular(MaterialTheme.typography.bodyLarge),
                     color = scheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .padding(top = 2.dp)
+                        .padding(top = 4.dp)
                         .then(
                             if (pendingPulse != null) {
                                 // Read in the graphics layer, so the pulse never
