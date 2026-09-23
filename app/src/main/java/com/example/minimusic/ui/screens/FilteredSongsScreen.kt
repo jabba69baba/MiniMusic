@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -142,12 +143,28 @@ fun FilteredSongsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                    // Songs + total duration indicator (h:mm or m:ss scale)
+                    val totalMs = songs.sumOf { it.durationMs }
+                    val totalMin = totalMs / 60000
+                    val totalSec = (totalMs / 1000) % 60
+                    val durationText = if (totalMin >= 60) {
+                        "%d:%02d:%02d".format(totalMin / 60, totalMin % 60, totalSec)
+                    } else {
+                        "%d:%02d".format(totalMin, totalSec)
+                    }
+                    Text(
+                        text = "${songs.size} ${if (songs.size == 1) "song" else "songs"} · $durationText",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                     Row(
-                        modifier = Modifier.padding(top = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        FilledIconButton(
+                        Button(
                             onClick = onPlayAll,
                             enabled = songs.isNotEmpty(),
                             modifier = Modifier.weight(1f)
@@ -156,7 +173,7 @@ fun FilteredSongsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Play")
                         }
-                        FilledIconButton(
+                        Button(
                             onClick = onShuffleAll,
                             enabled = songs.isNotEmpty(),
                             modifier = Modifier.weight(1f)

@@ -580,7 +580,10 @@ private fun SleepTimerSwitchRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = if (checked) artColors.primaryContainer else artColors.surfaceVariant
+        // Neutral container in both states: the row tinting to the accent
+        // color when checked was louder than M3E wants — the switch itself
+        // reports state.
+        color = artColors.surfaceVariant
     ) {
         Row(
             modifier = Modifier
@@ -592,7 +595,7 @@ private fun SleepTimerSwitchRow(
         ) {
             Text(
                 text = label,
-                color = if (checked) artColors.onPrimaryContainer else artColors.onSurface,
+                color = artColors.onSurface,
                 // The row's own container color reports the switch state, so
                 // the label stays at its role's weight instead of bolding the
                 // body scale to fake the emphasis.
@@ -833,12 +836,14 @@ private fun VerticalMetadataStrip(
                     Text(
                         text = song.artist,
                         style = artistStyle,
-                        // Secondary text on a background surface takes the
-                        // surface's own secondary role. The line previously
-                        // mixed a *container* role (onPrimaryContainer) at 70%
-                        // alpha over the background, which is not a pairing the
-                        // palette guarantees contrast for.
-                        color = artColors.onSurfaceVariant,
+                        // Secondary text on the dynamic background takes the
+                        // BACKGROUND's own secondary pairing: onBackground at
+                        // reduced alpha. onSurfaceVariant is generated against
+                        // the *surface* tone, which on art-tinted backgrounds
+                        // can drift outside the guaranteed contrast pair — the
+                        // washed-out look. Gramophone does the same (its
+                        // "contentColor.copy(alpha = 0.72f)" secondary line).
+                        color = artColors.onBackground.copy(alpha = 0.72f),
                         textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

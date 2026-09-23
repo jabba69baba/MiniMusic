@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -282,8 +283,15 @@ fun SettingsScreen(
                                 // progress spinner.
                                 LoadingIndicator(modifier = Modifier.padding(8.dp).size(36.dp))
                             } else {
+                                // M3E expressive refresh icon — the outlined
+                                // expressive variant, no filled/highlight
+                                // container around it.
                                 IconButton(onClick = onRescanLibrary) {
-                                    Icon(Icons.Filled.Refresh, contentDescription = "Rescan library")
+                                    Icon(
+                                        Icons.Outlined.Refresh,
+                                        contentDescription = "Rescan library",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }

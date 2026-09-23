@@ -56,6 +56,9 @@ fun AlbumArtImage(
             .build()
     }
     var imageFailed by remember(model) { mutableStateOf(false) }
+    // While the bitmap decodes, the tile shows the music-note placeholder
+    // instead of a bare color block — the "stuck loading" look.
+    var imageLoading by remember(model) { mutableStateOf(model != null) }
 
     Box(
         modifier = modifier
@@ -71,11 +74,15 @@ fun AlbumArtImage(
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
                 onState = { state ->
-                    if (state is AsyncImagePainter.State.Error) imageFailed = true
+                    when (state) {
+                        is AsyncImagePainter.State.Error -> { imageFailed = true; imageLoading = false }
+                        is AsyncImagePainter.State.Success -> { imageFailed = false; imageLoading = false }
+                        else -> imageLoading = true
+                    }
                 }
             )
         }
-        if (model == null || imageFailed) {
+        if (model == null || imageFailed || imageLoading) {
             MissingAlbumArtIcon(iconSize)
         }
     }

@@ -78,21 +78,23 @@ fun SongListItem(
                 requestSizePx = 96
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     color = contentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = song.artist,
-                    // The supporting line keeps its role's own weight: bolding
-                    // it made the artist visually heavier than the title above
-                    // it, which inverts the list's hierarchy. Roles carry the
-                    // hierarchy; the color role marks it as secondary.
+                    // Supporting line: one step down in size, secondary color,
+                    // no artificial weight — the standard M3 list pairing
+                    // (bodyLarge + bodyMedium) used by Gramophone/Auxio.
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (isPlaying) contentColor.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

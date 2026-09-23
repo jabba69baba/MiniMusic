@@ -55,9 +55,10 @@ class AlbumThumbFetcher(
                 isSampled = true,
                 dataSource = DataSource.DISK
             )
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
             // Thumbnail generation can fail for missing/odd providers; fall
             // through to the default chain rather than showing a blank tile.
+            // Throwable, not Exception: provider crashes surface as Errors.
             null
         }
     }
