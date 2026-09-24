@@ -74,43 +74,60 @@ private val LrcTimestampRegex = Regex(
 
 /** Strips ALL leading timestamp tags from a line, leaving the lyric text. */
 private val LrcTimestampPrefixRegex = Regex(
-    "^(?:\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?])+", RegexOption.IGNORE_CASE
+    "^(?:\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?])+",
+    RegexOption.IGNORE_CASE
 )
 
 private const val READING_BAND_FRACTION = 0.36f
 private const val LYRIC_TARGET_TOLERANCE_PX = 2
 
 private fun parseDisplayLyrics(text: String): List<DisplayLyricLine> {
-    return text.lines()
-        .filter { it.isNotBlank() }
-        .flatMap { rawLine ->
-            val line = rawLine.trim()
-            // LRC lines can carry multiple timestamps:
-            // "[00:12.00][01:45.20] text" repeats the line at both times.
-            val stamps = LrcTimestampRegex.findAll(line).toList()
-            if (stamps.isEmpty()) {
-                listOf(DisplayLyricLine(line))
-            } else {
-                val body = line.replace(LrcTimestampPrefixRegex, "").trim().ifBlank { "…" }
-                stamps.map { match ->
-                    // Regex groups: 1 = minutes, 2 = seconds, 3 = fraction.
-                    val minutes = match.groupValues[1].toLong()
-                    val seconds = match.groupValues[2].toLong()
-                    val fractionText = match.groupValues[3]
-                    val fractionMs = when (fractionText.length) {
-                        1 -> fractionText.toLong() * 100L
-                        2 -> fractionText.toLong() * 10L
-                        3 -> fractionText.toLong()
-                        else -> 0L
+    return try {
+        text.lines()
+            .filter { it.isNotBlank() }
+            .flatMap { rawLine ->
+                val line = rawLine.trim()
+                val stamps = try {
+                    LrcTimestampRegex.findAll(line).toList()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                if (stamps.isEmpty()) {
+                    listOf(DisplayLyricLine(line))
+                } else {
+                    val body = try {
+                        line.replace(LrcTimestampPrefixRegex, "").trim().ifBlank { "…" }
+                    } catch (_: Exception) {
+                        line.trim().ifBlank { "…" }
                     }
-                    DisplayLyricLine(
-                        text = body,
-                        startMs = minutes * 60_000L + seconds * 1_000L + fractionMs
-                    )
+                    val parsed = stamps.mapNotNull { match ->
+                        try {
+                            if (match.groupValues.size < 3) return@mapNotNull null
+                            val minutes = match.groupValues.getOrNull(1)?.toLongOrNull() ?: return@mapNotNull null
+                            val seconds = match.groupValues.getOrNull(2)?.toLongOrNull() ?: return@mapNotNull null
+                            if (minutes < 0 || minutes > 999 || seconds < 0 || seconds >= 100) return@mapNotNull null
+                            val fractionText = match.groupValues.getOrNull(3).orEmpty()
+                            val fractionMs = when (fractionText.length) {
+                                1 -> fractionText.toLongOrNull()?.times(100L) ?: 0L
+                                2 -> fractionText.toLongOrNull()?.times(10L) ?: 0L
+                                3 -> fractionText.toLongOrNull() ?: 0L
+                                else -> 0L
+                            }
+                            DisplayLyricLine(
+                                text = body,
+                                startMs = minutes * 60_000L + seconds * 1_000L + fractionMs
+                            )
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    if (parsed.isEmpty()) listOf(DisplayLyricLine(body)) else parsed
                 }
             }
-        }
-        .sortedWith(compareBy<DisplayLyricLine> { it.startMs == null }.thenBy { it.startMs ?: Long.MAX_VALUE })
+            .sortedWith(compareBy<DisplayLyricLine> { it.startMs == null }.thenBy { it.startMs ?: Long.MAX_VALUE })
+    } catch (_: Exception) {
+        text.lines().filter { it.isNotBlank() }.map { DisplayLyricLine(it.trim()) }
+    }
 }
 
 @Composable

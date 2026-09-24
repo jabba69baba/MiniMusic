@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
@@ -52,6 +53,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
@@ -107,9 +109,22 @@ fun SettingsScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val rescanScope = rememberCoroutineScope()
+    var rescanInProgress by remember { mutableStateOf(false) }
     val totalSizeBytes by produceState<Long?>(initialValue = null, libraryState.allSongs) {
         value = withContext(Dispatchers.IO) {
             libraryState.allSongs.sumOf { songSizeBytes(context, it) }
+        }
+    }
+
+    // Show "Scan complete" after rescan finishes — was requested but never visible
+    androidx.compose.runtime.LaunchedEffect(libraryState.isLoading, libraryState.allSongs.size) {
+        if (rescanInProgress && !libraryState.isLoading) {
+            rescanInProgress = false
+            val count = libraryState.allSongs.size
+            snackbarHostState.showSnackbar(
+                message = if (count > 0) "Scan complete • $count songs" else "Scan complete",
+                duration = androidx.compose.material3.SnackbarDuration.Short
+            )
         }
     }
 
@@ -280,13 +295,20 @@ fun SettingsScreen(
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Rescan library") },
-                        // Whole row is the tap target; feedback is ONLY the
-                        // snackbar — no spinner, no shape animation, per the
-                        // original request.
+                        supportingContent = { Text("Tap to rescan MediaStore") },
+                        // Whole row is tap target; feedback ONLY snackbar —
+                        // no spinner, no M3E LoadingIndicator, no shape animation.
+                        // Now shows both Scanning… and Scan complete • N songs.
                         modifier = Modifier.clickable {
-                            onRescanLibrary()
-                            rescanScope.launch {
-                                snackbarHostState.showSnackbar("Scanning…")
+                            if (!libraryState.isLoading) {
+                                rescanInProgress = true
+                                onRescanLibrary()
+                                rescanScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Scanning…",
+                                        duration = androidx.compose.material3.SnackbarDuration.Short
+                                    )
+                                }
                             }
                         }
                     )
@@ -335,7 +357,10 @@ fun SettingsScreen(
     }
         androidx.compose.material3.SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
         )
     }
 }

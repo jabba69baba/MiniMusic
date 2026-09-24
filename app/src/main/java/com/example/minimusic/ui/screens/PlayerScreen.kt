@@ -578,59 +578,53 @@ private fun SleepTimerSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     artColors: ArtColorRoles
 ) {
+    // Visible outline fix: outlineVariant alone on surfaceVariant was invisible
+    // in dark art schemes (see screenshot). Use a stronger hairline (1.5dp) with
+    // onSurfaceVariant at 35% alpha for guaranteed contrast, and make the
+    // Switch track distinct from the row background so only the thumb isn't visible.
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        // Neutral container in both states; the hairline border is what marks
-        // the row as a control at all — surfaceVariant alone sits too close to
-        // the sheet background to read (user-reported).
         color = artColors.surfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, artColors.outlineVariant)
+        border = androidx.compose.foundation.BorderStroke(
+            1.5.dp,
+            artColors.onSurfaceVariant.copy(alpha = 0.35f)
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onCheckedChange(!checked) }
-                .padding(horizontal = 14.dp, vertical = 4.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = label,
                 color = artColors.onSurface,
-                // The row's own container color reports the switch state, so
-                // the label stays at its role's weight instead of bolding the
-                // body scale to fake the emphasis.
                 style = MaterialTheme.typography.bodyLarge
             )
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
-                // Full color set stated explicitly: in this material3 version
-                // the M3E switch's BORDER falls back to SwitchDefaults (the
-                // app's global theme) and showed a red hue over the
-                // art-derived track. The border follows the album art too.
-                // (SwitchColors.copy only exists from material3 alpha28 on.)
                 colors = androidx.compose.material3.SwitchColors(
                     checkedThumbColor = artColors.onPrimary,
                     checkedTrackColor = artColors.primary,
-                    // Border = outline role, NOT the saturated accent: the
-                    // Monet-derived primary bled into the ring and read as an
-                    // over-saturated halo. outlineVariant is the palette's
-                    // designated hairline tone.
-                    checkedBorderColor = artColors.outlineVariant,
+                    checkedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.35f),
                     checkedIconColor = artColors.onPrimary,
-                    uncheckedThumbColor = artColors.onSurfaceVariant,
-                    uncheckedTrackColor = artColors.surfaceVariant,
-                    uncheckedBorderColor = artColors.outlineVariant,
+                    // Track must be distinct from row background (surfaceVariant)
+                    // or the switch disappears leaving only the thumb (screenshot bug)
+                    uncheckedThumbColor = artColors.onSurface,
+                    uncheckedTrackColor = artColors.surfaceContainerHigh,
+                    uncheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.35f),
                     uncheckedIconColor = artColors.onSurfaceVariant,
                     disabledCheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledCheckedTrackColor = artColors.surfaceVariant,
-                    disabledCheckedBorderColor = artColors.outlineVariant.copy(alpha = 0.3f),
+                    disabledCheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.15f),
                     disabledCheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
                     disabledUncheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
-                    disabledUncheckedTrackColor = artColors.surfaceVariant,
-                    disabledUncheckedBorderColor = artColors.outlineVariant.copy(alpha = 0.3f),
+                    disabledUncheckedTrackColor = artColors.surfaceContainerHigh,
+                    disabledUncheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.15f),
                     disabledUncheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f)
                 )
             )

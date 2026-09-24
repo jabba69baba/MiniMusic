@@ -17,8 +17,10 @@ import com.example.minimusic.R
  * The bold file is also registered for ExtraBold so Compose has a real local
  * face for the requested 800-weight role instead of falling back to a device
  * font or attempting downloadable-font resolution.
+ *
+ * Public so DetailsScreen can explicitly use it and avoid fallback on some devices.
  */
-private val GoogleSansFlexFamily = FontFamily(
+val GoogleSansFlexFamily = FontFamily(
     Font(resId = R.font.google_sans_flex_regular, weight = FontWeight.Normal),
     Font(resId = R.font.google_sans_flex_medium, weight = FontWeight.Medium),
     Font(resId = R.font.google_sans_flex_semibold, weight = FontWeight.SemiBold),

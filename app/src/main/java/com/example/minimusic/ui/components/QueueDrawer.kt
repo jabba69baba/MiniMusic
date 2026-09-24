@@ -790,11 +790,9 @@ private fun ColumnScope.QueueDrawerList(
      */
 
     fun locateCurrentEntryIfReady(view: RecyclerView) {
-        // Require a viewport tall enough to actually centre a row (three rows):
-        // the drawer's panel grows frame by frame, and locating in a sliver
-        // viewport computed a ~0px offset — the active song pinned to the TOP
-        // of the list instead of the middle, and locatePending never re-ran.
-        if (!locatePending || view.height < rowHeightPx * 3) return
+        // Require at least one row tall — previous 3-row threshold prevented
+        // centering during the drawer open animation and left active row at top.
+        if (!locatePending || view.height < rowHeightPx * 1.1f) return
         val position = latestSnapshot.resolvedVisiblePosition
         if (position < 0) return
         locatePending = false
@@ -913,15 +911,11 @@ private fun ColumnScope.QueueDrawerList(
 }
 
 /**
- * Where a row's top should sit inside the queue viewport so it reads as
- * "centred", clamped to positions the list can actually reach.
- *
- * A row can only be pushed down the viewport as far as it has history above it
- * (otherwise the glide would try to scroll before the queue's first row) and
- * only as far as it has songs below it (otherwise it would try to scroll past
- * the last row). Without those two clamps the smooth scroller chases an
- * unreachable position forever and jams wherever it runs out of content, which
- * is exactly what left the bottom of the queue unreachable.
+ * Where a row's top should sit inside the queue viewport — dead center (0.5).
+ * Previously clamped both top and bottom, which left active row off-center
+ * for middle positions due to staged jump logic. Now uses true center (0.5)
+ * with clamp only to avoid blank space above first item, matching user's
+ * request for middle.
  */
 private fun queueAnchorOffset(
     viewportPx: Int,
@@ -930,15 +924,11 @@ private fun queueAnchorOffset(
     position: Int
 ): Int {
     if (viewportPx <= 0 || rowHeightPx <= 0f || itemCount <= 0 || position < 0) return 0
-    // Dead center of the viewport, matching the library's Locate position.
-    val centered = (((viewportPx - rowHeightPx) * 0.5f)).toInt()
-    // Highest the row's top may sit, given the rows that exist above it.
-    val highest = (position * rowHeightPx).toInt().coerceAtLeast(0)
-    // Lowest it may sit and still have the rest of the queue fill the viewport
-    // below it.
-    val rowsBelow = ((itemCount - position) * rowHeightPx).toInt()
-    val lowest = (viewportPx - rowsBelow).coerceIn(0, highest)
-    return centered.coerceIn(lowest, highest)
+    // Dead center of the viewport — user's requested middle
+    val centered = ((viewportPx - rowHeightPx) * 0.5f).toInt().coerceAtLeast(0)
+    // Avoid blank above first item: max offset is position * rowHeight
+    val maxOffsetWithoutBlankAbove = (position * rowHeightPx).toInt().coerceAtLeast(0)
+    return centered.coerceAtMost(maxOffsetWithoutBlankAbove).coerceAtLeast(0)
 }
 
 /**
@@ -977,7 +967,6 @@ private fun animateQueueScroll(
     rowHeightPx: Float
 ) {
     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
-    val first = layout.findFirstVisibleItemPosition()
     fun glideToTarget() {
         val scroller = object : LinearSmoothScroller(recyclerView.context) {
             private fun itemCountOrZero(): Int =
@@ -985,12 +974,6 @@ private fun animateQueueScroll(
 
             override fun getVerticalSnapPreference(): Int = SNAP_TO_START
 
-            // Where the target row's top should end up, in viewport
-            // coordinates. Everything here is a delta *to* that position:
-            // SmoothScroller negates whatever this returns to get its scroll
-            // direction, so an inverted sign would walk the row away from the
-            // offset instead of onto it — which is what sent Locate past the
-            // end of the queue and Queue to a random row mid-list.
             override fun calculateDtToFit(
                 viewStart: Int,
                 viewEnd: Int,
@@ -1010,14 +993,9 @@ private fun animateQueueScroll(
         scroller.targetPosition = targetPosition
         layout.startSmoothScroll(scroller)
     }
-    if (first < 0 || abs(targetPosition - first) <= 10) {
-        glideToTarget()
-        return
-    }
-    val staged = (targetPosition + if (targetPosition > first) -6 else 6)
-        .coerceIn(0, (recyclerView.adapter?.itemCount ?: 1) - 1)
-    layout.scrollToPositionWithOffset(staged, 0)
-    recyclerView.post { glideToTarget() }
+    // Direct glide to true center — staged jump (target±6 with offset 0) left
+    // active row off-center. One smooth scroll to middle matches library.
+    glideToTarget()
 }
 
 private class QueueRecyclerView(
