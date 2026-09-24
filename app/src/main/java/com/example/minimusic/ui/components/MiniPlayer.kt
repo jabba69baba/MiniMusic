@@ -4,9 +4,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -114,15 +116,26 @@ fun MiniPlayer(
         }
     }
     val artColors = rememberArtColorRoles(song?.albumArtUri, albumArtPaletteStyle)
-    val miniPlayerColor = artColors.primaryContainer
+    // Breathe transition: the bar's container color cross-fades on the slow
+    // effects spring — same soft in/out as the full player's scheme — instead
+    // of snapping between track palettes.
+    val miniPlayerColor by animateColorAsState(
+        targetValue = artColors.primaryContainer,
+        animationSpec = MiniMusicMotion.slowEffects(),
+        label = "miniPlayerBreatheColor"
+    )
     // The bar canvas is the primaryContainer, so text and controls use the
     // onPrimaryContainer family (PixelPlayer's canvas-text rule) instead of
     // neutral surface tones.
-    val controlTint = if (song != null) {
-        artColors.onPrimaryContainer
-    } else {
-        artColors.onPrimaryContainer.copy(alpha = 0.42f)
-    }
+    val controlTint by animateColorAsState(
+        targetValue = if (song != null) {
+            artColors.onPrimaryContainer
+        } else {
+            artColors.onPrimaryContainer.copy(alpha = 0.42f)
+        },
+        animationSpec = MiniMusicMotion.slowEffects(),
+        label = "miniPlayerControlTint"
+    )
     val progressRingColor = readableProgressColor(
         accent = artColors.primary,
         background = miniPlayerColor,
@@ -171,13 +184,17 @@ fun MiniPlayer(
                 AnimatedContent(
                     targetState = song,
                     transitionSpec = {
-                        slideInVertically(
+                        // Size transform snaps the container to the incoming
+                        // content's size immediately: without it the outgoing and
+                        // incoming rows are measured side by side for one frame —
+                        // the "icons twice / jumpy shift" artifact.
+                        (slideInVertically(
                             initialOffsetY = { trackTransitionDirection * it },
                             animationSpec = MiniMusicMotion.carouselSpatial()
                         ) togetherWith slideOutVertically(
                             targetOffsetY = { -trackTransitionDirection * it },
                             animationSpec = MiniMusicMotion.carouselSpatial()
-                        )
+                        )).using(SizeTransform(clip = true))
                     },
                     contentKey = { it?.id },
                     label = "miniPlayerTrackSwitch",

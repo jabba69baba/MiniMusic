@@ -578,57 +578,49 @@ private fun SleepTimerSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     artColors: ArtColorRoles
 ) {
-    // Visible outline fix: outlineVariant alone on surfaceVariant was invisible
-    // in dark art schemes (see screenshot). Use a stronger hairline (1.5dp) with
-    // onSurfaceVariant at 35% alpha for guaranteed contrast, and make the
-    // Switch track distinct from the row background so only the thumb isn't visible.
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = artColors.surfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(
-            1.5.dp,
-            artColors.onSurfaceVariant.copy(alpha = 0.35f)
-        )
+    // Plain row — no card boundary around the whole line. The outline the user
+    // asked for belongs to the SWITCH only, and only while it is OFF (the off
+    // track blends into the dialog surface otherwise); the on state keeps its
+    // filled primary track and needs no outline.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onCheckedChange(!checked) }
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = label,
-                color = artColors.onSurface,
-                style = MaterialTheme.typography.bodyLarge
+        Text(
+            text = label,
+            color = artColors.onSurface,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = androidx.compose.material3.SwitchColors(
+                checkedThumbColor = artColors.onPrimary,
+                checkedTrackColor = artColors.primary,
+                checkedBorderColor = Color.Transparent,
+                checkedIconColor = artColors.onPrimary,
+                // Off state: muted tonal track + a visible outline so the
+                // control reads against the dialog surface. A neutral blend of
+                // the dialog's own surfaceVariant keeps it inside the art
+                // scheme without the oversaturated container punch.
+                uncheckedThumbColor = artColors.onSurfaceVariant,
+                uncheckedTrackColor = artColors.surfaceContainerHigh,
+                uncheckedBorderColor = artColors.outlineVariant,
+                uncheckedIconColor = Color.Transparent,
+                disabledCheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                disabledCheckedTrackColor = artColors.surfaceVariant,
+                disabledCheckedBorderColor = Color.Transparent,
+                disabledCheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                disabledUncheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
+                disabledUncheckedTrackColor = artColors.surfaceContainerHigh,
+                disabledUncheckedBorderColor = artColors.outlineVariant.copy(alpha = 0.5f),
+                disabledUncheckedIconColor = Color.Transparent
             )
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                colors = androidx.compose.material3.SwitchColors(
-                    checkedThumbColor = artColors.onPrimary,
-                    checkedTrackColor = artColors.primary,
-                    checkedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.35f),
-                    checkedIconColor = artColors.onPrimary,
-                    // Track must be distinct from row background (surfaceVariant)
-                    // or the switch disappears leaving only the thumb (screenshot bug)
-                    uncheckedThumbColor = artColors.onSurface,
-                    uncheckedTrackColor = artColors.surfaceContainerHigh,
-                    uncheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.35f),
-                    uncheckedIconColor = artColors.onSurfaceVariant,
-                    disabledCheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
-                    disabledCheckedTrackColor = artColors.surfaceVariant,
-                    disabledCheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.15f),
-                    disabledCheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
-                    disabledUncheckedThumbColor = artColors.onSurfaceVariant.copy(alpha = 0.3f),
-                    disabledUncheckedTrackColor = artColors.surfaceContainerHigh,
-                    disabledUncheckedBorderColor = artColors.onSurfaceVariant.copy(alpha = 0.15f),
-                    disabledUncheckedIconColor = artColors.onSurfaceVariant.copy(alpha = 0.3f)
-                )
-            )
-        }
+        )
     }
 }
 
@@ -1415,12 +1407,16 @@ private fun animateArtColorRoles(target: ArtColorRoles): ArtColorRoles {
         fromRoles = fromRoles.lerpTo(toRoles, progress.value)
         toRoles = target
         progress.snapTo(0f)
-        // One critically-damped slow-effects spring drives the whole roles
-        // lerp: full-screen color transitions use the slow token (M3E effects
-        // rule, no overshoot) so a track change eases instead of stomping.
+        // One critically-damped, deliberately soft spring drives the whole
+        // roles lerp: slower than the slow-effects token (stiffness 800 ->
+        // 220), so a track change reads as a gentle "breathe in/out" color
+        // shift rather than a sharp swap, still settling within ~1s.
         progress.animateTo(
             targetValue = 1f,
-            animationSpec = MiniMusicMotion.slowEffects()
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 1f,
+                stiffness = 220f
+            )
         )
     }
 

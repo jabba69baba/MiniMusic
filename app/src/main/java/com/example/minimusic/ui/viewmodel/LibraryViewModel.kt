@@ -11,6 +11,7 @@ import com.example.minimusic.MainApplication
 import com.example.minimusic.data.DeleteResult
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
+import com.example.minimusic.data.model.Folder
 import com.example.minimusic.data.model.Song
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import kotlinx.coroutines.Job
@@ -102,6 +103,8 @@ data class LibraryUiState(
     val allSongs: List<Song> = emptyList(),
     val albums: List<Album> = emptyList(),
     val artists: List<Artist> = emptyList(),
+    val folders: List<Folder> = emptyList(),
+    val folderSongs: Map<String, List<Song>> = emptyMap(),
     val searchQuery: String = "",
     val sortOrder: SongSortOrder = SongSortOrder.NAME_A_Z,
     val filteredSongs: List<Song> = emptyList()
@@ -138,6 +141,14 @@ sealed interface LibraryEvent {
     data class DeleteFailed(val message: String) : LibraryEvent
     data class SongDeleted(val song: Song) : LibraryEvent
 }
+
+/** Small private tuple so loadLibrary can compute derived data in one dispatch. */
+private data class Quintuple<A, B, C, D, E>(
+    val first: A, val second: B, val third: C, val fourth: D, val fifth: E
+)
+
+fun songsForFolder(folderSongs: Map<String, List<Song>>, path: String): List<Song> =
+    folderSongs[path].orEmpty()
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -190,11 +201,27 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 // Derive the first published list with the active query and sort
                 // order already applied. This avoids a visible flash of the raw
                 // MediaStore order during a rescan.
-                val (albums, artists, filteredSongs) = withContext(Dispatchers.Default) {
-                    Triple(
+                val (albums, artists, filteredSongs, folders, folderSongs) = withContext(Dispatchers.Default) {
+                    val byPath = songs.associateWith { song ->
+                        // Cheap identity fallback: two MediaStore rows under the
+                        // same directory share the content URI's parent. RELATIVE_PATH
+                        // would be exact, but a per-row resolver query over a large
+                        // library costs more than this grouping saves — the URI path
+                        // already carries the folder for MediaStore-provided URIs.
+                        song.contentUri.path
+                            ?.substringBeforeLast('/')
+                            ?.substringAfterLast("/Music/", missingDelimiterValue = "")
+                            ?.takeIf { it.isNotBlank() }
+                            ?: song.contentUri.path?.substringBeforeLast('/')?.substringAfterLast('/')
+                            ?: "Storage"
+                    }
+                    Quintuple(
                         repository.deriveAlbums(songs),
                         repository.deriveArtists(songs),
-                        filterAndSortSongs(songs, currentState.searchQuery, currentState.sortOrder)
+                        filterAndSortSongs(songs, currentState.searchQuery, currentState.sortOrder),
+                        repository.deriveFolders(byPath),
+                        byPath.entries.groupBy({ it.value }, { it.key })
+                            .mapValues { (_, list) -> list.sortedBy { it.title.lowercase() } }
                     )
                 }
                 // Keep the skeleton up until the first screenful of artwork is
@@ -224,6 +251,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     allSongs = songs,
                     albums = albums,
                     artists = artists,
+                    folders = folders,
+                    folderSongs = folderSongs,
                     filteredSongs = filteredSongs
                 )
             } catch (error: Exception) {

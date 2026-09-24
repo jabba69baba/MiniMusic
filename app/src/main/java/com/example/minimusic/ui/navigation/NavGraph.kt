@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -48,14 +50,12 @@ import com.example.minimusic.ui.screens.LibraryScreen
 import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.screens.LyricsScreen
-import com.example.minimusic.ui.screens.PlaylistDetailScreen
 import com.example.minimusic.ui.screens.PlayerScreen
 import com.example.minimusic.ui.components.MiniPlayer
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
 import com.example.minimusic.ui.components.LocalMiniMusicHaptics
 import com.example.minimusic.ui.screens.SettingsScreen
 import com.example.minimusic.ui.viewmodel.LibraryViewModel
-import com.example.minimusic.ui.viewmodel.PlaylistViewModel
 import kotlinx.coroutines.launch
 import com.example.minimusic.ui.viewmodel.PlayerViewModel
 import com.example.minimusic.ui.viewmodel.SettingsViewModel
@@ -73,21 +73,19 @@ private object Routes {
     fun album(albumId: Long) = "album/$albumId"
     fun artist(artistName: String) = "artist/${java.net.URLEncoder.encode(artistName, "UTF-8")}"
     fun details(songId: Long) = "details/$songId"
-    const val PLAYLIST = "playlist/{playlistId}"
-    fun playlist(playlistId: Long) = "playlist/$playlistId"
+    const val FOLDER = "folder/{path}"
+    fun folder(path: String) = "folder/${java.net.URLEncoder.encode(path, "UTF-8")}"
 }
 
 @Composable
 fun MiniMusicNavGraph(
     libraryViewModel: LibraryViewModel,
-    playlistViewModel: PlaylistViewModel,
     playerViewModel: PlayerViewModel,
     settingsViewModel: SettingsViewModel,
     openPlayerFromWidget: Boolean = false,
     navController: NavHostController = rememberNavController()
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
-    val playlists by playlistViewModel.observeAll().collectAsState(initial = emptyList())
     // Sliced so the 20 Hz position ticker never recomposes this graph: only an
     // actual track change flows down. Player/MiniPlayer/Lyrics collect the full
     // playback flow themselves, scoped to their own subtrees.
@@ -197,7 +195,31 @@ fun MiniMusicNavGraph(
         // Keep Home composed as a stable base layer for every destination.
         // Overlay destinations can then enter/exit over the already-rendered
         // library instead of exposing a stale frame while the back stack changes.
+        //
+        // While another route is on top, the base layer must be totally inert:
+        // an overlay screen during its enter/exit transition doesn't yet cover
+        // the whole graph, and taps that fall through were registering on the
+        // home list underneath — the "flash of home, then back to settings"
+        // bug. The pointerInput blocker consumes everything over the base.
+        val homeCovered = currentRoute != null && currentRoute != Routes.LIBRARY
         CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
+        Box(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .then(
+                    if (homeCovered) {
+                        androidx.compose.ui.Modifier.pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent().changes.forEach { it.consume() }
+                                }
+                            }
+                        }
+                    } else {
+                        androidx.compose.ui.Modifier
+                    }
+                )
+        ) {
         LibraryScreen(
             uiState = libraryState,
             currentSongId = currentSong?.id,
@@ -213,17 +235,6 @@ fun MiniMusicNavGraph(
                 playerViewModel.startShufflePlayback(songs, songs.indexOf(song))
             },
             onDeleteSong = libraryViewModel::deleteSong,
-            playlists = playlists,
-            onAddSongToPlaylist = { playlist, song ->
-                playlistViewModel.addSongsToPlaylist(playlist.id, listOf(song.id))
-            },
-            onPlaylistClick = { playlist -> navController.navigate(Routes.playlist(playlist.id)) },
-            onCreatePlaylistAndAdd = { name, song ->
-                playlistViewModel.createPlaylist(name) { id ->
-                    playlistViewModel.addSongsToPlaylist(id, listOf(song.id))
-                }
-            },
-            onCreatePlaylist = playlistViewModel::createPlaylistNameOnly,
             onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
             onRetryDelete = libraryViewModel::deleteSong,
             onAlbumClick = { album -> navController.navigate(Routes.album(album.id)) },
@@ -239,8 +250,10 @@ fun MiniMusicNavGraph(
                     launchSingleTop = true
                 }
             },
+            onFolderClick = { path -> navController.navigate(Routes.folder(path)) },
             onRetryLoad = libraryViewModel::loadLibrary
         )
+        }
         }
 
         NavHost(
@@ -352,30 +365,26 @@ fun MiniMusicNavGraph(
         }
 
         composable(
-            route = Routes.PLAYLIST,
-            arguments = listOf(navArgument("playlistId") { type = NavType.LongType })
+            route = Routes.FOLDER,
+            arguments = listOf(navArgument("path") { type = NavType.StringType })
         ) { backStackEntry ->
-            val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
-            PlaylistDetailScreen(
-                playlistId = playlistId,
-                playlistViewModel = playlistViewModel,
-                allSongs = libraryState.allSongs,
+            val encoded = backStackEntry.arguments?.getString("path") ?: return@composable
+            val path = java.net.URLDecoder.decode(encoded, "UTF-8")
+            val songs = com.example.minimusic.ui.viewmodel.songsForFolder(libraryState.folderSongs, path)
+            FilteredSongsScreen(
+                title = path.substringAfterLast('/').ifBlank { path },
+                songs = songs,
                 currentSongId = currentSong?.id,
                 onBack = { navController.popBackStack() },
-                onPlaySong = { songs, song ->
-                    playerViewModel.playQueue(songs, songs.indexOf(song))
-                },
-                onShuffleAll = { songs ->
+                onPlaySong = { song -> playerViewModel.playQueue(songs, songs.indexOf(song)) },
+                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) },
+                onPlayAll = { playerViewModel.playQueue(songs, 0) },
+                onShuffleAll = {
                     if (songs.isNotEmpty()) {
                         playerViewModel.startShufflePlayback(songs, songs.indices.random())
                     }
                 },
-                onRemoveSong = { songId -> playlistViewModel.removeSongFromPlaylist(playlistId, songId) },
-                onDeletePlaylist = {
-                    playlistViewModel.deletePlaylist(playlistId)
-                    navController.popBackStack()
-                },
-                onOpenDetails = { song -> navController.navigate(Routes.details(song.id)) }
+                headerSubtitle = path
             )
         }
 
@@ -464,11 +473,17 @@ fun MiniMusicNavGraph(
         // not recompose this whole graph (library list included) — only the
         // boolean handoffs below may trigger composition. The translationY
         // itself stays in graphicsLayer (layout phase, no recomposition).
+        //
+        // The player sheet lives ABOVE the NavHost (zIndex 2), so keeping it
+        // composed while the LYRICS route is current covers the lyrics screen
+        // entirely — that is the "lyrics page doesn't open" bug. The sheet is
+        // visible for PLAYER, and for any route while it is mid-travel, but
+        // NOT once lyrics has settled on top. Its transitionY then stays at
+        // fullHeight so it doesn't flash over the lyrics card.
         val playerSheetVisible by remember(sheetState, hasActiveSong, currentRoute) {
             derivedStateOf {
-                hasActiveSong &&
-                    (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS ||
-                        sheetState.progress > 0.001f)
+                hasActiveSong && currentRoute != Routes.LYRICS &&
+                    (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)
             }
         }
         val playerSheetInteractive by remember(sheetState, currentRoute, queueDrawerOpen) {
@@ -545,7 +560,19 @@ fun MiniMusicNavGraph(
                     onReorderQueue = playerViewModel::moveQueueEntry,
                     onRemoveQueueEntry = playerViewModel::removeQueueEntry,
                     onClearQueue = {
+                        // Collapse the player sheet first, then pop the route
+                        // when the collapse has begun: the queue empties and the
+                        // player glides down to the miniplayer in one motion
+                        // instead of the abrupt two-frame jump.
                         playerViewModel.clearQueue()
+                        scope.launch {
+                            sheetState.settle(
+                                velocityPxPerSecond = 0f,
+                                targetProgressOverride = 0f,
+                                onExpanded = {},
+                                onCollapsed = {}
+                            )
+                        }
                         navController.popBackStack(Routes.LIBRARY, inclusive = false)
                     },
                     onStartSleepTimer = playerViewModel::startSleepTimer,
@@ -614,10 +641,13 @@ fun MiniMusicNavGraph(
  * 4. **Reduced motion collapses to the fade alone**, per the guide's first
  *    characteristic.
  */
-// Nav slides use M3 emphasized tween — both enter and exit share ONE
-// duration (300ms) so surfaces land together. Previous 300/250 split caused
-// stutter: outgoing stopped while incoming still travelled.
-private const val NavDurationMs = 300
+// Nav transitions: short travel, gentle fade, ONE duration for both layers.
+// The sticking came from two sources: (a) large slide distances kept full-size
+// screens compositing for the whole 300ms while the layer beneath re-rendered,
+// and (b) asymmetric pop timing. Both directions now share one 260ms tween,
+// travel only ~12% of the width, and fade — the pair reads as one motion and
+// finishes decisively instead of dragging a long tail.
+private const val NavDurationMs = 260
 
 private fun navEnterSpec() = tween<IntOffset>(
     NavDurationMs, easing = MiniMusicMotion.navEnterEasing
@@ -627,24 +657,38 @@ private fun navExitSpec() = tween<IntOffset>(
     NavDurationMs, easing = MiniMusicMotion.navExitEasing
 )
 
+private fun navFadeInSpec() = tween<Float>(
+    NavDurationMs, easing = MiniMusicMotion.navEnterEasing
+)
+
+private fun navFadeOutSpec() = tween<Float>(
+    NavDurationMs, easing = MiniMusicMotion.navExitEasing
+)
+
 private fun pushEnter(reduced: Boolean): EnterTransition {
     return if (reduced) EnterTransition.None
-    else slideInHorizontally(animationSpec = navEnterSpec()) { it / 4 }
+    else slideInHorizontally(animationSpec = navEnterSpec()) { it / 8 } +
+        fadeIn(navFadeInSpec())
 }
 
 private fun pushExit(reduced: Boolean): ExitTransition {
     return if (reduced) ExitTransition.None
-    else slideOutHorizontally(animationSpec = navExitSpec()) { -it / 6 }
+    else slideOutHorizontally(animationSpec = navExitSpec()) { -it / 10 } +
+        fadeOut(navFadeOutSpec())
 }
 
 private fun backEnter(reduced: Boolean): EnterTransition {
-    // Mirrors pushExit distance, now same 300ms duration — no stutter
+    // Exact mirror of pushExit: same distance, same duration, same curve
+    // family — returning from Settings/Album/Artist is the same motion
+    // rewound, which is what removes the pop-side stutter.
     return if (reduced) EnterTransition.None
-    else slideInHorizontally(animationSpec = navExitSpec()) { -it / 6 }
+    else slideInHorizontally(animationSpec = navEnterSpec()) { -it / 10 } +
+        fadeIn(navFadeInSpec())
 }
 
 private fun backExit(reduced: Boolean): ExitTransition {
-    // Mirrors pushEnter distance with same duration
+    // Exact mirror of pushEnter.
     return if (reduced) ExitTransition.None
-    else slideOutHorizontally(animationSpec = navEnterSpec()) { it / 4 }
+    else slideOutHorizontally(animationSpec = navExitSpec()) { it / 8 } +
+        fadeOut(navFadeOutSpec())
 }

@@ -59,6 +59,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MyLocation
@@ -125,7 +126,6 @@ import com.example.minimusic.ui.components.AlbumGridSkeleton
 import com.example.minimusic.ui.components.ArtistListSkeleton
 import com.example.minimusic.ui.components.MiniMusicImageLoader
 import com.example.minimusic.ui.components.MiniPlayerReservedHeight
-import com.example.minimusic.ui.components.PlaylistPickerDialog
 import com.example.minimusic.ui.components.SongListItem
 import com.example.minimusic.ui.components.SongListSkeleton
 import com.example.minimusic.ui.theme.LocalMiniMusicReducedMotion
@@ -150,7 +150,7 @@ private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.g
     SONGS("Songs", Icons.Filled.MusicNote),
     ARTISTS("Artists", Icons.Filled.Person),
     ALBUMS("Albums", Icons.Filled.Album),
-    PLAYLISTS("Playlists", Icons.Filled.QueueMusic)
+    FOLDERS("Folders", Icons.Filled.Folder)
 }
 
 /** The library drawer's shape: rounded only at the top, flat everywhere else —
@@ -174,12 +174,7 @@ fun LibraryScreen(
     onShufflePlayFrom: (Song, List<Song>) -> Unit,
     onDeleteSong: (Song) -> Unit,
     onOpenDetails: (Song) -> Unit = {},
-    onAddToPlaylist: (Song) -> Unit = {},
-    playlists: List<com.example.minimusic.data.playlist.Playlist> = emptyList(),
-    onAddSongToPlaylist: (com.example.minimusic.data.playlist.Playlist, Song) -> Unit = { _, _ -> },
-    onPlaylistClick: (com.example.minimusic.data.playlist.Playlist) -> Unit = {},
-    onCreatePlaylistAndAdd: (String, Song) -> Unit = { _, _ -> },
-    onCreatePlaylist: (String) -> Unit = {},
+    onFolderClick: (String) -> Unit = {},
     onRetryDelete: (Song) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
@@ -238,8 +233,6 @@ fun LibraryScreen(
     var pendingRetrySong by remember { mutableStateOf<Song?>(null) }
     val currentOnRetryDelete = rememberUpdatedState(onRetryDelete)
     val snackbarHostState = remember { SnackbarHostState() }
-    var showPlaylistPicker by remember { mutableStateOf(false) }
-    var pickerSong by remember { mutableStateOf<Song?>(null) }
 
     val deletePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -459,7 +452,7 @@ fun LibraryScreen(
                     }
 
                     CategorySortMenu(
-                        expanded = sortMenuExpanded && selectedTab != LibraryTab.PLAYLISTS,
+                        expanded = sortMenuExpanded && selectedTab != LibraryTab.FOLDERS,
                         tab = selectedTab,
                         songSortOrder = uiState.sortOrder,
                         artistSortOrder = artistSortOrder,
@@ -537,7 +530,6 @@ fun LibraryScreen(
                                         onShufflePlayFrom = { song -> onShufflePlayFrom(song, filteredSongs) },
                                         onDelete = onDeleteSong,
                                         onOpenDetails = onOpenDetails,
-                                        onAddToPlaylist = onAddToPlaylist
                                     )
                                     LibraryTab.ALBUMS -> AlbumsTab(
                                         albums = sortedAlbums,
@@ -549,11 +541,11 @@ fun LibraryScreen(
                                         bottomContentPadding = footerHeight,
                                         onArtistClick = onArtistClick
                                     )
-                                    LibraryTab.PLAYLISTS -> PlaylistsTab(
-                                        playlists = playlists,
+                                    LibraryTab.FOLDERS -> FoldersTab(
+                                        folders = uiState.folders,
+                                        folderSongs = uiState.folderSongs,
                                         bottomContentPadding = footerHeight,
-                                        onPlaylistClick = onPlaylistClick,
-                                        onCreatePlaylist = onCreatePlaylist
+                                        onFolderClick = onFolderClick
                                     )
                                     }
                                 }
@@ -569,26 +561,6 @@ fun LibraryScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = footerHeight + 12.dp)
         )
-        if (showPlaylistPicker && pickerSong != null) {
-            PlaylistPickerDialog(
-                playlists = playlists,
-                songTitle = pickerSong?.title ?: "",
-                onDismiss = { showPlaylistPicker = false; pickerSong = null },
-                onPickPlaylist = { playlist ->
-                    onAddSongToPlaylist(playlist, pickerSong ?: return@PlaylistPickerDialog)
-                    showPlaylistPicker = false
-                    pickerSong = null
-                },
-                onCreatePlaylist = { name, onCreated ->
-                    // Create and immediately add the pending song; the created
-                    // snapshot is only for closing the dialog.
-                    onCreatePlaylistAndAdd(name, pickerSong ?: return@PlaylistPickerDialog)
-                    onCreated(com.example.minimusic.data.playlist.Playlist(id = -1, name = name, createdAtSeconds = 0))
-                    showPlaylistPicker = false
-                    pickerSong = null
-                }
-            )
-        }
     }
 }
 
@@ -629,7 +601,6 @@ private fun SongsTab(
     onShufflePlayFrom: (Song) -> Unit,
     onDelete: (Song) -> Unit,
     onOpenDetails: (Song) -> Unit,
-    onAddToPlaylist: (Song) -> Unit = {}
 ) {
     val listState = rememberLazyListState(cacheWindow = ListPrefetchWindow)
     val scrollScope = rememberCoroutineScope()
@@ -720,7 +691,6 @@ private fun SongsTab(
                     onShufflePlayFrom = onShufflePlayFrom,
                     onDelete = onDelete,
                     onOpenDetails = onOpenDetails,
-                    onAddToPlaylist = onAddToPlaylist,
                     // Reorder glide on sort/search changes (Metrolist pattern:
                     // stable keys + contentType above, animateItem on the row).
                     // Fades stay null: newly-composed rows must not spend
@@ -746,6 +716,73 @@ private fun SongsTab(
         )
     }
 }
+@Composable
+private fun FoldersTab(
+    folders: List<com.example.minimusic.data.model.Folder>,
+    folderSongs: Map<String, List<Song>>,
+    bottomContentPadding: androidx.compose.ui.unit.Dp,
+    onFolderClick: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 8.dp, bottom = bottomContentPadding, end = 28.dp)
+    ) {
+        items(
+            items = folders,
+            key = { it.path },
+            contentType = { "folder-row" }
+        ) { folder ->
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                    .clickable { onFolderClick(folder.path) }
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = folder.path.substringAfterLast('/').ifBlank { folder.path },
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = folder.path,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Text(
+                        text = "${folder.songCount}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AlbumsTab(
 
@@ -868,20 +905,20 @@ private suspend fun locateCentered(
     itemCount: Int
 ) {
     if (index < 0) return
-    val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-    val rowPx = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size
-        ?: listState.layoutInfo.visibleItemsInfo.lastOrNull()?.size
-        ?: 0
+    // Two-pass placement: scrollToItem with the centered offset lands the row
+    // deterministically; animateScrollToItem with a large offset can overshoot
+    // and bounce (the double-tap snap bug). The measure pass below corrects
+    // for variable row heights so the row is truly centered in every case.
+    val viewport = listState.layoutInfo.let { it.viewportEndOffset - it.viewportStartOffset }
+    val rowPx = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 0
     if (viewport <= 0 || rowPx <= 0) {
-        listState.animateScrollToItem(index = index)
+        listState.scrollToItem(index = index)
         return
     }
-    // Dead center: (viewport - row)/2
     val centeredOffset = ((viewport - rowPx) * 0.5f).toInt().coerceAtLeast(0)
-    // Don't show blank above first item: max offset is index * rowHeight
     val maxOffsetWithoutBlank = index * rowPx
     val offset = centeredOffset.coerceAtMost(maxOffsetWithoutBlank)
-    listState.animateScrollToItem(index = index, scrollOffset = offset)
+    listState.scrollToItem(index = index, scrollOffset = offset)
 }
 /** Rows covered by the closing glide after a long-distance locate jump. */
 private const val LocateGlideTail = 20
@@ -968,7 +1005,9 @@ private fun BoxScope.SongsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            .padding(top = 8.dp, bottom = bottomContentPadding + 12.dp)
+            // Exactly matches the song list's own content padding (bottom + 4,
+            // 28dp end gutter) so the track never extends past the first/last card.
+            .padding(top = 0.dp, bottom = bottomContentPadding + 4.dp)
     )
 }
 
@@ -997,6 +1036,8 @@ private fun BoxScope.AlbumsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
+            // Same vertical bounds as the grid's content padding (top 12, bottom
+            // +12) so the thumb stays inside the card area at both ends.
             .padding(top = 12.dp, bottom = bottomContentPadding + 12.dp)
     )
 }
@@ -1023,7 +1064,8 @@ private fun BoxScope.ArtistsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            .padding(top = 8.dp, bottom = bottomContentPadding)
+            // Matches the artist list's content padding (bottom + 8).
+            .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
     )
 }
 
@@ -1074,7 +1116,7 @@ private fun ExpandingCategoryControl(
                     .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS, LibraryTab.PLAYLISTS)
+                val tabs = listOf(LibraryTab.SONGS, LibraryTab.ARTISTS, LibraryTab.ALBUMS, LibraryTab.FOLDERS)
                 tabs.forEachIndexed { index, tab ->
                     val active = tab == selected
                     val weight by animateFloatAsState(
@@ -1283,7 +1325,7 @@ private fun CategorySortMenu(
             AlbumSortOrder.ARTIST_A_Z, AlbumSortOrder.ARTIST_Z_A -> SortField.ARTIST
             AlbumSortOrder.SONGS_MOST, AlbumSortOrder.SONGS_FEWEST -> SortField.SONGS
         }
-        LibraryTab.PLAYLISTS -> SortField.NAME
+        LibraryTab.FOLDERS -> SortField.NAME
     }
     val ascending = when (tab) {
         LibraryTab.SONGS -> songSortOrder in setOf(
@@ -1303,7 +1345,7 @@ private fun CategorySortMenu(
             AlbumSortOrder.ARTIST_A_Z,
             AlbumSortOrder.SONGS_FEWEST
         )
-        LibraryTab.PLAYLISTS -> true
+        LibraryTab.FOLDERS -> true
     }
 
     fun apply(field: SortField, asc: Boolean) {
@@ -1312,7 +1354,7 @@ private fun CategorySortMenu(
             LibraryTab.SONGS -> onSongSort(sortOrderOf(field, asc))
             LibraryTab.ARTISTS -> onArtistSort(artistSortOrderOf(field, asc))
             LibraryTab.ALBUMS -> onAlbumSort(albumSortOrderOf(field, asc))
-            LibraryTab.PLAYLISTS -> Unit
+            LibraryTab.FOLDERS -> Unit
         }
     }
 
@@ -1334,7 +1376,7 @@ private fun CategorySortMenu(
             SortField.ARTIST to "Artist",
             SortField.SONGS to "Songs"
         )
-        LibraryTab.PLAYLISTS -> emptyList()
+        LibraryTab.FOLDERS -> emptyList()
     }
 
     AlertDialog(
@@ -1347,7 +1389,7 @@ private fun CategorySortMenu(
                     LibraryTab.SONGS -> "Sort songs"
                     LibraryTab.ARTISTS -> "Sort artists"
                     LibraryTab.ALBUMS -> "Sort albums"
-                    LibraryTab.PLAYLISTS -> "Sort playlists"
+                    LibraryTab.FOLDERS -> "Sort folders"
                 }
             )
         },
@@ -1508,7 +1550,7 @@ private fun LibrarySkeleton(
             LibraryTab.SONGS -> SongListSkeleton()
             LibraryTab.ARTISTS -> ArtistListSkeleton()
             LibraryTab.ALBUMS -> AlbumGridSkeleton()
-            LibraryTab.PLAYLISTS -> SongListSkeleton()
+            LibraryTab.FOLDERS -> SongListSkeleton()
         }
         // Same reserved space the real lists leave, so the mini player never
         // sits on top of a placeholder that the content will not sit under.

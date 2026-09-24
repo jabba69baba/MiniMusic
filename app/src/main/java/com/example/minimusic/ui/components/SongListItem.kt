@@ -47,7 +47,6 @@ fun SongListItem(
     onShufflePlayFrom: (Song) -> Unit = {},
     onDelete: (Song) -> Unit = {},
     onOpenDetails: (Song) -> Unit = {},
-    onAddToPlaylist: (Song) -> Unit = {},
     /** Optional extra trailing action (e.g. remove-from-playlist X button). */
     trailingContent: @Composable (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -146,7 +145,6 @@ fun SongListItem(
                         onShufflePlayFrom = onShufflePlayFrom,
                         onDelete = onDelete,
                         onOpenDetails = onOpenDetails,
-                        onAddToPlaylist = onAddToPlaylist
                     )
                 }
             }

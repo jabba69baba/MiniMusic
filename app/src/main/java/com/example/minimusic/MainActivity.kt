@@ -131,7 +131,6 @@ class MainActivity : ComponentActivity() {
                     if (hasPermission) {
                         MiniMusicNavGraph(
                             libraryViewModel = libraryViewModel,
-                            playlistViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
                             playerViewModel = playerViewModel,
                             settingsViewModel = settingsViewModel,
                             openPlayerFromWidget = openPlayerFromWidget

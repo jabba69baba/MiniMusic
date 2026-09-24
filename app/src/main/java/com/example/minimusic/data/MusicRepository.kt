@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.MediaStore
 import com.example.minimusic.data.model.Album
 import com.example.minimusic.data.model.Artist
+import com.example.minimusic.data.model.Folder
 import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,7 +39,7 @@ class MusicRepository(private val context: Context) {
         val songs = mutableListOf<Song>()
 
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val projection = arrayOf(
+        val projection = mutableListOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
@@ -49,13 +50,19 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.IS_MUSIC,
             MediaStore.Audio.Media.DATE_ADDED
         )
+        // RELATIVE_PATH exists from API 29 on; older devices fall back to
+        // DATA-derived folders in deriveFolders.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            projection += MediaStore.Audio.Media.RELATIVE_PATH
+        }
+        val projectionArray = projection.toTypedArray()
         // Filter out very short clips (ringtones/notification blips) and non-music audio.
         // The threshold is user-configurable from Settings > Content.
         val minDurationMs = minDurationSeconds * 1000L
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} >= $minDurationMs"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
-        context.contentResolver.query(collection, projection, selection, null, sortOrder)?.use { cursor ->
+        context.contentResolver.query(collection, projectionArray, selection, null, sortOrder)?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
             val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
             val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
@@ -64,6 +71,8 @@ class MusicRepository(private val context: Context) {
             val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
             val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+            val pathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH) else -1
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
@@ -96,6 +105,43 @@ class MusicRepository(private val context: Context) {
 
         songs
     }
+
+    /**
+     * Maps every song to its MediaStore RELATIVE_PATH folder (API 29+),
+     * falling back to the file's parent directory on older devices.
+     * Stored as a plain string on the row for cheap grouping.
+     */
+    suspend fun folderOf(song: Song): String = withContext(Dispatchers.IO) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.query(
+                    song.contentUri,
+                    arrayOf(MediaStore.Audio.Media.RELATIVE_PATH),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        cursor.getString(0)?.trimEnd('/')
+                    } else null
+                }
+            } else null
+        }.getOrNull()
+            ?: song.contentUri.path
+                ?.substringBeforeLast('/')
+                ?.substringAfterLast("Music/", missingDelimiterValue = "")
+                ?.takeIf { it.isNotBlank() }
+            ?: "Storage"
+    }
+
+    /** Groups the flat song list into folders using pre-resolved paths. */
+    fun deriveFolders(songsByPath: Map<Song, String>): List<Folder> =
+        songsByPath.entries
+            .groupBy({ it.value }, { it.key })
+            .map { (path, songsInFolder) ->
+                Folder(path = path.ifBlank { "Storage" }, songCount = songsInFolder.size)
+            }
+            .sortedBy { it.path.lowercase() }
 
     /**
      * Deletes [song]'s underlying file via MediaStore. On Android 10+, deleting a

@@ -143,17 +143,16 @@ class MusicService : MediaSessionService() {
                 exoPlayer.addListener(object : Player.Listener {
                     override fun onEvents(player: Player, events: Player.Events) {
                         MiniMusicWidgetProvider.requestUpdate(this@MusicService)
-                        // Re-derive the fade window for the current item; duration
-                        // becomes known once the media source is prepared.
-                        if (events.contains(Player.EVENT_TIMELINE_CHANGED) ||
-                            events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
-                            events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)
-                        ) {
-                            crossfadeEngine.configure(
-                                enabledSecondsMs = crossfadeEngine.currentFadeMs,
-                                currentDurationMs = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: 0L
-                            )
-                        }
+                        // Re-derive the fade window on EVERY event batch: the
+                        // duration only becomes known once the source is prepared,
+                        // and a stale duration (0 or the previous track's) with an
+                        // active fade is what previously muted playback. Keeping
+                        // the window in sync with the real item is cheap (a couple
+                        // of volatile writes) and cannot desync.
+                        crossfadeEngine.configure(
+                            enabledSecondsMs = crossfadeEngine.currentFadeMs,
+                            currentDurationMs = player.duration
+                        )
                     }
                 })
             }
@@ -169,10 +168,9 @@ class MusicService : MediaSessionService() {
         serviceScope.launch {
             settingsRepository.settings.collect { settings ->
                 monoProcessor.setEnabled(settings.monoAudio)
-                val fadeSecondsMs = if (settings.crossfadeEnabled) settings.crossfadeSeconds * 1000L else 0L
                 crossfadeEngine.configure(
-                    enabledSecondsMs = fadeSecondsMs,
-                    currentDurationMs = player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: 0L
+                    enabledSecondsMs = if (settings.crossfadeEnabled) settings.crossfadeSeconds * 1000L else 0L,
+                    currentDurationMs = player.duration
                 )
             }
         }

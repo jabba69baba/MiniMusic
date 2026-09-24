@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -295,7 +296,6 @@ fun SettingsScreen(
                     SettingsDivider()
                     ListItem(
                         headlineContent = { Text("Rescan library") },
-                        supportingContent = { Text("Tap to rescan MediaStore") },
                         // Whole row is tap target; feedback ONLY snackbar —
                         // no spinner, no M3E LoadingIndicator, no shape animation.
                         // Now shows both Scanning… and Scan complete • N songs.
@@ -360,8 +360,42 @@ fun SettingsScreen(
             modifier = Modifier
                 .align(androidx.compose.ui.Alignment.BottomCenter)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-        )
+                // Sits above the miniplayer strip and respects its horizontal
+                // boundaries: margins on both sides, not full-bleed.
+                .padding(bottom = 84.dp, start = 16.dp, end = 16.dp)
+        ) { snackbarData ->
+            // Muted, compact snackbar: surface-container tone, no description,
+            // an icon on the right (rescan) when the message is a scan state.
+            val isScanState = snackbarData.visuals.message.startsWith("Scan")
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                tonalElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = snackbarData.visuals.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isScanState) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Filled.Sync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.inverseOnSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
