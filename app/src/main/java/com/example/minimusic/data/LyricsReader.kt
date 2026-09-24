@@ -189,23 +189,7 @@ class LyricsReader(private val context: Context) {
      * Removes provider metadata and nonstandard word-timing markup without removing
      * genuine Unicode combining marks, including Zalgo-style text.
      */
-    internal fun cleanLyricsText(text: String): String? {
-        val cleaned = text
-            .lineSequence()
-            .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
-            .map { ProviderControlTagRegex.replace(it, "") }
-            .map { LrcMetadataTagRegex.replace(it, "") }
-            .map { WordTimingLinePrefixRegex.replace(WordTimingTokenRegex.replace(it, ""), "") }
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { InstrumentalPlaceholderRegex.matches(it) }
-            .joinToString("\n")
-            .trim()
-            .ifBlank { null }
-        return cleaned?.let(::repairLikelyMojibake)
-    }
+    internal fun cleanLyricsText(text: String): String? = cleanLyricsTextTopLevel(text)
 
     private fun indexAfterNullTerminator(body: ByteArray, start: Int, nullWidth: Int): Int {
         var i = start
@@ -248,4 +232,28 @@ class LyricsReader(private val context: Context) {
     private fun bigEndianToInt(b0: Byte, b1: Byte, b2: Byte, b3: Byte): Int =
         ((b0.toInt() and 0xFF) shl 24) or ((b1.toInt() and 0xFF) shl 16) or
             ((b2.toInt() and 0xFF) shl 8) or (b3.toInt() and 0xFF)
+}
+
+/**
+ * Top-level implementation of [LyricsReader.cleanLyricsText]. It lives outside the
+ * class because it depends only on the file-level regexes and text repair — no
+ * Android types — which lets the plain JVM unit test call it directly without
+ * needing an Android context or a Robolectric-style runner.
+ */
+internal fun cleanLyricsTextTopLevel(text: String): String? {
+    val cleaned = text
+        .lineSequence()
+        .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
+        .filter { it.isNotBlank() }
+        .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
+        .map { ProviderControlTagRegex.replace(it, "") }
+        .map { LrcMetadataTagRegex.replace(it, "") }
+        .map { WordTimingLinePrefixRegex.replace(WordTimingTokenRegex.replace(it, ""), "") }
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .filterNot { InstrumentalPlaceholderRegex.matches(it) }
+        .joinToString("\n")
+        .trim()
+        .ifBlank { null }
+    return cleaned?.let(::repairLikelyMojibake)
 }

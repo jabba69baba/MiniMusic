@@ -16,7 +16,7 @@ class LyricsReaderTest {
 
         assertEquals(
             "[00:12.34]That I need to ask before I'm alone",
-            cleanLyricsText(input)
+            cleanLyricsTextTopLevel(input)
         )
     }
 
@@ -28,11 +28,11 @@ class LyricsReaderTest {
             [00:04.00]I said [arbitrary words] out loud
         """.trimIndent()
 
-        assertEquals(input, cleanLyricsText(input))
+        assertEquals(input, cleanLyricsTextTopLevel(input))
     }
 
     @Test
     fun metadataOnlyContentIsNotDisplayed() {
-        assertNull(cleanLyricsText("[ti:After Dark]\n[ar:Mr.Kitty]\n[offset:0]"))
+        assertNull(cleanLyricsTextTopLevel("[ti:After Dark]\n[ar:Mr.Kitty]\n[offset:0]"))
     }
 }

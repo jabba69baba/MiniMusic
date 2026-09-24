@@ -122,7 +122,13 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.2")
     ksp("androidx.room:room-compiler:2.7.2")
 
-    testImplementation(kotlin("test"))
+    // kotlin-test with the explicit JUnit4 provider: AGP's unit-test source set
+    // does not get the default framework mapping the JVM plugin provides, so
+    // plain kotlin("test") leaves `kotlin.test.Test` unresolved.
+    testImplementation(kotlin("test-junit"))
+    // Song.contentUri is a non-null android.net.Uri; in JVM unit tests the Android
+    // stub jar makes Uri.EMPTY null and Uri.parse throw, so tests mock the Uri.
+    testImplementation("io.mockk:mockk:1.13.13")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

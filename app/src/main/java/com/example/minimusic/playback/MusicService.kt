@@ -166,8 +166,25 @@ class MusicService : MediaSessionService() {
         // keep applying them live whenever the user toggles a setting.
         settingsRepository = SettingsRepository(this)
         serviceScope.launch {
+            var lastMono: Boolean? = null
             settingsRepository.settings.collect { settings ->
                 monoProcessor.setEnabled(settings.monoAudio)
+                // Toggling mono changes the processor's isActive() output, but the
+                // audio sink only re-evaluates active processors on a stream
+                // re-configuration — which never happens mid-track. Without this,
+                // the toggle takes effect only on the NEXT song ("does nothing").
+                // Re-preparing the current item at its position forces the sink to
+                // reset and rebuild its chain with mono active/inactive right away.
+                if (lastMono != null && lastMono != settings.monoAudio) {
+                    (player as? ExoPlayer)?.let { exo ->
+                        val item = exo.currentMediaItem ?: return@let
+                        // replaceMediaItem keeps the whole queue intact; the
+                        // re-prepare it triggers forces the sink to rebuild its
+                        // processor chain, applying the mono downmix immediately.
+                        exo.replaceMediaItem(exo.currentMediaItemIndex, item)
+                    }
+                }
+                lastMono = settings.monoAudio
                 crossfadeEngine.configure(
                     enabledSecondsMs = if (settings.crossfadeEnabled) settings.crossfadeSeconds * 1000L else 0L,
                     currentDurationMs = player.duration
