@@ -6,6 +6,7 @@ on:
       - main
       - master
       - m3e-expressive-rollout
+      - hero-overhaul
       - arena/*
   workflow_dispatch:
 
