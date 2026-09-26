@@ -233,9 +233,10 @@ fun LibraryScreen(
         }
         onDispose { }
     }
-    // The outer library column already consumes system-bar insets. Reserve
-    // only the persistent miniplayer here so navigation space is not counted twice.
-    val footerHeight = MiniPlayerReservedHeight
+    // The outer library column already consumes system-bar insets. Reserve the
+    // floating miniplayer (its height) plus the M3 NavigationBar beneath it
+    // (~80dp) + a small gap, so the last row clears both floating surfaces.
+    val footerHeight = MiniPlayerReservedHeight + 96.dp
     val filteredSongs = uiState.filteredSongs
     // Which of the four mutually exclusive states the content area is in. A
     // skeleton stands in only for content that has never arrived: a rescan of a
@@ -522,13 +523,11 @@ fun LibraryScreen(
                         }
                     }
 
-                    // M3 NavigationBar: Home's tab switcher graduates here
-                    // (Songs / Artists / Albums / Folders) — batch 1 of the
-                    // hero-overhaul home redesign. Lifted above the miniplayer
-                    // (which otherwise overlays its labels) via bottom padding.
+                    // M3 NavigationBar: docked at the screen's true bottom
+                    // edge — it is the app's floor. The miniplayer floats
+                    // ABOVE it (see NavGraph), never over it.
                     NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.padding(bottom = footerHeight)
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
                         LibraryTab.entries.forEach { tab ->
                             NavigationBarItem(

@@ -24,6 +24,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -600,11 +601,16 @@ fun MiniMusicNavGraph(
         }
 
         if (miniPlayerVisible) {
+            // Floating miniplayer: hovered above the navigation bar (which owns
+            // the screen's bottom edge) with side margins — a detached pill the
+            // list scrolls beneath. Bottom clearance = nav bar + 8dp gap.
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 10.dp)
+                    .padding(bottom = 86.dp)
                     .graphicsLayer {
                         translationY = sheetState.progress * miniPlayerHeightPx
                         // Keep the miniplayer opaque until it fully hands off to
