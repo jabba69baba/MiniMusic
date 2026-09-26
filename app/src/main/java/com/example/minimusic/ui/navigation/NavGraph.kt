@@ -480,10 +480,26 @@ fun MiniMusicNavGraph(
         // visible for PLAYER, and for any route while it is mid-travel, but
         // NOT once lyrics has settled on top. Its transitionY then stays at
         // fullHeight so it doesn't flash over the lyrics card.
-        val playerSheetVisible by remember(sheetState, hasActiveSong, currentRoute) {
+        // While LYRICS is current the sheet is held composed (but parked at
+        // fullHeight) so the lyrics card's own close animation slides down OVER
+        // the player surface — without this, the route flips to LIBRARY behind
+        // the falling card and the home library flashes through during close.
+        var lyricsCloseOverPlayer by androidx.compose.runtime.remember {
+            androidx.compose.runtime.mutableStateOf(false)
+        }
+        LaunchedEffect(currentRoute) {
+            // Latch while leaving LYRICS, clear once back on PLAYER/LIBRARY.
+            if (currentRoute == Routes.LYRICS) {
+                lyricsCloseOverPlayer = true
+            } else if (lyricsCloseOverPlayer && currentRoute == Routes.PLAYER) {
+                lyricsCloseOverPlayer = false
+            }
+        }
+        val playerSheetVisible by remember(sheetState, hasActiveSong, currentRoute, lyricsCloseOverPlayer) {
             derivedStateOf {
-                hasActiveSong && currentRoute != Routes.LYRICS &&
-                    (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)
+                hasActiveSong && (currentRoute != Routes.LYRICS || lyricsCloseOverPlayer) &&
+                    (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS ||
+                        sheetState.progress > 0.001f)
             }
         }
         val playerSheetInteractive by remember(sheetState, currentRoute, queueDrawerOpen) {

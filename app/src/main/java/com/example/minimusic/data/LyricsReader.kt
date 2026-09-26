@@ -2,9 +2,11 @@ package com.example.minimusic.data
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.provider.MediaStore
 import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.InputStream
 
 private val LrcMetadataTagRegex = Regex(
@@ -42,11 +44,44 @@ class LyricsReader(private val context: Context) {
 
     suspend fun readLyrics(song: Song): String? = withContext(Dispatchers.IO) {
         runCatching {
-            val id3Lyrics = context.contentResolver.openInputStream(song.contentUri)?.use { input ->
-                parseId3Lyrics(input)
-            }
-            id3Lyrics ?: readContainerLyrics(song)
+            // Sidecar .lrc wins: most taggers and downloaders ship synced lyrics
+            // as "Title.lrc" next to the audio file, and players the user compares
+            // against (Poweramp, Musicolet, Metrolist) read exactly this. Embedded
+            // tags remain the in-file fallback.
+            readSidecarLrc(song)
+                ?: context.contentResolver.openInputStream(song.contentUri)?.use { input ->
+                    parseId3Lyrics(input)
+                }
+                ?: readContainerLyrics(song)
         }.getOrNull()
+    }
+
+    /**
+     * Reads "<audio basename>.lrc" from the same directory as the audio file.
+     * The audio path comes from MediaStore's DATA column (absolute path). If the
+     * path can't be resolved or no sidecar exists, returns null silently.
+     */
+    private fun readSidecarLrc(song: Song): String? {
+        val audioPath = runCatching {
+            context.contentResolver.query(
+                song.contentUri,
+                arrayOf(MediaStore.Audio.Media.DATA),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull() ?: return null
+        val audioFile = File(audioPath)
+        val candidates = listOf(
+            File(audioFile.parentFile, audioFile.nameWithoutExtension + ".lrc"),
+            File(audioFile.parentFile, audioFile.nameWithoutExtension + ".LRC")
+        )
+        for (candidate in candidates) {
+            if (!candidate.isFile) continue
+            val text = runCatching { candidate.readText() }.getOrNull() ?: continue
+            cleanLyricsText(text)?.let { return it }
+        }
+        return null
     }
 
     /**

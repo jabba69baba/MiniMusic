@@ -905,19 +905,24 @@ private suspend fun locateCentered(
     itemCount: Int
 ) {
     if (index < 0) return
-    // Two-pass placement: scrollToItem with the centered offset lands the row
-    // deterministically; animateScrollToItem with a large offset can overshoot
-    // and bounce (the double-tap snap bug). The measure pass below corrects
-    // for variable row heights so the row is truly centered in every case.
+    // Two-pass placement: animateScrollToItem first brings the row into the
+    // viewport with real travel (the "actual animation" the locate gesture is
+    // supposed to have — a teleporting scrollToItem reads as the list abruptly
+    // stopping), then the measured pass below corrects the row to true center.
+    listState.animateScrollToItem(index = index)
+    listState.layoutInfo.visibleItemsInfo
+        .firstOrNull { it.index == index }
+        ?: return
     val viewport = listState.layoutInfo.let { it.viewportEndOffset - it.viewportStartOffset }
-    val rowPx = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 0
-    if (viewport <= 0 || rowPx <= 0) {
-        listState.scrollToItem(index = index)
-        return
-    }
+    val rowPx = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.size
+        ?: listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size
+        ?: 0
+    if (viewport <= 0 || rowPx <= 0) return
     val centeredOffset = ((viewport - rowPx) * 0.5f).toInt().coerceAtLeast(0)
     val maxOffsetWithoutBlank = index * rowPx
     val offset = centeredOffset.coerceAtMost(maxOffsetWithoutBlank)
+    // Second pass after layout: corrects for variable row heights so the row
+    // is truly centered in every case.
     listState.scrollToItem(index = index, scrollOffset = offset)
 }
 /** Rows covered by the closing glide after a long-distance locate jump. */
@@ -996,7 +1001,15 @@ private fun BoxScope.SongsScrollbarOverlay(
                 // unseen territory otherwise cold-decodes a full window of
                 // MediaStore thumbnails per pointer event.
                 preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, RowArtSizePx, artUriAt)
-                listState.scrollToItem(index = index, scrollOffset = 0)
+                // scrollToItem teleports the rows: the thumb moves but the cards
+                // appear stationary under it. animateScrollToItem makes the rows
+                // travel like a manual fling instead. (The prefetch cache window
+                // keeps the animation from hitching on row composition.)
+                if (listState.isScrollInProgress) {
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         },
         // The top remains aligned with the first song container. The bottom
@@ -1005,9 +1018,10 @@ private fun BoxScope.SongsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            // Exactly matches the song list's own content padding (bottom + 4,
-            // 28dp end gutter) so the track never extends past the first/last card.
-            .padding(top = 0.dp, bottom = bottomContentPadding + 4.dp)
+            // Same geometry as the Artists tab (the visual reference): top 8dp,
+            // bottom = content padding + 8. All three tabs now share one track
+            // height and one start/end behavior for the first/last card.
+            .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
     )
 }
 
@@ -1030,15 +1044,21 @@ private fun BoxScope.AlbumsScrollbarOverlay(
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
                 preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, GridArtSizePx, artUriAt)
-                gridState.scrollToItem(index = index, scrollOffset = 0)
+                // Same animated-travel fix as the songs list (see above).
+                if (gridState.isScrollInProgress) {
+                    gridState.scrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    gridState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         },
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            // Same vertical bounds as the grid's content padding (top 12, bottom
-            // +12) so the thumb stays inside the card area at both ends.
-            .padding(top = 12.dp, bottom = bottomContentPadding + 12.dp)
+            // Same geometry as the Artists tab (the visual reference) so the
+            // album grid's scrollbar starts and ends at the same place as the
+            // songs and artists tracks.
+            .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
     )
 }
 
@@ -1058,7 +1078,12 @@ private fun BoxScope.ArtistsScrollbarOverlay(
         onScrollToIndex = { index ->
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
-                listState.scrollToItem(index = index, scrollOffset = 0)
+                // Same animated-travel fix as the songs list (see above).
+                if (listState.isScrollInProgress) {
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         },
         modifier = Modifier

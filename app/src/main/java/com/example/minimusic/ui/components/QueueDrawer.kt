@@ -782,12 +782,12 @@ private fun ColumnScope.QueueDrawerList(
     // position tick from triggering it.
     var previousCurrentEntryId by remember { mutableStateOf(snapshot.currentEntryId) }
 
-    /**
-     * Offset that lands a row in the middle of the viewport, but never invents
-     * a gap above the queue's own first row: the list can only show as much
-     * history as it actually has, so a current song near the top still starts
-     * flush.
-     */
+        fun placeQueueNow(view: RecyclerView) {
+        val position = latestSnapshot.resolvedVisiblePosition
+        if (position < 0 || view.height < rowHeightPx * 1.1f) return
+        view.stopScroll()
+        placeQueueInstantly(view, position, rowHeightPx)
+    }
 
     fun locateCurrentEntryIfReady(view: RecyclerView) {
         // Require at least one row tall — previous 3-row threshold prevented
@@ -797,13 +797,12 @@ private fun ColumnScope.QueueDrawerList(
         if (position < 0) return
         locatePending = false
         view.stopScroll()
-        // Same motion and same landing offset as the Locate action, so the
-        // position the drawer opens at matches what Locate produces.
-        if (reducedMotion) {
-            placeQueueInstantly(view, position, rowHeightPx)
-        } else {
-            animateQueueScroll(view, position, rowHeightPx)
-        }
+        // Opening placement must be INSTANT, not animated: an animated placement
+        // reads as "the drawer opens at the first song, then scrolls itself to
+        // the active one". Placing instantly on the first frame where the
+        // viewport can hold the row means the drawer opens already centered on
+        // the current song. (The explicit Locate action below still glides.)
+        placeQueueInstantly(view, position, rowHeightPx)
     }
 
     // Keep the RecyclerView visually below the fixed drawer header; this
@@ -868,10 +867,9 @@ private fun ColumnScope.QueueDrawerList(
                 previousOpenRequest = openRequest
                 recyclerView.stopScroll()
                 locatePending = true
-                // If the drawer is already tall enough (a drag-open that has
-                // grown past a row, or a reopen), place it now; otherwise the
-                // layout listener above does it as soon as the panel allows.
-                recyclerView.post { locateCurrentEntryIfReady(recyclerView) }
+                // Reopen placement is also instant (see locateCurrentEntryIfReady):
+                // the drawer must never present itself at row 0 and then glide.
+                recyclerView.post { placeQueueNow(recyclerView) }
             }
             if (locateRequest != previousLocateRequest) {
                 previousLocateRequest = locateRequest

@@ -10,6 +10,8 @@ import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -364,35 +366,45 @@ fun SettingsScreen(
                 // boundaries: margins on both sides, not full-bleed.
                 .padding(bottom = 84.dp, start = 16.dp, end = 16.dp)
         ) { snackbarData ->
-            // Muted, compact snackbar: surface-container tone, no description,
-            // an icon on the right (rescan) when the message is a scan state.
+            // M3E snackbar: Monet primaryContainer tone (instead of the default
+            // inverseSurface gray that stuck out of the themed page), a big
+            // expressive 28dp-rounded shape, icon chip on the left.
             val isScanState = snackbarData.visuals.message.startsWith("Scan")
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.inverseSurface,
-                tonalElevation = 2.dp,
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 3.dp,
+                shadowElevation = 3.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 androidx.compose.foundation.layout.Row(
                     modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 18.dp, vertical = 14.dp)
                         .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
                 ) {
+                    if (isScanState) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Filled.Sync,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = snackbarData.visuals.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.weight(1f)
                     )
-                    if (isScanState) {
-                        Icon(
-                            androidx.compose.material.icons.Icons.Filled.Sync,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.inverseOnSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                 }
             }
         }
