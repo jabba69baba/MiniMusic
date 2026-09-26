@@ -286,6 +286,11 @@ fun LibraryScreen(
         }
     }
 
+    var jumpToCurrentRequest by remember { mutableStateOf(0) }
+    var stopSongScrollRequest by remember { mutableStateOf(0) }
+    val hapticView = LocalView.current
+    val hapticsEnabled = LocalMiniMusicHaptics.current
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -311,6 +316,20 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Locate (jump to current song) — moved here from the old
+                    // pills row in the subtraction pass: one contextual icon
+                    // in the bar instead of a floating control row.
+                    IconButton(onClick = {
+                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                        stopSongScrollRequest++
+                        jumpToCurrentRequest++
+                    }) {
+                        Icon(
+                            Icons.Filled.MyLocation,
+                            contentDescription = "Jump to current song",
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                     // Sort moved up here from the tab row. Sorting is a
                     // preference about how a list is shown rather than a
                     // one-off action, and it now serves all three tabs — so it
@@ -371,27 +390,20 @@ fun LibraryScreen(
                 content = {}
             )
 
-            var jumpToCurrentRequest by remember { mutableStateOf(0) }
-            var stopSongScrollRequest by remember { mutableStateOf(0) }
+            val hapticView = LocalView.current
+            val hapticsEnabled = LocalMiniMusicHaptics.current
             // sortMenuExpanded belongs to the screen, not to this drawer: the
             // button that opens the menu now lives up in the app bar, outside
             // this scope. Declaring a second one here would shadow the outer
             // state and leave the app-bar button able to set a value nothing
             // reads.
-            val hapticView = LocalView.current
-            val hapticsEnabled = LocalMiniMusicHaptics.current
 
-            // ═══ DISCOVER (Home hero) ═══
-            // Art-tinted now-playing card. Only composes when a song is
-            // actually playing; hidden (not zero-height) otherwise so the
-            // library layout is identical to pre-hero builds when idle.
-            if (heroSong != null) {
-                NowPlayingHero(
-                    heroSong = heroSong,
-                    isPlaying = uiState.let { true },
-                    onClick = onOpenPlayer
-                )
-            }
+            // ═══ SUBTRACTION PASS (hero-overhaul v2) ═══
+            // Hero card deleted: it duplicated the miniplayer (same song, same
+            // art, same play action twice on one screen). The miniplayer is
+            // the single now-playing surface. Locate/Shuffle pills row also
+            // removed — Locate lives in the title bar, Shuffle in the sort
+            // menu, and the list now starts immediately after search.
 
             // One continuous drawer, rounded only at the top: the selector/
             // controls row and the song list beneath it share the same
@@ -406,71 +418,6 @@ fun LibraryScreen(
                     .padding(top = 8.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        // Tab switching moved to the bottom M3 NavigationBar
-                        // (hero-overhaul batch 1); this row keeps Locate and
-                        // Shuffle, right-aligned where the switcher used to
-                        // leave them.
-
-                        // Locate and Shuffle: two segments of one continuous
-                        // pill — the grouped treatment this row used before the
-                        // switcher redesign. The segments share a container and
-                        // a hairline, with the group's outer corners at a full
-                        // stadium radius and only a small radius where they
-                        // meet, so it reads as one object split in two rather
-                        // than two buttons that happen to be adjacent.
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            PillButton(
-                                onClick = {
-                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    stopSongScrollRequest++
-                                    jumpToCurrentRequest++
-                                },
-                                horizontalPadding = 12.dp,
-                                shape = PillGroupShapes.First,
-                                modifier = Modifier.width(ControlSegmentWidth)
-                            ) {
-                                Icon(
-                                    Icons.Filled.MyLocation,
-                                    contentDescription = "Jump to current song",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                            PillButton(
-                                onClick = {
-                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    // Shuffle changes playback in the background
-                                    // only: it must NOT stop an active fling or
-                                    // re-anchor the list (that's Locate's job).
-                                    // Scrolling continues undisturbed.
-                                    if (filteredSongs.isNotEmpty()) {
-                                        val startSong = filteredSongs.random()
-                                        onShufflePlayFrom(startSong, filteredSongs)
-                                    }
-                                },
-                                horizontalPadding = 12.dp,
-                                shape = PillGroupShapes.Last,
-                                modifier = Modifier.width(ControlSegmentWidth)
-                            ) {
-                                Icon(
-                                    Icons.Filled.Shuffle,
-                                    contentDescription = "Shuffle",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
 
                     CategorySortMenu(
                         expanded = sortMenuExpanded && selectedTab != LibraryTab.FOLDERS,
@@ -607,148 +554,6 @@ fun LibraryScreen(
     }
 }
 
-
-/**
- * The Home "Now playing" hero card. Tinted by the current song's album art
- * via the same palette engine the player uses, with the soft breathe palette
- * animation. Sliced input ([HeroSong]) keeps the position ticker away.
- */
-@Composable
-private fun NowPlayingHero(
-    heroSong: HeroSong,
-    isPlaying: Boolean,
-    onClick: () -> Unit
-) {
-    val targetArtColors = com.example.minimusic.ui.theme.rememberArtColorRoles(
-        heroSong.albumArtUri,
-        com.example.minimusic.data.PaletteStyle.TONAL_SPOT
-    )
-    // Breathe: one soft critically-damped spring lerps the whole role set on
-    // track change — the same "gentle color shift" clock the player uses.
-    val artColors = animateHeroArtColorRoles(targetArtColors)
-    val reducedMotion = LocalMiniMusicReducedMotion.current
-
-    // Entrance: on first composition (song starts), rise a short distance and
-    // settle — never pops in. Uses the shared nav-enter token.
-    val entranceProgress = remember { androidx.compose.animation.core.Animatable(if (reducedMotion) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (entranceProgress.value < 1f) {
-            entranceProgress.animateTo(
-                1f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    MiniMusicMotion.navTransitionDurationMillis,
-                    easing = MiniMusicMotion.navEnterEasing
-                )
-            )
-        }
-    }
-
-    // Press: scale down slightly on touch, spring back on release.
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val pressScale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = if (isPressed) MiniMusicMotion.fastEffects() else MiniMusicMotion.defaultSpatial(),
-        label = "heroPressScale"
-    )
-
-    Surface(
-        onClick = onClick,
-        interactionSource = interactionSource,
-        shape = RoundedCornerShape(24.dp),
-        color = artColors.primaryContainer,
-        shadowElevation = if (isPressed) 1.dp else 2.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .graphicsLayer {
-                val p = entranceProgress.value
-                scaleX = 0.96f + 0.04f * p
-                scaleY = 0.96f + 0.04f * p
-                alpha = p
-                translationY = (1f - p) * 40f
-                // Press scale rides the entrance transform.
-                val s = pressScale
-                scaleX *= s
-                scaleY *= s
-            }
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            com.example.minimusic.ui.components.AlbumArtImage(
-                model = heroSong.albumArtUri,
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.size(64.dp),
-                contentDescription = null
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "NOW PLAYING",
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 1.4.sp,
-                    color = artColors.onSurfaceVariant
-                )
-                Text(
-                    text = heroSong.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = artColors.onSurface
-                )
-                Text(
-                    text = heroSong.artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = artColors.onSurfaceVariant
-                )
-            }
-            Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = artColors.primary,
-                modifier = Modifier.size(46.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.PlayArrow else Icons.Filled.MusicNote,
-                        contentDescription = "Open player",
-                        tint = artColors.onPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Hero's copy of the player's palette-breathe lerp: one critically-damped
- * 220-stiffness spring lerps the whole ArtColorRoles set on track change.
- */
-@Composable
-private fun animateHeroArtColorRoles(target: com.example.minimusic.ui.theme.ArtColorRoles): com.example.minimusic.ui.theme.ArtColorRoles {
-    val progress = remember { androidx.compose.animation.core.Animatable(1f) }
-    var fromRoles by remember { mutableStateOf(target) }
-    var toRoles by remember { mutableStateOf(target) }
-    LaunchedEffect(target) {
-        if (toRoles == target) return@LaunchedEffect
-        fromRoles = fromRoles.lerpTo(toRoles, progress.value)
-        toRoles = target
-        progress.snapTo(0f)
-        progress.animateTo(
-            1f,
-            animationSpec = androidx.compose.animation.core.spring(
-                dampingRatio = 1f,
-                stiffness = 220f
-            )
-        )
-    }
-    return fromRoles.lerpTo(toRoles, progress.value)
-}
 
 /**
  * Builds the "which letter does this index fall under" lookup used to drive

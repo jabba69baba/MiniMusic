@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
@@ -51,23 +52,27 @@ fun SongListItem(
     trailingContent: @Composable (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    // Subtraction pass (hero-overhaul v2): flat rows. No per-row card chrome —
+    // the only background is a soft tint on the currently-playing row. Hairline
+    // separators in the list container give structure; 8 rounded rectangles
+    // per screenful competed with the scrollbar and read as clutter.
     val containerColor = if (isPlaying) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
     } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
+        Color.Transparent
     }
     val contentColor = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
     var menuExpanded by remember { mutableStateOf(false) }
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         color = containerColor,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 5.dp)
+            .padding(horizontal = 8.dp, vertical = 1.dp)
     ) {
         Row(
-            modifier = Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = 2.dp),
+            modifier = Modifier.padding(start = 12.dp, top = 9.dp, bottom = 9.dp, end = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
