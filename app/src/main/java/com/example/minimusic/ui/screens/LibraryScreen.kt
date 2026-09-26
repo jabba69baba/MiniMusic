@@ -147,6 +147,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.Job
+import androidx.compose.foundation.gestures.animateScrollBy
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -573,9 +574,11 @@ fun LibraryScreen(
 
                     // M3 NavigationBar: Home's tab switcher graduates here
                     // (Songs / Artists / Albums / Folders) — batch 1 of the
-                    // hero-overhaul home redesign.
+                    // hero-overhaul home redesign. Lifted above the miniplayer
+                    // (which otherwise overlays its labels) via bottom padding.
                     NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.padding(bottom = footerHeight)
                     ) {
                         LibraryTab.entries.forEach { tab ->
                             NavigationBarItem(
@@ -1018,25 +1021,22 @@ private suspend fun locateCentered(
     itemCount: Int
 ) {
     if (index < 0) return
-    // Two-pass placement: animateScrollToItem first brings the row into the
-    // viewport with real travel (the "actual animation" the locate gesture is
-    // supposed to have — a teleporting scrollToItem reads as the list abruptly
-    // stopping), then the measured pass below corrects the row to true center.
-    listState.animateScrollToItem(index = index)
-    listState.layoutInfo.visibleItemsInfo
-        .firstOrNull { it.index == index }
+    // Sign convention: a POSITIVE scrollOffset in LazyListState.scrollToItem
+    // pushes the target item UP past the viewport top — which is exactly the
+    // "locate lands 2 songs before the target" bug. To center the row we need
+    // a NEGATIVE offset (shift the item down into the middle).
+    listState.scrollToItem(index = index)
+    val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
         ?: return
-    val viewport = listState.layoutInfo.let { it.viewportEndOffset - it.viewportStartOffset }
-    val rowPx = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.size
-        ?: listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size
-        ?: 0
-    if (viewport <= 0 || rowPx <= 0) return
-    val centeredOffset = ((viewport - rowPx) * 0.5f).toInt().coerceAtLeast(0)
-    val maxOffsetWithoutBlank = index * rowPx
-    val offset = centeredOffset.coerceAtMost(maxOffsetWithoutBlank)
-    // Second pass after layout: corrects for variable row heights so the row
-    // is truly centered in every case.
-    listState.scrollToItem(index = index, scrollOffset = offset)
+    val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+    if (viewport <= 0) return
+    val rowCenter = info.offset + info.size / 2
+    val viewportCenter = viewport / 2
+    val delta = rowCenter - viewportCenter
+    if (abs(delta) < 2) return
+    // animateScrollBy moves the content by a raw pixel delta with the correct
+    // sign automatically, and glides — the centered landing with real motion.
+    listState.animateScrollBy(delta.toFloat())
 }
 /** Rows covered by the closing glide after a long-distance locate jump. */
 private const val LocateGlideTail = 20
@@ -1114,15 +1114,11 @@ private fun BoxScope.SongsScrollbarOverlay(
                 // unseen territory otherwise cold-decodes a full window of
                 // MediaStore thumbnails per pointer event.
                 preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, RowArtSizePx, artUriAt)
-                // scrollToItem teleports the rows: the thumb moves but the cards
-                // appear stationary under it. animateScrollToItem makes the rows
-                // travel like a manual fling instead. (The prefetch cache window
-                // keeps the animation from hitching on row composition.)
-                if (listState.isScrollInProgress) {
-                    listState.scrollToItem(index = index, scrollOffset = 0)
-                } else {
-                    listState.animateScrollToItem(index = index, scrollOffset = 0)
-                }
+                // Instant scroll while dragging: the thumb tracks the finger
+                // 1:1 and rows land under it. (An animateScrollToItem per
+                // pointer-move restarts the animation constantly — the stutter
+                // and thumb/rows desync reported on the hero-overhaul build.)
+                listState.scrollToItem(index = index, scrollOffset = 0)
             }
         },
         // The top remains aligned with the first song container. The bottom
@@ -1157,12 +1153,8 @@ private fun BoxScope.AlbumsScrollbarOverlay(
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
                 preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, GridArtSizePx, artUriAt)
-                // Same animated-travel fix as the songs list (see above).
-                if (gridState.isScrollInProgress) {
-                    gridState.scrollToItem(index = index, scrollOffset = 0)
-                } else {
-                    gridState.animateScrollToItem(index = index, scrollOffset = 0)
-                }
+                // Instant scroll while dragging — see the songs-list note above.
+                gridState.scrollToItem(index = index, scrollOffset = 0)
             }
         },
         modifier = Modifier
@@ -1191,12 +1183,8 @@ private fun BoxScope.ArtistsScrollbarOverlay(
         onScrollToIndex = { index ->
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
-                // Same animated-travel fix as the songs list (see above).
-                if (listState.isScrollInProgress) {
-                    listState.scrollToItem(index = index, scrollOffset = 0)
-                } else {
-                    listState.animateScrollToItem(index = index, scrollOffset = 0)
-                }
+                // Instant scroll while dragging — see the songs-list note above.
+                listState.scrollToItem(index = index, scrollOffset = 0)
             }
         },
         modifier = Modifier

@@ -201,8 +201,15 @@ fun MiniMusicNavGraph(
         // the whole graph, and taps that fall through were registering on the
         // home list underneath — the "flash of home, then back to settings"
         // bug. The pointerInput blocker consumes everything over the base.
+        // While the LYRICS route is current the home base is not composed at
+        // all: the lyrics card's own close animation would otherwise expose
+        // the home library beneath it for a frame (the "flash of homescreen"
+        // on close). With no base there is only the plain background behind
+        // the falling card, and back lands on PLAYER (sheet rises over home).
         val homeCovered = currentRoute != null && currentRoute != Routes.LIBRARY
+        val homeVisible = currentRoute == Routes.LIBRARY || currentRoute == null
         CompositionLocalProvider(LocalMiniMusicHaptics provides appSettings.hapticFeedback) {
+        if (homeVisible) {
         Box(
             modifier = androidx.compose.ui.Modifier
                 .fillMaxSize()
@@ -261,6 +268,7 @@ fun MiniMusicNavGraph(
             onFolderClick = { path -> navController.navigate(Routes.folder(path)) },
             onRetryLoad = libraryViewModel::loadLibrary
         )
+        }
         }
         }
 
@@ -488,26 +496,10 @@ fun MiniMusicNavGraph(
         // visible for PLAYER, and for any route while it is mid-travel, but
         // NOT once lyrics has settled on top. Its transitionY then stays at
         // fullHeight so it doesn't flash over the lyrics card.
-        // While LYRICS is current the sheet is held composed (but parked at
-        // fullHeight) so the lyrics card's own close animation slides down OVER
-        // the player surface — without this, the route flips to LIBRARY behind
-        // the falling card and the home library flashes through during close.
-        var lyricsCloseOverPlayer by androidx.compose.runtime.remember {
-            androidx.compose.runtime.mutableStateOf(false)
-        }
-        LaunchedEffect(currentRoute) {
-            // Latch while leaving LYRICS, clear once back on PLAYER/LIBRARY.
-            if (currentRoute == Routes.LYRICS) {
-                lyricsCloseOverPlayer = true
-            } else if (lyricsCloseOverPlayer && currentRoute == Routes.PLAYER) {
-                lyricsCloseOverPlayer = false
-            }
-        }
-        val playerSheetVisible by remember(sheetState, hasActiveSong, currentRoute, lyricsCloseOverPlayer) {
+        val playerSheetVisible by remember(sheetState, hasActiveSong, currentRoute) {
             derivedStateOf {
-                hasActiveSong && (currentRoute != Routes.LYRICS || lyricsCloseOverPlayer) &&
-                    (currentRoute == Routes.PLAYER || currentRoute == Routes.LYRICS ||
-                        sheetState.progress > 0.001f)
+                hasActiveSong && currentRoute != Routes.LYRICS &&
+                    (currentRoute == Routes.PLAYER || sheetState.progress > 0.001f)
             }
         }
         val playerSheetInteractive by remember(sheetState, currentRoute, queueDrawerOpen) {
