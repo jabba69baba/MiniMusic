@@ -91,6 +91,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.minimusic.ui.theme.lerpTo
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.getValue
@@ -616,18 +619,59 @@ private fun NowPlayingHero(
     isPlaying: Boolean,
     onClick: () -> Unit
 ) {
-    val artColors = com.example.minimusic.ui.theme.rememberArtColorRoles(
+    val targetArtColors = com.example.minimusic.ui.theme.rememberArtColorRoles(
         heroSong.albumArtUri,
         com.example.minimusic.data.PaletteStyle.TONAL_SPOT
     )
+    // Breathe: one soft critically-damped spring lerps the whole role set on
+    // track change — the same "gentle color shift" clock the player uses.
+    val artColors = animateHeroArtColorRoles(targetArtColors)
+    val reducedMotion = LocalMiniMusicReducedMotion.current
+
+    // Entrance: on first composition (song starts), rise a short distance and
+    // settle — never pops in. Uses the shared nav-enter token.
+    val entranceProgress = remember { androidx.compose.animation.core.Animatable(if (reducedMotion) 1f else 0f) }
+    LaunchedEffect(Unit) {
+        if (entranceProgress.value < 1f) {
+            entranceProgress.animateTo(
+                1f,
+                animationSpec = androidx.compose.animation.core.tween(
+                    MiniMusicMotion.navTransitionDurationMillis,
+                    easing = MiniMusicMotion.navEnterEasing
+                )
+            )
+        }
+    }
+
+    // Press: scale down slightly on touch, spring back on release.
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = if (isPressed) MiniMusicMotion.fastEffects() else MiniMusicMotion.defaultSpatial(),
+        label = "heroPressScale"
+    )
+
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(24.dp),
         color = artColors.primaryContainer,
-        shadowElevation = 2.dp,
+        shadowElevation = if (isPressed) 1.dp else 2.dp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
+            .graphicsLayer {
+                val p = entranceProgress.value
+                scaleX = 0.96f + 0.04f * p
+                scaleY = 0.96f + 0.04f * p
+                alpha = p
+                translationY = (1f - p) * 40f
+                // Press scale rides the entrance transform.
+                val s = pressScale
+                scaleX *= s
+                scaleY *= s
+            }
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -679,6 +723,31 @@ private fun NowPlayingHero(
             }
         }
     }
+}
+
+/**
+ * Hero's copy of the player's palette-breathe lerp: one critically-damped
+ * 220-stiffness spring lerps the whole ArtColorRoles set on track change.
+ */
+@Composable
+private fun animateHeroArtColorRoles(target: com.example.minimusic.ui.theme.ArtColorRoles): com.example.minimusic.ui.theme.ArtColorRoles {
+    val progress = remember { androidx.compose.animation.core.Animatable(1f) }
+    var fromRoles by remember { mutableStateOf(target) }
+    var toRoles by remember { mutableStateOf(target) }
+    LaunchedEffect(target) {
+        if (toRoles == target) return@LaunchedEffect
+        fromRoles = fromRoles.lerpTo(toRoles, progress.value)
+        toRoles = target
+        progress.snapTo(0f)
+        progress.animateTo(
+            1f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 1f,
+                stiffness = 220f
+            )
+        )
+    }
+    return fromRoles.lerpTo(toRoles, progress.value)
 }
 
 /**
