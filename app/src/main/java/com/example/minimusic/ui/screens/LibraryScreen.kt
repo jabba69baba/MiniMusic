@@ -77,6 +77,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -107,6 +109,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -153,6 +157,18 @@ private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.g
     FOLDERS("Folders", Icons.Filled.Folder)
 }
 
+/**
+ * Data the Home hero card needs about the currently playing track. Sliced to
+ * just title/artist/art so the 20Hz position ticker can never recompose the
+ * hero (or the library beneath it) — the same slicing pattern NavGraph uses.
+ */
+data class HeroSong(
+    val id: Long,
+    val title: String,
+    val artist: String,
+    val albumArtUri: android.net.Uri?
+)
+
 /** The library drawer's shape: rounded only at the top, flat everywhere else —
  *  it's one continuous container holding both the Shuffle/Locate/Sort row and
  *  the song list beneath it, with no visual seam between the two. */
@@ -165,6 +181,7 @@ private val LibraryDrawerShape = RoundedCornerShape(
 fun LibraryScreen(
     uiState: LibraryUiState,
     currentSongId: Long?,
+    heroSong: HeroSong? = null,
     events: SharedFlow<LibraryEvent>,
     onSearchQueryChange: (String) -> Unit,
     onSortOrderChange: (SongSortOrder) -> Unit,
@@ -360,6 +377,18 @@ fun LibraryScreen(
             val hapticView = LocalView.current
             val hapticsEnabled = LocalMiniMusicHaptics.current
 
+            // ═══ DISCOVER (Home hero) ═══
+            // Art-tinted now-playing card. Only composes when a song is
+            // actually playing; hidden (not zero-height) otherwise so the
+            // library layout is identical to pre-hero builds when idle.
+            if (heroSong != null) {
+                NowPlayingHero(
+                    heroSong = heroSong,
+                    isPlaying = uiState.let { true },
+                    onClick = onOpenPlayer
+                )
+            }
+
             // One continuous drawer, rounded only at the top: the selector/
             // controls row and the song list beneath it share the same
             // surface with no seam, matching the reference — not two
@@ -377,25 +406,13 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        // The switcher takes every dp the action pill does not
-                        // need. It is the primary control in this row — it
-                        // changes what the whole screen below is showing —
-                        // while Locate and Shuffle are one-off taps, so the
-                        // layout gives the width to the thing that is used
-                        // most and lets the buttons sit at their natural size
-                        // instead of stretching to fill a fixed slot.
-                        ExpandingCategoryControl(
-                            selected = selectedTab,
-                            onSelect = { tab ->
-                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                selectedTab = tab
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
+                        // Tab switching moved to the bottom M3 NavigationBar
+                        // (hero-overhaul batch 1); this row keeps Locate and
+                        // Shuffle, right-aligned where the switcher used to
+                        // leave them.
 
                         // Locate and Shuffle: two segments of one continuous
                         // pill — the grouped treatment this row used before the
@@ -462,6 +479,7 @@ fun LibraryScreen(
                         onArtistSort = { artistSortOrder = it },
                         onAlbumSort = { albumSortOrder = it }
                     )
+
 
                     Box(modifier = Modifier.weight(1f)) {
                         // Skeleton-to-content handoff. This is the one place the
@@ -552,6 +570,25 @@ fun LibraryScreen(
                             }
                         }
                     }
+
+                    // M3 NavigationBar: Home's tab switcher graduates here
+                    // (Songs / Artists / Albums / Folders) — batch 1 of the
+                    // hero-overhaul home redesign.
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    ) {
+                        LibraryTab.entries.forEach { tab ->
+                            NavigationBarItem(
+                                selected = selectedTab == tab,
+                                onClick = {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    selectedTab = tab
+                                },
+                                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                                label = { Text(tab.label) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -564,6 +601,82 @@ fun LibraryScreen(
     }
 }
 
+
+/**
+ * The Home "Now playing" hero card. Tinted by the current song's album art
+ * via the same palette engine the player uses, with the soft breathe palette
+ * animation. Sliced input ([HeroSong]) keeps the position ticker away.
+ */
+@Composable
+private fun NowPlayingHero(
+    heroSong: HeroSong,
+    isPlaying: Boolean,
+    onClick: () -> Unit
+) {
+    val artColors = com.example.minimusic.ui.theme.rememberArtColorRoles(
+        heroSong.albumArtUri,
+        com.example.minimusic.data.PaletteStyle.TONAL_SPOT
+    )
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(24.dp),
+        color = artColors.primaryContainer,
+        shadowElevation = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            com.example.minimusic.ui.components.AlbumArtImage(
+                model = heroSong.albumArtUri,
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.size(64.dp),
+                contentDescription = null
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "NOW PLAYING",
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.4.sp,
+                    color = artColors.onSurfaceVariant
+                )
+                Text(
+                    text = heroSong.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = artColors.onSurface
+                )
+                Text(
+                    text = heroSong.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = artColors.onSurfaceVariant
+                )
+            }
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = artColors.primary,
+                modifier = Modifier.size(46.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.PlayArrow else Icons.Filled.MusicNote,
+                        contentDescription = "Open player",
+                        tint = artColors.onPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 /**
  * Builds the "which letter does this index fall under" lookup used to drive
