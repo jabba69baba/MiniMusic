@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniMusic — Homepage Redesign Mockup</title>
+<style>
+  :root {
+    --bg: #14100c;
+    --surface: #201a14;
+    --surface-2: #2b2318;
+    --primary: #ffb545;
+    --on-primary: #3f2e00;
+    --primary-container: #5e4300;
+    --on-primary-container: #ffddb0;
+    --secondary-container: #4b4032;
+    --on-secondary-container: #e5d9c5;
+    --text: #e9e0d4;
+    --text-dim: #a99f91;
+    --outline: #4d4436;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Google Sans', Roboto, sans-serif;
+    background: radial-gradient(ellipse at top, #1e1810 0%, #0e0b08 70%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  h1 { font-size: 28px; text-align: center; margin-bottom: 6px; letter-spacing: -0.5px; }
+  .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 40px; font-size: 14px; }
+  .variants { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; }
+  .variant { max-width: 380px; }
+  .variant h2 { font-size: 17px; margin-bottom: 4px; color: var(--primary); }
+  .variant p.desc { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; }
+  .phone {
+    width: 360px; height: 760px; border-radius: 40px;
+    background: var(--bg); border: 6px solid #33291c;
+    box-shadow: 0 30px 80px rgba(0,0,0,.6);
+    overflow: hidden; position: relative; display: flex; flex-direction: column;
+  }
+  .statusbar { display:flex; justify-content:space-between; padding: 14px 24px 6px; font-size: 12px; color: var(--text-dim); }
+  .greeting { padding: 10px 22px 4px; }
+  .greeting h3 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; }
+  .greeting span { font-size: 13px; color: var(--text-dim); }
+  /* hero */
+  .hero {
+    margin: 12px 18px; border-radius: 28px; padding: 18px;
+    background: linear-gradient(135deg, var(--primary-container), #3a2a05 90%);
+    display: flex; gap: 14px; align-items: center; cursor: pointer;
+    transition: transform .15s ease; border: 1px solid rgba(255,181,69,.25);
+  }
+  .hero:hover { transform: scale(1.015); }
+  .hero .art {
+    width: 76px; height: 76px; border-radius: 22px; flex-shrink: 0;
+    background: conic-gradient(from 210deg, #ffb545, #ff7a3d, #d64f2a, #ffb545);
+    position: relative; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  .hero .art::after {
+    content:''; position:absolute; inset: 24px; border-radius:50%;
+    background:#1b1408; box-shadow: inset 0 0 0 6px #3d2c10;
+  }
+  .hero .meta { flex:1; min-width:0; }
+  .hero .label { font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--on-primary-container); opacity:.75; margin-bottom: 4px; }
+  .hero .title { font-size: 16px; font-weight: 700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hero .artist { font-size: 13px; color: var(--on-primary-container); opacity:.8; margin-top:2px; }
+  .hero .eq { display:flex; gap:3px; align-items:flex-end; height:18px; margin-top:8px; }
+  .hero .eq i { width:4px; background: var(--primary); border-radius:2px; animation: bounce 1s infinite ease-in-out; }
+  .hero .eq i:nth-child(1){ height:60%; animation-delay:0s }
+  .hero .eq i:nth-child(2){ height:100%; animation-delay:.15s }
+  .hero .eq i:nth-child(3){ height:40%; animation-delay:.3s }
+  @keyframes bounce { 0%,100%{transform:scaleY(.5)} 50%{transform:scaleY(1)} }
+  .hero .play {
+    width: 46px; height: 46px; border-radius: 50%; background: var(--primary);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    color: var(--on-primary); font-size: 18px;
+  }
+  /* chips */
+  .chips { display:flex; gap:8px; padding: 4px 18px 10px; overflow:hidden; }
+  .chip {
+    padding: 8px 16px; border-radius: 50px; font-size: 13px; white-space: nowrap;
+    background: var(--surface-2); color: var(--text-dim); border: 1px solid transparent;
+  }
+  .chip.active { background: var(--secondary-container); color: var(--on-secondary-container); border-color: var(--outline); }
+  /* carousels */
+  .section { padding: 8px 18px; }
+  .section .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 10px; }
+  .section .head h4 { font-size: 15px; font-weight: 700; }
+  .section .head a { font-size: 12px; color: var(--primary); text-decoration:none; }
+  .cards { display:flex; gap: 12px; overflow:hidden; }
+  .card { width: 128px; flex-shrink:0; }
+  .card .cover {
+    width: 128px; height: 128px; border-radius: 20px; margin-bottom: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+  .card:nth-child(1) .cover { background: linear-gradient(145deg,#c9563a,#5e1f14); }
+  .card:nth-child(2) .cover { background: linear-gradient(145deg,#4f7f5c,#1d3a26); }
+  .card:nth-child(3) .cover { background: linear-gradient(145deg,#4b6fa8,#1c2c4a); }
+  .card .t { font-size: 13px; font-weight: 600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .s { font-size: 12px; color: var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* rows */
+  .rows { padding: 0 18px; }
+  .row { display:flex; align-items:center; gap: 12px; padding: 9px 0; }
+  .row .thumb { width: 46px; height: 46px; border-radius: 12px; flex-shrink:0; }
+  .row:nth-child(1) .thumb { background: linear-gradient(145deg,#a3552e,#4a230f); }
+  .row:nth-child(2) .thumb { background: linear-gradient(145deg,#6a5aa0,#2c2350); }
+  .row:nth-child(3) .thumb { background: linear-gradient(145deg,#3d7a74,#173430); }
+  .row:nth-child(4) .thumb { background: linear-gradient(145deg,#a8893d,#4a3b14); }
+  .row .m { flex:1; min-width:0; }
+  .row .t { font-size: 14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .s { font-size: 12px; color: var(--text-dim); }
+  .row .num { width: 18px; font-size: 12px; color: var(--text-dim); text-align:center; }
+  .row.playing .t { color: var(--primary); }
+  /* grid variant */
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 4px 18px; }
+  .gcard .cover { width:100%; aspect-ratio:1; border-radius: 24px; margin-bottom:8px; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+  .gcard:nth-child(1) .cover { background: linear-gradient(145deg,#c9563a,#5e1f14); }
+  .gcard:nth-child(2) .cover { background: linear-gradient(145deg,#4f7f5c,#1d3a26); }
+  .gcard:nth-child(3) .cover { background: linear-gradient(145deg,#4b6fa8,#1c2c4a); }
+  .gcard:nth-child(4) .cover { background: linear-gradient(145deg,#8a6ba8,#3a2750); }
+  /* miniplayer */
+  .mini {
+    margin-top:auto; margin: auto 12px 10px; padding: 10px 14px; border-radius: 24px;
+    background: var(--surface-2); display:flex; align-items:center; gap: 12px;
+    border: 1px solid var(--outline);
+  }
+  .mini .art { width: 40px; height: 40px; border-radius: 12px; background: conic-gradient(from 210deg, #ffb545, #ff7a3d, #d64f2a, #ffb545); }
+  .mini .m { flex:1; min-width:0; }
+  .mini .t { font-size: 13px; font-weight: 700; }
+  .mini .s { font-size: 11px; color: var(--text-dim); }
+  .mini .btns { display:flex; gap: 14px; font-size: 16px; color: var(--text); }
+  /* nav */
+  .nav {
+    display:flex; justify-content: space-around; padding: 12px 0 22px; margin: 0 12px;
+    background: var(--surface); border-radius: 28px 28px 0 0;
+  }
+  .nav .item { display:flex; flex-direction:column; align-items:center; gap:4px; font-size: 10px; color: var(--text-dim); }
+  .nav .item .ic { width: 54px; height: 30px; border-radius: 16px; display:flex; align-items:center; justify-content:center; font-size: 16px; }
+  .nav .item.active { color: var(--on-secondary-container); }
+  .nav .item.active .ic { background: var(--secondary-container); }
+  .note {
+    max-width: 800px; margin: 48px auto 0; background: var(--surface);
+    border: 1px solid var(--outline); border-radius: 20px; padding: 24px 28px;
+    font-size: 13px; line-height: 1.7; color: var(--text-dim);
+  }
+  .note b { color: var(--text); }
+  .note h3 { color: var(--primary); margin-bottom: 8px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<h1>MiniMusic — Homepage Redesign</h1>
+<p class="subtitle">Two directions, same Monet/M3E language. Hover the hero card.</p>
+
+<div class="variants">
+
+  <!-- VARIANT A -->
+  <div class="variant">
+    <h2>Direction A — "Continue listening"</h2>
+    <p class="desc">A breathing Now-Playing hero card up top (tinted by the current song's art, same palette engine as the player), then quick-jump chips, then recently-added carousels. Library tabs stay one tap below in the nav.</p>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="greeting"><h3>Good evening</h3><span>1,248 songs · 96 albums</span></div>
+      <div class="hero">
+        <div class="art"></div>
+        <div class="meta">
+          <div class="label">Now playing</div>
+          <div class="title">After Dark</div>
+          <div class="artist">Mr.Kitty</div>
+          <div class="eq"><i></i><i></i><i></i></div>
+        </div>
+        <div class="play">▶</div>
+      </div>
+      <div class="chips">
+        <div class="chip active">Recent</div>
+        <div class="chip">Most played</div>
+        <div class="chip">New artists</div>
+        <div class="chip">Long tracks</div>
+      </div>
+      <div class="section">
+        <div class="head"><h4>Recently added</h4><a>See all</a></div>
+        <div class="cards">
+          <div class="card"><div class="cover"></div><div class="t">Midnight Drive</div><div class="s">Synthwave Rider</div></div>
+          <div class="card"><div class="cover"></div><div class="t">Fern &amp; Stone</div><div class="s">Mossy Vale</div></div>
+          <div class="card"><div class="cover"></div><div class="t">Tidal</div><div class="s">Blue Harbor</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="head"><h4>Jump back in</h4><a>See all</a></div>
+        <div class="rows">
+          <div class="row playing"><div class="num">●</div><div class="thumb"></div><div class="m"><div class="t">Neon Rain</div><div class="s">Lantern District · 3:42</div></div></div>
+          <div class="row"><div class="num">2</div><div class="thumb"></div><div class="m"><div class="t">Glass Cathedral</div><div class="s">Echo Formation · 4:15</div></div></div>
+          <div class="row"><div class="num">3</div><div class="thumb"></div><div class="m"><div class="t">Slow Coast</div><div class="s">Marina Flux · 3:58</div></div></div>
+          <div class="row"><div class="num">4</div><div class="thumb"></div><div class="m"><div class="t">Paper Suns</div><div class="s">Attic Sessions · 5:02</div></div></div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="art"></div>
+        <div class="m"><div class="t">After Dark</div><div class="s">Mr.Kitty</div></div>
+        <div class="btns"><span>⏮</span><span>⏸</span><span>⏭</span></div>
+      </div>
+      <div class="nav">
+        <div class="item active"><div class="ic">🏠</div>Home</div>
+        <div class="item"><div class="ic">🎵</div>Songs</div>
+        <div class="item"><div class="ic">💿</div>Albums</div>
+        <div class="item"><div class="ic">🎤</div>Artists</div>
+        <div class="item"><div class="ic">📁</div>Folders</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIANT B -->
+  <div class="variant">
+    <h2>Direction B — "Library first"</h2>
+    <p class="desc">A slimmer header (greeting + rescan/search inline), an auto-shuffling "Featured album" banner, then your albums grid immediately. No carousels — everything the home shows is one scroll from your library. Calmer, closer to Gramophone.</p>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="greeting" style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px">
+        <div><h3 style="font-size:20px">Your library</h3><span>1,248 songs</span></div>
+        <div style="display:flex;gap:8px">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center">🔍</div>
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center">⟳</div>
+        </div>
+      </div>
+      <div class="hero" style="margin:6px 18px 14px; padding:16px; border-radius:24px">
+        <div class="art" style="width:64px;height:64px;border-radius:18px"></div>
+        <div class="meta">
+          <div class="label">Shuffle all</div>
+          <div class="title" style="font-size:15px">1,248 songs · 14.2 GB</div>
+          <div class="artist">Surprise me with a mix</div>
+        </div>
+        <div class="play">🔀</div>
+      </div>
+      <div class="section">
+        <div class="head"><h4>Featured album</h4><a>Shuffle</a></div>
+        <div class="cards">
+          <div class="card" style="width:100%;display:flex;gap:14px;align-items:center">
+            <div class="cover" style="width:92px;height:92px;border-radius:22px"></div>
+            <div class="m">
+              <div class="t" style="font-size:15px">Midnight Drive</div>
+              <div class="s">Synthwave Rider · 12 songs</div>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <div class="chip active" style="font-size:11px;padding:6px 14px">▶ Play</div>
+                <div class="chip" style="font-size:11px;padding:6px 14px">ⓘ Details</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="head"><h4>Albums</h4><a>See all 96</a></div>
+      </div>
+      <div class="grid">
+        <div class="gcard"><div class="cover"></div><div class="t">Midnight Drive</div><div class="s">Synthwave Rider</div></div>
+        <div class="gcard"><div class="cover"></div><div class="t">Fern &amp; Stone</div><div class="s">Mossy Vale</div></div>
+        <div class="gcard"><div class="cover"></div><div class="t">Tidal</div><div class="s">Blue Harbor</div></div>
+        <div class="gcard"><div class="cover"></div><div class="t">Velvet Hours</div><div class="s">Iris Moody</div></div>
+      </div>
+      <div class="mini">
+        <div class="art"></div>
+        <div class="m"><div class="t">After Dark</div><div class="s">Mr.Kitty</div></div>
+        <div class="btns"><span>⏮</span><span>⏸</span><span>⏭</span></div>
+      </div>
+      <div class="nav">
+        <div class="item active"><div class="ic">🏠</div>Home</div>
+        <div class="item"><div class="ic">🎵</div>Songs</div>
+        <div class="item"><div class="ic">💿</div>Albums</div>
+        <div class="item"><div class="ic">🎤</div>Artists</div>
+        <div class="item"><div class="ic">📁</div>Folders</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <h3>What both directions share</h3>
+  <b>Monet integration</b> — the hero card and accents tint from the current song's album art using the same <code>rememberArtColorRoles</code> palette engine the player already uses, with the soft 220ms "breathe" transition on track change.<br><br>
+  <b>M3E shapes</b> — 22–28dp cookie/blob corner radii consistent with the player's artwork, and an M3 navigation bar replacing the current pill switcher on home (the switcher stays for the library tabs).<br><br>
+  <b>What's needed under the hood</b> — play-count and last-played columns from MediaStore (<code>PLAYBACKS</code>/<code>LAST_TIME_PLAYED</code> on API 30+, fallback: date-added) to power "Recently played" and "Most played". Recently-added already exists via <code>DATE_ADDED</code>.
+</div>
+
+</body>
+</html>
