@@ -145,13 +145,11 @@ fun AlphabetScrollbar(
         )
 
         // Pill-shaped thumb that tracks scroll position, Material fast-scroll
-        // style. Shorter than before (roughly 65% of the old height) so it
-        // reads as a proportionally smaller, more precise indicator — with
-        // very large libraries the old height made it look like it barely
-        // moved as you scrolled. Wider than the track so it visibly stands
-        // proud of it on both sides.
-        val thumbWidth = 9.dp
-        val thumbHeight = 34.dp
+        // style. Restored to the full-card-length scale of the original build
+        // (the 34dp shrink made it read as a stray dot that "ended randomly").
+        // Wider than the track so it visibly stands proud of it on both sides.
+        val thumbWidth = 10.dp
+        val thumbHeight = 56.dp
         val density = LocalDensity.current
         val thumbOffsetY = remember(trackHeightPx, thumbFraction, thumbHeight, density) {
             val thumbHeightPx = with(density) { thumbHeight.roundToPx() }

@@ -59,16 +59,10 @@ import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import kotlinx.coroutines.flow.StateFlow
 
-/** Corner shape for the floating mini player bar — curved on top, flat on
- *  the bottom so it reads as the upper half of one connected shape with the
- *  navigation bar beneath it (the navbar mirrors: flat top, curved bottom).
- *  Both share the same horizontal margins (see NavGraph / LibraryScreen). */
-private val MiniPlayerShape = RoundedCornerShape(
-    topStart = 28.dp,
-    topEnd = 28.dp,
-    bottomStart = 0.dp,
-    bottomEnd = 0.dp
-)
+/** Corner shape for the floating mini player bar — a detached pill, rounded
+ *  on all four corners, hovering above the floating navigation bar with
+ *  matching side margins (the Lune/PixelPlayer floating-bar pattern). */
+private val MiniPlayerShape = RoundedCornerShape(28.dp)
 
 /** Reserved content height used by the library while the shared host overlays the bar. */
 val MiniPlayerReservedHeight = 68.dp

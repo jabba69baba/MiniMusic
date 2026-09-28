@@ -152,7 +152,10 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 84.dp),
+            // No miniplayer overlays Settings anymore, so only the system
+            // gesture inset needs clearing — the old 84dp reserve left a
+            // strip of dead space below the last group.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             item {
@@ -362,9 +365,9 @@ fun SettingsScreen(
             modifier = Modifier
                 .align(androidx.compose.ui.Alignment.BottomCenter)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                // Sits above the miniplayer strip and respects its horizontal
-                // boundaries: margins on both sides, not full-bleed.
-                .padding(bottom = 84.dp, start = 16.dp, end = 16.dp)
+                // Miniplayer no longer overlays Settings; keep the snackbar
+                // just above the gesture area with its usual margins.
+                .padding(bottom = 12.dp, start = 16.dp, end = 16.dp)
         ) { snackbarData ->
             // M3E snackbar: Monet primaryContainer tone (instead of the default
             // inverseSurface gray that stuck out of the themed page), a big

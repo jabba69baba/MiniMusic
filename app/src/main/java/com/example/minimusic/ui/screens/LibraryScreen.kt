@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -278,7 +279,11 @@ fun LibraryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars)
+                // Status bar only: the bottom is sized by the footer reserves
+                // (miniplayer + floating nav). Padding systemBars here too
+                // double-counted the gesture inset and left a strip of dead
+                // space below the last card.
+                .windowInsetsPadding(WindowInsets.statusBars)
         ) {
 
             Row(
@@ -366,8 +371,9 @@ fun LibraryScreen(
                             value = uiState.searchQuery,
                             onValueChange = onSearchQueryChange,
                             singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyLarge,
                             placeholder = { Text("Search....") },
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             trailingIcon = {
                                 AnimatedVisibility(
                                     visible = uiState.searchQuery.isNotEmpty(),
@@ -377,18 +383,23 @@ fun LibraryScreen(
                                     exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
                                 ) {
                                     IconButton(onClick = { onSearchQueryChange("") }) {
-                                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                                        Icon(Icons.Filled.Clear, contentDescription = "Clear search", modifier = Modifier.size(20.dp))
                                     }
                                 }
                             },
-                            shape = RoundedCornerShape(28.dp),
+                            shape = RoundedCornerShape(24.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
                                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             ),
-                            modifier = Modifier.weight(1f)
+                            // Slimmer than the Material default (~56dp): ~10%
+                            // less vertical bulk, matching the 44dp
+                            // Locate/Shuffle pill beside it.
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
                         )
 
                         // Locate and Shuffle: two segments of one continuous
@@ -549,24 +560,23 @@ fun LibraryScreen(
                 }
             }
 
-            // Floating navigation bar: a detached pill pinned to the bottom
-            // edge, mirroring the miniplayer above it — flat top, curved
-            // bottom, same 10dp side margins. The two read as one connected
-            // shape split by a 4dp seam. The list scrolls beneath it; the
-            // miniplayer hovers OVER this bar, never under it.
+            // Floating navigation bar: a fully detached pill hovering above
+            // the system gesture area — rounded on ALL corners, with real
+            // gaps on the sides and bottom, the way other apps (Lune,
+            // PixelPlayer) do it. Not a shaped background docked to the
+            // screen edge. The miniplayer floats OVER this bar, never under
+            // it; the list scrolls beneath both.
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 tonalElevation = 3.dp,
                 modifier = Modifier
-                    .padding(horizontal = 10.dp)
-                    .navigationBarsPadding()
-                    .padding(bottom = 4.dp)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 0.dp, topEnd = 0.dp,
-                            bottomStart = 28.dp, bottomEnd = 28.dp
-                        )
-                    )
+                    // Clear the system gesture area, then hover 8dp above it
+
+                    // with real side gaps: a detached pill, not a docked
+                    // shaped background.
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                    .clip(RoundedCornerShape(28.dp))
             ) {
                 LibraryTab.entries.forEach { tab ->
                     NavigationBarItem(
@@ -587,6 +597,7 @@ fun LibraryScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(bottom = footerHeight + 12.dp)
         )
     }
@@ -739,7 +750,6 @@ private fun SongsTab(
             listState = listState,
             itemCount = songs.size,
             letterForIndex = letterForIndex,
-            bottomContentPadding = bottomContentPadding,
             artUriAt = { songs.getOrNull(it)?.albumArtUri }
         )
     }
@@ -861,7 +871,6 @@ private fun AlbumsTab(
             gridState = gridState,
             itemCount = albums.size,
             letterForIndex = letterForIndex,
-            bottomContentPadding = bottomContentPadding,
             artUriAt = { albums.getOrNull(it)?.albumArtUri }
         )
     }
@@ -902,8 +911,7 @@ private fun ArtistsTab(
         ArtistsScrollbarOverlay(
             listState = listState,
             itemCount = artists.size,
-            letterForIndex = letterForIndex,
-            bottomContentPadding = bottomContentPadding
+            letterForIndex = letterForIndex
         )
     }
 }
@@ -1010,7 +1018,6 @@ private fun BoxScope.SongsScrollbarOverlay(
     listState: LazyListState,
     itemCount: Int,
     letterForIndex: (Int) -> Char?,
-    bottomContentPadding: Dp,
     artUriAt: (Int) -> Uri? = { null }
 ) {
     val scrollScope = rememberCoroutineScope()
@@ -1046,10 +1053,11 @@ private fun BoxScope.SongsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            // Same geometry as the Artists tab (the visual reference): top 8dp,
-            // bottom = content padding + 8. All three tabs now share one track
-            // height and one start/end behavior for the first/last card.
-            .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+            // Full song-card column: track starts at the first card's top and
+            // ends at the last card's bottom (the bottom reserve is padding
+            // below the scroll viewport, not list chrome), so the thumb spans
+            // exactly the visible list like it did in the pre-overhaul build.
+            .padding(top = 8.dp)
     )
 }
 
@@ -1058,7 +1066,6 @@ private fun BoxScope.AlbumsScrollbarOverlay(
     gridState: LazyGridState,
     itemCount: Int,
     letterForIndex: (Int) -> Char?,
-    bottomContentPadding: Dp,
     artUriAt: (Int) -> Uri? = { null }
 ) {
     val scrollScope = rememberCoroutineScope()
@@ -1083,10 +1090,8 @@ private fun BoxScope.AlbumsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            // Same geometry as the Artists tab (the visual reference) so the
-            // album grid's scrollbar starts and ends at the same place as the
-            // songs and artists tracks.
-            .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+            // Same full-column geometry as the songs list.
+            .padding(top = 8.dp)
     )
 }
 
@@ -1094,8 +1099,7 @@ private fun BoxScope.AlbumsScrollbarOverlay(
 private fun BoxScope.ArtistsScrollbarOverlay(
     listState: LazyListState,
     itemCount: Int,
-    letterForIndex: (Int) -> Char?,
-    bottomContentPadding: Dp
+    letterForIndex: (Int) -> Char?
 ) {
     val scrollScope = rememberCoroutineScope()
     var fastScrollJob by remember { mutableStateOf<Job?>(null) }
@@ -1117,8 +1121,8 @@ private fun BoxScope.ArtistsScrollbarOverlay(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            // Matches the artist list's content padding (bottom + 8).
-            .padding(top = 8.dp, bottom = bottomContentPadding + 8.dp)
+            // Same full-column geometry as the songs list.
+            .padding(top = 8.dp)
     )
 }
 
@@ -1251,7 +1255,7 @@ private fun ExpandingCategoryControl(
 
 /** Height shared by the segments of the action pill, matched to the switcher
  *  beside it in the same row so the two controls share a baseline. */
-private val PillButtonHeight = 48.dp
+private val PillButtonHeight = 44.dp
 
 /** Width of a single action-pill segment. Two of these plus the hairline
  *  between them is the whole group, and 48dp keeps each a full touch target. */
