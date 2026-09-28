@@ -231,14 +231,6 @@ fun MiniMusicNavGraph(
         LibraryScreen(
             uiState = libraryState,
             currentSongId = currentSong?.id,
-            heroSong = currentSong?.let {
-                com.example.minimusic.ui.screens.HeroSong(
-                    id = it.id,
-                    title = it.title,
-                    artist = it.artist,
-                    albumArtUri = it.albumArtUri
-                )
-            },
             events = libraryViewModel.events,
             onSearchQueryChange = libraryViewModel::onSearchQueryChange,
             onSortOrderChange = libraryViewModel::onSortOrderChange,

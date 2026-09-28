@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -67,6 +68,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.AlertDialog
@@ -75,10 +80,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -91,9 +96,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.graphics.graphicsLayer
-import com.example.minimusic.ui.theme.lerpTo
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.getValue
@@ -112,8 +114,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -150,7 +150,6 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.Job
-import androidx.compose.foundation.gestures.animateScrollBy
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -160,18 +159,6 @@ private enum class LibraryTab(val label: String, val icon: androidx.compose.ui.g
     ALBUMS("Albums", Icons.Filled.Album),
     FOLDERS("Folders", Icons.Filled.Folder)
 }
-
-/**
- * Data the Home hero card needs about the currently playing track. Sliced to
- * just title/artist/art so the 20Hz position ticker can never recompose the
- * hero (or the library beneath it) — the same slicing pattern NavGraph uses.
- */
-data class HeroSong(
-    val id: Long,
-    val title: String,
-    val artist: String,
-    val albumArtUri: android.net.Uri?
-)
 
 /** The library drawer's shape: rounded only at the top, flat everywhere else —
  *  it's one continuous container holding both the Shuffle/Locate/Sort row and
@@ -185,7 +172,6 @@ private val LibraryDrawerShape = RoundedCornerShape(
 fun LibraryScreen(
     uiState: LibraryUiState,
     currentSongId: Long?,
-    heroSong: HeroSong? = null,
     events: SharedFlow<LibraryEvent>,
     onSearchQueryChange: (String) -> Unit,
     onSortOrderChange: (SongSortOrder) -> Unit,
@@ -233,10 +219,10 @@ fun LibraryScreen(
         }
         onDispose { }
     }
-    // The outer library column already consumes system-bar insets. Reserve the
-    // floating miniplayer (its height) plus the M3 NavigationBar beneath it
-    // (~80dp) + a small gap, so the last row clears both floating surfaces.
-    val footerHeight = MiniPlayerReservedHeight + 96.dp
+    // The outer library column consumes system-bar insets. Reserve the
+    // persistent miniplayer plus the floating navigation bar beneath it
+    // (nav pill ~80dp tall + 8dp gap) so lists can scroll clear of both.
+    val footerHeight = MiniPlayerReservedHeight + 88.dp
     val filteredSongs = uiState.filteredSongs
     // Which of the four mutually exclusive states the content area is in. A
     // skeleton stands in only for content that has never arrived: a rescan of a
@@ -287,11 +273,6 @@ fun LibraryScreen(
         }
     }
 
-    var jumpToCurrentRequest by remember { mutableStateOf(0) }
-    var stopSongScrollRequest by remember { mutableStateOf(0) }
-    val hapticView = LocalView.current
-    val hapticsEnabled = LocalMiniMusicHaptics.current
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -317,20 +298,6 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Locate (jump to current song) — moved here from the old
-                    // pills row in the subtraction pass: one contextual icon
-                    // in the bar instead of a floating control row.
-                    IconButton(onClick = {
-                        if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                        stopSongScrollRequest++
-                        jumpToCurrentRequest++
-                    }) {
-                        Icon(
-                            Icons.Filled.MyLocation,
-                            contentDescription = "Jump to current song",
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                    }
                     // Sort moved up here from the tab row. Sorting is a
                     // preference about how a list is shown rather than a
                     // one-off action, and it now serves all three tabs — so it
@@ -391,20 +358,15 @@ fun LibraryScreen(
                 content = {}
             )
 
-            val hapticView = LocalView.current
-            val hapticsEnabled = LocalMiniMusicHaptics.current
+            var jumpToCurrentRequest by remember { mutableStateOf(0) }
+            var stopSongScrollRequest by remember { mutableStateOf(0) }
             // sortMenuExpanded belongs to the screen, not to this drawer: the
             // button that opens the menu now lives up in the app bar, outside
             // this scope. Declaring a second one here would shadow the outer
             // state and leave the app-bar button able to set a value nothing
             // reads.
-
-            // ═══ SUBTRACTION PASS (hero-overhaul v2) ═══
-            // Hero card deleted: it duplicated the miniplayer (same song, same
-            // art, same play action twice on one screen). The miniplayer is
-            // the single now-playing surface. Locate/Shuffle pills row also
-            // removed — Locate lives in the title bar, Shuffle in the sort
-            // menu, and the list now starts immediately after search.
+            val hapticView = LocalView.current
+            val hapticsEnabled = LocalMiniMusicHaptics.current
 
             // One continuous drawer, rounded only at the top: the selector/
             // controls row and the song list beneath it share the same
@@ -419,6 +381,83 @@ fun LibraryScreen(
                     .padding(top = 8.dp)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // The switcher takes every dp the action pill does not
+                        // need. It is the primary control in this row — it
+                        // changes what the whole screen below is showing —
+                        // while Locate and Shuffle are one-off taps, so the
+                        // layout gives the width to the thing that is used
+                        // most and lets the buttons sit at their natural size
+                        // instead of stretching to fill a fixed slot.
+                        ExpandingCategoryControl(
+                            selected = selectedTab,
+                            onSelect = { tab ->
+                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                selectedTab = tab
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Locate and Shuffle: two segments of one continuous
+                        // pill — the grouped treatment this row used before the
+                        // switcher redesign. The segments share a container and
+                        // a hairline, with the group's outer corners at a full
+                        // stadium radius and only a small radius where they
+                        // meet, so it reads as one object split in two rather
+                        // than two buttons that happen to be adjacent.
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            PillButton(
+                                onClick = {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    stopSongScrollRequest++
+                                    jumpToCurrentRequest++
+                                },
+                                horizontalPadding = 12.dp,
+                                shape = PillGroupShapes.First,
+                                modifier = Modifier.width(ControlSegmentWidth)
+                            ) {
+                                Icon(
+                                    Icons.Filled.MyLocation,
+                                    contentDescription = "Jump to current song",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            PillButton(
+                                onClick = {
+                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                                    // Shuffle changes playback in the background
+                                    // only: it must NOT stop an active fling or
+                                    // re-anchor the list (that's Locate's job).
+                                    // Scrolling continues undisturbed.
+                                    if (filteredSongs.isNotEmpty()) {
+                                        val startSong = filteredSongs.random()
+                                        onShufflePlayFrom(startSong, filteredSongs)
+                                    }
+                                },
+                                horizontalPadding = 12.dp,
+                                shape = PillGroupShapes.Last,
+                                modifier = Modifier.width(ControlSegmentWidth)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Shuffle,
+                                    contentDescription = "Shuffle",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                    }
 
                     CategorySortMenu(
                         expanded = sortMenuExpanded && selectedTab != LibraryTab.FOLDERS,
@@ -431,7 +470,6 @@ fun LibraryScreen(
                         onArtistSort = { artistSortOrder = it },
                         onAlbumSort = { albumSortOrder = it }
                     )
-
 
                     Box(modifier = Modifier.weight(1f)) {
                         // Skeleton-to-content handoff. This is the one place the
@@ -522,25 +560,34 @@ fun LibraryScreen(
                             }
                         }
                     }
+                }
+            }
 
-                    // M3 NavigationBar: docked at the screen's true bottom
-                    // edge — it is the app's floor. The miniplayer floats
-                    // ABOVE it (see NavGraph), never over it.
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ) {
-                        LibraryTab.entries.forEach { tab ->
-                            NavigationBarItem(
-                                selected = selectedTab == tab,
-                                onClick = {
-                                    if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    selectedTab = tab
-                                },
-                                icon = { Icon(tab.icon, contentDescription = tab.label) },
-                                label = { Text(tab.label) }
-                            )
-                        }
-                    }
+            // Floating navigation bar: a detached pill pinned to the bottom
+            // edge — the same treatment as the miniplayer above it (matching
+            // 10dp side margins and ~28dp corner radius). The list scrolls
+            // beneath it; the miniplayer hovers OVER this bar, never under it.
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = 3.dp,
+                modifier = Modifier
+                    .padding(horizontal = 10.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 4.dp)
+                    .clip(RoundedCornerShape(28.dp))
+            ) {
+                LibraryTab.entries.forEach { tab ->
+                    NavigationBarItem(
+                        selected = selectedTab == tab,
+                        onClick = {
+                            if (hapticsEnabled) hapticView.performMiniMusicHaptic()
+                            selectedTab = tab
+                        },
+                        icon = {
+                            Icon(tab.icon, contentDescription = tab.label)
+                        },
+                        label = { Text(tab.label) }
+                    )
                 }
             }
         }
@@ -894,22 +941,25 @@ private suspend fun locateCentered(
     itemCount: Int
 ) {
     if (index < 0) return
-    // Sign convention: a POSITIVE scrollOffset in LazyListState.scrollToItem
-    // pushes the target item UP past the viewport top — which is exactly the
-    // "locate lands 2 songs before the target" bug. To center the row we need
-    // a NEGATIVE offset (shift the item down into the middle).
-    listState.scrollToItem(index = index)
-    val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    // Two-pass placement: animateScrollToItem first brings the row into the
+    // viewport with real travel (the "actual animation" the locate gesture is
+    // supposed to have — a teleporting scrollToItem reads as the list abruptly
+    // stopping), then the measured pass below corrects the row to true center.
+    listState.animateScrollToItem(index = index)
+    listState.layoutInfo.visibleItemsInfo
+        .firstOrNull { it.index == index }
         ?: return
-    val viewport = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-    if (viewport <= 0) return
-    val rowCenter = info.offset + info.size / 2
-    val viewportCenter = viewport / 2
-    val delta = rowCenter - viewportCenter
-    if (abs(delta) < 2) return
-    // animateScrollBy moves the content by a raw pixel delta with the correct
-    // sign automatically, and glides — the centered landing with real motion.
-    listState.animateScrollBy(delta.toFloat())
+    val viewport = listState.layoutInfo.let { it.viewportEndOffset - it.viewportStartOffset }
+    val rowPx = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.size
+        ?: listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size
+        ?: 0
+    if (viewport <= 0 || rowPx <= 0) return
+    val centeredOffset = ((viewport - rowPx) * 0.5f).toInt().coerceAtLeast(0)
+    val maxOffsetWithoutBlank = index * rowPx
+    val offset = centeredOffset.coerceAtMost(maxOffsetWithoutBlank)
+    // Second pass after layout: corrects for variable row heights so the row
+    // is truly centered in every case.
+    listState.scrollToItem(index = index, scrollOffset = offset)
 }
 /** Rows covered by the closing glide after a long-distance locate jump. */
 private const val LocateGlideTail = 20
@@ -987,11 +1037,15 @@ private fun BoxScope.SongsScrollbarOverlay(
                 // unseen territory otherwise cold-decodes a full window of
                 // MediaStore thumbnails per pointer event.
                 preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, RowArtSizePx, artUriAt)
-                // Instant scroll while dragging: the thumb tracks the finger
-                // 1:1 and rows land under it. (An animateScrollToItem per
-                // pointer-move restarts the animation constantly — the stutter
-                // and thumb/rows desync reported on the hero-overhaul build.)
-                listState.scrollToItem(index = index, scrollOffset = 0)
+                // scrollToItem teleports the rows: the thumb moves but the cards
+                // appear stationary under it. animateScrollToItem makes the rows
+                // travel like a manual fling instead. (The prefetch cache window
+                // keeps the animation from hitching on row composition.)
+                if (listState.isScrollInProgress) {
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         },
         // The top remains aligned with the first song container. The bottom
@@ -1026,8 +1080,12 @@ private fun BoxScope.AlbumsScrollbarOverlay(
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
                 preloadArtWindow(context, itemCount, index, ScrubPreloadRadius, GridArtSizePx, artUriAt)
-                // Instant scroll while dragging — see the songs-list note above.
-                gridState.scrollToItem(index = index, scrollOffset = 0)
+                // Same animated-travel fix as the songs list (see above).
+                if (gridState.isScrollInProgress) {
+                    gridState.scrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    gridState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         },
         modifier = Modifier
@@ -1056,8 +1114,12 @@ private fun BoxScope.ArtistsScrollbarOverlay(
         onScrollToIndex = { index ->
             fastScrollJob?.cancel()
             fastScrollJob = scrollScope.launch {
-                // Instant scroll while dragging — see the songs-list note above.
-                listState.scrollToItem(index = index, scrollOffset = 0)
+                // Same animated-travel fix as the songs list (see above).
+                if (listState.isScrollInProgress) {
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                } else {
+                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                }
             }
         },
         modifier = Modifier
