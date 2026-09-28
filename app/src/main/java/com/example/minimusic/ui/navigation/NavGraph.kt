@@ -502,7 +502,10 @@ fun MiniMusicNavGraph(
         }
         val miniPlayerVisible by remember(sheetState, currentRoute) {
             derivedStateOf {
-                currentRoute != Routes.LYRICS &&
+                // Settings owns its full-screen list: no miniplayer overlay
+                // there (it sat over the bottom toggles). Home and album/artist
+                // drill-downs keep it.
+                currentRoute != Routes.LYRICS && currentRoute != Routes.SETTINGS &&
                     (currentRoute != Routes.PLAYER || sheetState.progress < 0.999f)
             }
         }
@@ -593,16 +596,18 @@ fun MiniMusicNavGraph(
         }
 
         if (miniPlayerVisible) {
-            // Floating miniplayer: hovered above the navigation bar (which owns
-            // the screen's bottom edge) with side margins — a detached pill the
-            // list scrolls beneath. Bottom clearance = nav bar + 8dp gap.
+            // Floating miniplayer: hovered just above the floating navigation
+            // bar with matching side margins. The pair reads as one connected
+            // shape — miniplayer curved top / flat bottom meets the navbar's
+            // flat top / curved bottom, separated by a 4dp seam. Nav pill is
+            // ~80dp tall, so bottom clearance = 80 + 4.
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = 10.dp)
-                    .padding(bottom = 86.dp)
+                    .padding(bottom = 84.dp)
                     .graphicsLayer {
                         translationY = sheetState.progress * miniPlayerHeightPx
                         // Keep the miniplayer opaque until it fully hands off to

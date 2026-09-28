@@ -59,13 +59,13 @@ import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
 import kotlinx.coroutines.flow.StateFlow
 
-/** Corner shape for the mini player bar — rounded on top to match the app's
- *  Material Expressive shape scale, but square on the bottom two corners so
- *  it sits flush against the bottom of the screen instead of floating with
- *  a gap on either side. */
+/** Corner shape for the floating mini player bar — curved on top, flat on
+ *  the bottom so it reads as the upper half of one connected shape with the
+ *  navigation bar beneath it (the navbar mirrors: flat top, curved bottom).
+ *  Both share the same horizontal margins (see NavGraph / LibraryScreen). */
 private val MiniPlayerShape = RoundedCornerShape(
-    topStart = 18.dp,
-    topEnd = 18.dp,
+    topStart = 28.dp,
+    topEnd = 28.dp,
     bottomStart = 0.dp,
     bottomEnd = 0.dp
 )

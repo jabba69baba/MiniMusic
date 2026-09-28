@@ -85,10 +85,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -221,8 +222,8 @@ fun LibraryScreen(
     }
     // The outer library column consumes system-bar insets. Reserve the
     // persistent miniplayer plus the floating navigation bar beneath it
-    // (nav pill ~80dp tall + 8dp gap) so lists can scroll clear of both.
-    val footerHeight = MiniPlayerReservedHeight + 88.dp
+    // (nav pill ~80dp tall + 4dp seam) so lists can scroll clear of both.
+    val footerHeight = MiniPlayerReservedHeight + 84.dp
     val filteredSongs = uiState.filteredSongs
     // Which of the four mutually exclusive states the content area is in. A
     // skeleton stands in only for content that has never arrived: a rescan of a
@@ -326,38 +327,6 @@ fun LibraryScreen(
                 }
             }
 
-            SearchBar(
-                query = uiState.searchQuery,
-                onQueryChange = onSearchQueryChange,
-                onSearch = {},
-                active = false,
-                onActiveChange = {},
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                placeholder = { Text("Search....") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    AnimatedVisibility(
-                        visible = uiState.searchQuery.isNotEmpty(),
-                        // Scale-only pop, no fade — the clear button grows
-                        // over the static search field.
-                        enter = scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
-                        exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
-                    ) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Clear search")
-                        }
-                    }
-                },
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = androidx.compose.material3.SearchBarDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    dividerColor = Color.Transparent
-                ),
-                content = {}
-            )
-
             var jumpToCurrentRequest by remember { mutableStateOf(0) }
             var stopSongScrollRequest by remember { mutableStateOf(0) }
             // sortMenuExpanded belongs to the screen, not to this drawer: the
@@ -384,26 +353,43 @@ fun LibraryScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // The switcher takes every dp the action pill does not
-                        // need. It is the primary control in this row — it
-                        // changes what the whole screen below is showing —
-                        // while Locate and Shuffle are one-off taps, so the
-                        // layout gives the width to the thing that is used
-                        // most and lets the buttons sit at their natural size
-                        // instead of stretching to fill a fixed slot.
-                        ExpandingCategoryControl(
-                            selected = selectedTab,
-                            onSelect = { tab ->
-                                if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                selectedTab = tab
+                        // Search now lives where the old tab switcher did — the
+                        // nav bar at the bottom owns tab navigation, so the top
+                        // header row (switcher + top search bar pair) collapsed
+                        // into this single drawer row: search field first, then
+                        // Locate/Shuffle at a small 6dp gap.
+                        OutlinedTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            singleLine = true,
+                            placeholder = { Text("Search....") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            trailingIcon = {
+                                AnimatedVisibility(
+                                    visible = uiState.searchQuery.isNotEmpty(),
+                                    // Scale-only pop, no fade — the clear button grows
+                                    // over the static search field.
+                                    enter = scaleIn(initialScale = 0.82f, animationSpec = MiniMusicMotion.fastEffects()),
+                                    exit = scaleOut(targetScale = 1f, animationSpec = MiniMusicMotion.fastEffects())
+                                ) {
+                                    IconButton(onClick = { onSearchQueryChange("") }) {
+                                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                                    }
+                                }
                             },
+                            shape = RoundedCornerShape(28.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
                             modifier = Modifier.weight(1f)
                         )
-
-                        Spacer(modifier = Modifier.width(16.dp))
 
                         // Locate and Shuffle: two segments of one continuous
                         // pill — the grouped treatment this row used before the
@@ -564,9 +550,10 @@ fun LibraryScreen(
             }
 
             // Floating navigation bar: a detached pill pinned to the bottom
-            // edge — the same treatment as the miniplayer above it (matching
-            // 10dp side margins and ~28dp corner radius). The list scrolls
-            // beneath it; the miniplayer hovers OVER this bar, never under it.
+            // edge, mirroring the miniplayer above it — flat top, curved
+            // bottom, same 10dp side margins. The two read as one connected
+            // shape split by a 4dp seam. The list scrolls beneath it; the
+            // miniplayer hovers OVER this bar, never under it.
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 tonalElevation = 3.dp,
@@ -574,7 +561,12 @@ fun LibraryScreen(
                     .padding(horizontal = 10.dp)
                     .navigationBarsPadding()
                     .padding(bottom = 4.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 0.dp, topEnd = 0.dp,
+                            bottomStart = 28.dp, bottomEnd = 28.dp
+                        )
+                    )
             ) {
                 LibraryTab.entries.forEach { tab ->
                     NavigationBarItem(
