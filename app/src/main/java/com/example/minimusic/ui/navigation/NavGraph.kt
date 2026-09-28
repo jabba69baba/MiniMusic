@@ -596,11 +596,10 @@ fun MiniMusicNavGraph(
         }
 
         if (miniPlayerVisible) {
-            // Floating miniplayer: hovered just above the floating navigation
-            // bar with matching side margins. The pair reads as one connected
-            // shape — miniplayer curved top / flat bottom meets the navbar's
-            // flat top / curved bottom, separated by a 4dp seam. Nav pill is
-            // ~80dp tall, so bottom clearance = 80 + 4.
+            // YouTube Music pattern: the miniplayer hovers in a column
+            // directly above the docked NavigationBar (which handles its own
+            // gesture inset). M3's NavigationBar is 80dp tall + a 4dp hover
+            // gap, so bottom clearance = 84dp.
             Box(
                 modifier = androidx.compose.ui.Modifier
                     .align(Alignment.BottomCenter)

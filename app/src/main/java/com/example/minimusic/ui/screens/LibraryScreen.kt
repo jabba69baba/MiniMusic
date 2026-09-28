@@ -222,9 +222,11 @@ fun LibraryScreen(
         onDispose { }
     }
     // The outer library column consumes system-bar insets. Reserve the
-    // persistent miniplayer plus the floating navigation bar beneath it
-    // (nav pill ~80dp tall + 4dp seam) so lists can scroll clear of both.
-    val footerHeight = MiniPlayerReservedHeight + 84.dp
+    // persistent miniplayer plus the docked NavigationBar beneath it
+    // (M3's 80dp bar height + a 4dp hover gap, as one measured value).
+    // This is the single source of truth for bottom clearance — lists and
+    // the snackbar both derive from it, nothing else pads the bottom.
+    val footerHeight = MiniPlayerReservedHeight + 96.dp
     val filteredSongs = uiState.filteredSongs
     // Which of the four mutually exclusive states the content area is in. A
     // skeleton stands in only for content that has never arrived: a rescan of a
@@ -558,25 +560,13 @@ fun LibraryScreen(
                         }
                     }
                 }
-            }
-
-            // Floating navigation bar: a fully detached pill hovering above
-            // the system gesture area — rounded on ALL corners, with real
-            // gaps on the sides and bottom, the way other apps (Lune,
-            // PixelPlayer) do it. Not a shaped background docked to the
-            // screen edge. The miniplayer floats OVER this bar, never under
-            // it; the list scrolls beneath both.
+            }            // Docked M3 NavigationBar — the YouTube Music pattern. The
+            // component handles its own bottom (gesture) and horizontal
+            // insets internally; adding manual padding on top double-counted
+            // the inset and produced the dead-space/"shaped background"
+            // issues. The miniplayer hovers in a column directly above it.
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = 3.dp,
-                modifier = Modifier
-                    // Clear the system gesture area, then hover 8dp above it
-
-                    // with real side gaps: a detached pill, not a docked
-                    // shaped background.
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             ) {
                 LibraryTab.entries.forEach { tab ->
                     NavigationBarItem(
@@ -597,7 +587,6 @@ fun LibraryScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(bottom = footerHeight + 12.dp)
         )
     }
