@@ -2,6 +2,7 @@ package com.example.minimusic.playback
 
 import android.net.Uri
 import com.example.minimusic.data.model.Song
+import io.mockk.mockk
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -57,7 +58,8 @@ class QueueModelTest {
         val remaining = snapshot.removeEntry(1L)
 
         assertEquals(listOf(0L, 2L, 3L), remaining.entries.map { it.entryId })
-        assertEquals(1L, remaining.currentEntryId)
+        // Removing the current entry advances to the next one (2 was after 1).
+        assertEquals(2L, remaining.currentEntryId)
         assertEquals(2L, remaining.currentEntry?.entryId)
     }
 
@@ -82,15 +84,15 @@ class QueueModelTest {
         val entries = songs.mapIndexed { index, song -> QueueEntry(index.toLong(), song) }
         val snapshot = QueueSnapshot(
             entries = entries,
-            currentPosition = 4,
-            currentEntryId = 4L,
-            historyEntries = entries.take(4),
+            currentPosition = 3,
+            currentEntryId = 3L,
+            historyEntries = entries.take(3),
             visibleEntries = entries
         )
 
-        assertEquals(listOf(0L, 1L, 2L, 3L), snapshot.historyEntries.map { it.entryId })
-        assertEquals(listOf(0L, 1L, 2L, 3L, 4L), snapshot.visibleEntries.map { it.entryId })
-        assertEquals(4, snapshot.resolvedVisiblePosition)
+        assertEquals(listOf(0L, 1L, 2L), snapshot.historyEntries.map { it.entryId })
+        assertEquals(listOf(0L, 1L, 2L, 3L), snapshot.visibleEntries.map { it.entryId })
+        assertEquals(3, snapshot.resolvedVisiblePosition)
     }
 
     @Test
@@ -106,7 +108,7 @@ class QueueModelTest {
 
         val moved = snapshot.moveEntry(0L, 4)
 
-        assertEquals(listOf(1L, 2L, 3L, 4L, 0L), moved.entries.map { it.entryId })
+        assertEquals(listOf(1L, 2L, 3L, 0L), moved.entries.map { it.entryId })
         assertEquals(1, moved.resolvedCurrentPosition)
         assertEquals(listOf(1L), moved.historyEntries.map { it.entryId })
         assertEquals(moved.entries, moved.visibleEntries)
@@ -147,7 +149,7 @@ class QueueModelTest {
             albumId = 1L,
             durationMs = 180_000L,
             trackNumber = id.toInt(),
-            contentUri = Uri.EMPTY,
+            contentUri = mockk<Uri>(relaxed = true),
             albumArtUri = null,
             dateAddedSeconds = id
         )

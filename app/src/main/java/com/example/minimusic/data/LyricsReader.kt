@@ -2,9 +2,11 @@ package com.example.minimusic.data
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.provider.MediaStore
 import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.InputStream
 
 private val LrcMetadataTagRegex = Regex(
@@ -30,23 +32,56 @@ private val InstrumentalPlaceholderRegex = Regex(
 )
 
 /**
- * Reads lyrics straight out of a song's own embedded ID3v2 tag (the "USLT" frame —
- * standard unsynchronized lyrics), so nothing is ever fetched from the network.
- *
- * ID3v2 USLT is parsed directly for MP3-family files. For containers such as FLAC
- * and M4A, the platform metadata retriever is used as a lightweight fallback for
- * embedded lyric fields. Network lyrics and sidecar files remain intentionally out
- * of scope for the offline player.
+ * Reads lyrics from sources the song itself points to, so nothing is ever
+ * fetched from the network: first a sidecar "<basename>.lrc" next to the audio,
+ * then the song's own ID3v2 tag — the synced "SYLT" frame (preferred, decodes to
+ * timed LRC lines) or the plain "USLT" frame. For containers such as FLAC and
+ * M4A, the platform metadata retriever is used as a lightweight fallback for
+ * embedded lyric fields. Network lyrics remain intentionally out of scope for
+ * the offline player.
  */
 class LyricsReader(private val context: Context) {
 
     suspend fun readLyrics(song: Song): String? = withContext(Dispatchers.IO) {
         runCatching {
-            val id3Lyrics = context.contentResolver.openInputStream(song.contentUri)?.use { input ->
-                parseId3Lyrics(input)
-            }
-            id3Lyrics ?: readContainerLyrics(song)
+            // Sidecar .lrc wins: most taggers and downloaders ship synced lyrics
+            // as "Title.lrc" next to the audio file, and players the user compares
+            // against (Poweramp, Musicolet, Metrolist) read exactly this. Embedded
+            // tags remain the in-file fallback.
+            readSidecarLrc(song)
+                ?: context.contentResolver.openInputStream(song.contentUri)?.use { input ->
+                    parseId3Lyrics(input)
+                }
+                ?: readContainerLyrics(song)
         }.getOrNull()
+    }
+
+    /**
+     * Reads "<audio basename>.lrc" from the same directory as the audio file.
+     * The audio path comes from MediaStore's DATA column (absolute path). If the
+     * path can't be resolved or no sidecar exists, returns null silently.
+     */
+    private fun readSidecarLrc(song: Song): String? {
+        val audioPath = runCatching {
+            context.contentResolver.query(
+                song.contentUri,
+                arrayOf(MediaStore.Audio.Media.DATA),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull() ?: return null
+        val audioFile = File(audioPath)
+        val candidates = listOf(
+            File(audioFile.parentFile, audioFile.nameWithoutExtension + ".lrc"),
+            File(audioFile.parentFile, audioFile.nameWithoutExtension + ".LRC")
+        )
+        for (candidate in candidates) {
+            if (!candidate.isFile) continue
+            val text = runCatching { candidate.readText() }.getOrNull() ?: continue
+            cleanLyricsText(text)?.let { return it }
+        }
+        return null
     }
 
     /**
@@ -74,7 +109,7 @@ class LyricsReader(private val context: Context) {
         }
     }
 
-    private fun parseId3Lyrics(input: InputStream): String? {
+    internal fun parseId3Lyrics(input: InputStream): String? {
         val header = ByteArray(10)
         if (readFully(input, header) < 10) return null
         if (header[0] != 'I'.code.toByte() || header[1] != 'D'.code.toByte() || header[2] != '3'.code.toByte()) {
@@ -82,6 +117,8 @@ class LyricsReader(private val context: Context) {
         }
         val majorVersion = header[3].toInt() and 0xFF
         var remaining = synchsafeToInt(header[6], header[7], header[8], header[9])
+
+        var usltResult: String? = null
 
         while (remaining > 10) {
             val frameHeader = ByteArray(10)
@@ -103,12 +140,70 @@ class LyricsReader(private val context: Context) {
             if (frameId == "USLT") {
                 val body = ByteArray(frameSize)
                 readFully(input, body)
-                return decodeUslt(body)
+                if (usltResult == null) usltResult = decodeUslt(body)
+                // Keep scanning: a SYLT frame later in the file is preferred
+                // (synced lyrics beat plain text).
+            } else if (frameId == "SYLT") {
+                // Synchronized lyrics: decode to LRC-style "[mm:ss.xx] line"
+                // text, which the display layer already times.
+                val body = ByteArray(frameSize)
+                readFully(input, body)
+                // Prefer SYLT when it decodes to usable timed lines; otherwise
+                // keep scanning so a plain USLT can still be found.
+                decodeSylt(body)?.let { return it }
             } else {
                 skipFully(input, frameSize.toLong())
             }
         }
-        return null
+        return usltResult
+    }
+
+    /**
+     * ID3v2 SYLT → LRC-style text. Layout: [encoding:1][language:3][timestamp
+     * format:1][content type:1][descriptor, null-terminated][sync entries].
+     * Each entry: null-terminated text + 4-byte big-endian timestamp in ms
+     * (format 2) or ticks (format 1 — rare; skipped to milliseconds is not
+     * possible without the MPEG frame rate, so format 1 entries are dropped).
+     */
+    private fun decodeSylt(body: ByteArray): String? {
+        if (body.size < 7) return null
+        val charset = when (body[0].toInt() and 0xFF) {
+            1 -> Charsets.UTF_16
+            2 -> Charsets.UTF_16BE
+            3 -> Charsets.UTF_8
+            else -> Charsets.ISO_8859_1
+        }
+        val nullWidth = if (charset == Charsets.UTF_16 || charset == Charsets.UTF_16BE) 2 else 1
+        // Spec layout (ID3v2.3 §4.10 / ID3v2.4 §4.9): [0] encoding, [1..3]
+        // language, [4] time stamp format ($02 = milliseconds), [5] content
+        // type, [6..] content descriptor (null-terminated), then sync entries.
+        // Reading the format from [6] would hit the descriptor's first byte and
+        // silently drop every entry.
+        val timestampIsMs = body[4].toInt() == 2
+        var pos = indexAfterNullTerminator(body, 6, nullWidth)
+
+        val entries = mutableListOf<Pair<Long, String>>()
+        while (pos + 4 + nullWidth <= body.size) {
+            val textEnd = indexAfterNullTerminator(body, pos, nullWidth)
+            if (textEnd < 0 || textEnd + 4 > body.size) break
+            val text = String(body, pos, textEnd - nullWidth - pos, charset).trim()
+            val stamp = ((body[textEnd].toInt() and 0xFF) shl 24) or
+                ((body[textEnd + 1].toInt() and 0xFF) shl 16) or
+                ((body[textEnd + 2].toInt() and 0xFF) shl 8) or
+                (body[textEnd + 3].toInt() and 0xFF)
+            pos = textEnd + 4
+            if (text.isNotBlank() && timestampIsMs) entries += stamp.toLong() to text
+        }
+        if (entries.isEmpty()) return null
+        entries.sortBy { it.first }
+        val lrc = entries.joinToString("\n") { (ms, text) ->
+            val m = ms / 60_000
+            val s = (ms % 60_000) / 1000
+            val f = (ms % 1000) / 10
+            String.format(java.util.Locale.US, "[%02d:%02d.%02d]%s", m, s, f, text)
+        }
+        // Timestamps must survive cleaning: strip only metadata lines.
+        return cleanLyricsText(lrc)
     }
 
     private fun decodeUslt(body: ByteArray): String? {
@@ -134,23 +229,7 @@ class LyricsReader(private val context: Context) {
      * Removes provider metadata and nonstandard word-timing markup without removing
      * genuine Unicode combining marks, including Zalgo-style text.
      */
-    internal fun cleanLyricsText(text: String): String? {
-        val cleaned = text
-            .lineSequence()
-            .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
-            .map { ProviderControlTagRegex.replace(it, "") }
-            .map { LrcMetadataTagRegex.replace(it, "") }
-            .map { WordTimingLinePrefixRegex.replace(WordTimingTokenRegex.replace(it, ""), "") }
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { InstrumentalPlaceholderRegex.matches(it) }
-            .joinToString("\n")
-            .trim()
-            .ifBlank { null }
-        return cleaned?.let(::repairLikelyMojibake)
-    }
+    internal fun cleanLyricsText(text: String): String? = cleanLyricsTextTopLevel(text)
 
     private fun indexAfterNullTerminator(body: ByteArray, start: Int, nullWidth: Int): Int {
         var i = start
@@ -193,4 +272,28 @@ class LyricsReader(private val context: Context) {
     private fun bigEndianToInt(b0: Byte, b1: Byte, b2: Byte, b3: Byte): Int =
         ((b0.toInt() and 0xFF) shl 24) or ((b1.toInt() and 0xFF) shl 16) or
             ((b2.toInt() and 0xFF) shl 8) or (b3.toInt() and 0xFF)
+}
+
+/**
+ * Top-level implementation of [LyricsReader.cleanLyricsText]. It lives outside the
+ * class because it depends only on the file-level regexes and text repair — no
+ * Android types — which lets the plain JVM unit test call it directly without
+ * needing an Android context or a Robolectric-style runner.
+ */
+internal fun cleanLyricsTextTopLevel(text: String): String? {
+    val cleaned = text
+        .lineSequence()
+        .map { it.trim('\u0000', '\uFEFF', '\u2060').trim() }
+        .filter { it.isNotBlank() }
+        .filterNot { PlainMetadataLineRegex.matches(it) || LrcCommentLineRegex.matches(it) }
+        .map { ProviderControlTagRegex.replace(it, "") }
+        .map { LrcMetadataTagRegex.replace(it, "") }
+        .map { WordTimingLinePrefixRegex.replace(WordTimingTokenRegex.replace(it, ""), "") }
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .filterNot { InstrumentalPlaceholderRegex.matches(it) }
+        .joinToString("\n")
+        .trim()
+        .ifBlank { null }
+    return cleaned?.let(::repairLikelyMojibake)
 }
