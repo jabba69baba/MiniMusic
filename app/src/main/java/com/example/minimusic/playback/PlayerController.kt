@@ -553,6 +553,11 @@ class PlayerController(private val context: Context) {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (System.currentTimeMillis() < suppressIsPlayingUntilMs) return
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+            // was_playing drives resume-on-launch, and play/pause is exactly
+            // the state that never used to be persisted (only track/queue
+            // events wrote the file), so the flag sat stale until the next
+            // track change and relaunch resumed the wrong way.
+            controller?.let { persistPlaybackState(it, force = true) }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -708,9 +713,13 @@ class PlayerController(private val context: Context) {
         persistPlaybackState(c)
     }
 
-    private fun persistPlaybackState(c: Player) {
+    private fun persistPlaybackState(c: Player, force: Boolean = false) {
+        // Never let the pre-restore connect window (fresh controller, empty
+        // queue, service still delivering events) overwrite a saved session
+        // with an empty one — that wipe is "resume on launch does nothing".
+        if (currentQueueEntries.isEmpty() && !restoredSession) return
         val now = System.currentTimeMillis()
-        if (now - lastPersistedAtMs < 750L && c.playbackState != Player.STATE_ENDED) return
+        if (!force && now - lastPersistedAtMs < 750L && c.playbackState != Player.STATE_ENDED) return
         lastPersistedAtMs = now
         playbackPrefs.edit()
             .putString("queue_ids", currentQueueEntries.joinToString(",") { it.song.id.toString() })

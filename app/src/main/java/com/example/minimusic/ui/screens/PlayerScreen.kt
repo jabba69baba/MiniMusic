@@ -89,6 +89,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -691,6 +692,12 @@ private fun QueueArtStrip(
         }
     }
 
+    // Identity key per window slot: a reorder (shuffle) changes which song
+    // lives at each index, and without this key Compose reuses the slot's
+    // composition — one frame of the PREVIOUS slot occupant before the new
+    // song's content lands. Keying by song id forces a clean swap.
+    val keyedWindow = window.map { it to queue[it].id }
+
     Box(
         modifier = modifier
             .clipToBounds()
@@ -699,7 +706,7 @@ private fun QueueArtStrip(
         // Wait for the first measured width so the three window items don't
         // all draw at x=0 (stacked) for a frame.
         if (viewportWidthPx > 0) {
-            for (index in window) {
+            for ((index, songId) in keyedWindow) {
                 val song = queue[index]
                 Box(
                     modifier = Modifier
@@ -708,6 +715,7 @@ private fun QueueArtStrip(
                             translationX = (index - progress.value) * viewportWidthPx
                         }
                 ) {
+                    key(songId) {
                     if (song.albumArtUri == null) {
                         // PixelPlayer's placeholder icon tone (0.2 on the
                         // primary-container canvas).
@@ -732,6 +740,7 @@ private fun QueueArtStrip(
                             contentScale = ContentScale.Crop
                         )
                     }
+                    } // key(songId): clean slot swap on reorder
                 }
             }
         }
@@ -784,8 +793,13 @@ private fun VerticalMetadataStrip(
         }
     }
 
+    // Identity key per slot — same stale-occupant reason as QueueArtStrip:
+    // a reorder swaps which song lives at each index, and without a key the
+    // title/artist text reuses the previous song's composition for a frame.
+    val keyedWindow = window.map { it to queue[it].id }
+
     Box(modifier = modifier.clipToBounds()) {
-        for (index in window) {
+        for ((index, songId) in keyedWindow) {
             val song = queue[index]
             Box(
                 modifier = Modifier
@@ -794,6 +808,7 @@ private fun VerticalMetadataStrip(
                         translationY = (index - progress.value) * windowHeightPx
                     }
             ) {
+                key(songId) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -838,6 +853,7 @@ private fun VerticalMetadataStrip(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+                } // key(songId): clean slot swap on reorder
             }
         }
     }
@@ -929,6 +945,23 @@ private fun NowPlayingPanel(
             targetIndex
         } else {
             queue.indexOfFirst { it.id == song.id }.takeIf { it >= 0 } ?: return@LaunchedEffect
+        }
+        // A reorder (shuffle toggle) publishes a NEW list instance with the
+        // SAME current song at a DIFFERENT index. The display index therefore
+        // cannot be trusted as the strip anchor until the queue reference
+        // itself has been swapped in — anchoring on the index first is what
+        // composed the new list at the old slot and flashed a random song.
+        // Reorder: swap the list and snap onto the song's real index in one
+        // snapshot, atomically.
+        if (lastQueue !== queue && renderedQueue !== queue) {
+            val songIndex = queue.indexOfFirst { it.id == song.id }
+            if (songIndex >= 0) {
+                renderedQueue = queue
+                focusedIndex = songIndex
+                carouselProgress.snapTo(songIndex.toFloat())
+                lastQueue = queue
+                return@LaunchedEffect
+            }
         }
         val target = targetIndex.toFloat()
         val distance = abs(carouselProgress.value - target)

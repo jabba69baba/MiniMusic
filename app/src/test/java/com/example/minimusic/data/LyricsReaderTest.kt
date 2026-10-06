@@ -95,6 +95,174 @@ class LyricsReaderTest {
         assertEquals("plain unsynced text", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
     }
 
+    @Test
+    fun parsesUsltFromTagWithUnsynchronisation() {
+        // A tag-level unsync flag stores the payload with 0x00 inserted after
+        // every 0xFF. Without decoding that first, the frame walk lands
+        // mid-header and the USLT frame behind it is never found.
+        val frames = v23Frame("TIT2", byteArrayOf(0x00, 0xFF.toByte(), 0x41)) +
+            v23Frame("USLT", usltBody("unsync survivor"))
+        val tag = id3TagWith(flags = 0x80, storedPayload = applyUnsync(frames))
+
+        assertEquals("unsync survivor", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
+    }
+
+    @Test
+    fun parsesTagWithExtendedHeader() {
+        // v2.3 extended header: size field excludes itself (6 bytes of flags +
+        // padding-size follow). Left unread, the first frame header lands
+        // mid-field and no lyric frame is found.
+        val ext = ByteArrayOutputStream().apply {
+            write(0); write(0); write(0); write(6) // size (excludes itself)
+            write(0); write(0)                     // extended flags
+            write(0); write(0); write(0); write(0) // size of padding
+        }
+        val payload = ext.toByteArray() + v23Frame("USLT", usltBody("behind extended header"))
+        val tag = id3TagWith(flags = 0x40, storedPayload = payload)
+
+        assertEquals("behind extended header", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
+    }
+
+    @Test
+    fun parsesV22UltFrame() {
+        // ID3v2.2 uses 3-byte frame ids ("ULT"/"SLT") and 6-byte frame
+        // headers; the old walker read 10-byte headers and never matched.
+        val body = usltBody("v22 lyrics")
+        val frame = ByteArrayOutputStream().apply {
+            write("ULT".toByteArray(Charsets.US_ASCII))
+            write((body.size ushr 16) and 0xFF)
+            write((body.size ushr 8) and 0xFF)
+            write(body.size and 0xFF)
+            write(body)
+        }
+        val tag = id3TagWith(flags = 0, storedPayload = frame.toByteArray(), version = 2)
+
+        assertEquals("v22 lyrics", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
+    }
+
+    @Test
+    fun readsLyricsFromFlacVorbisComment() {
+        val flac = flacWithComments("LYRICS=[00:01.50]Line one\n[00:03.00]Line two")
+
+        assertEquals(
+            "[00:01.50]Line one\n[00:03.00]Line two",
+            reader().parseFlacLyrics(ByteArrayInputStream(flac))
+        )
+    }
+
+    @Test
+    fun prefersFlacSyncedLyricsOverPlainLyrics() {
+        // Order in the block must not decide: SYNCEDLYRICS wins even when the
+        // plain LYRICS comment appears first.
+        val flac = flacWithComments(
+            "LYRICS=plain text here",
+            "SYNCEDLYRICS=[00:00.50]Timed line"
+        )
+
+        assertEquals("[00:00.50]Timed line", reader().parseFlacLyrics(ByteArrayInputStream(flac)))
+    }
+
+    @Test
+    fun readsM4aCopyrightLyricAtom() {
+        val text = "[00:02.00]M4A line".toByteArray(Charsets.UTF_8)
+        val dataAtom = mp4Box("data", ByteArray(8) + text) // version/flags + locale
+        val lyricAtom = mp4BoxRaw(
+            byteArrayOf(0xA9.toByte(), 'l'.code.toByte(), 'y'.code.toByte(), 'r'.code.toByte()),
+            dataAtom
+        )
+        val meta = mp4Box("meta", ByteArray(4) + mp4Box("ilst", lyricAtom))
+        val file = mp4Box("ftyp", "isom".toByteArray(Charsets.US_ASCII) + ByteArray(4)) +
+            mp4Box("moov", mp4Box("udta", meta))
+
+        assertEquals("[00:02.00]M4A line", reader().parseMp4Lyrics(ByteArrayInputStream(file)))
+    }
+
+    private fun v23Frame(id: String, body: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream()
+        out.write(id.toByteArray(Charsets.US_ASCII))
+        val size = body.size
+        out.write((size ushr 24) and 0xFF)
+        out.write((size ushr 16) and 0xFF)
+        out.write((size ushr 8) and 0xFF)
+        out.write(size and 0xFF)
+        out.write(0) // frame flags, byte 1
+        out.write(0) // frame flags, byte 2
+        out.write(body)
+        return out.toByteArray()
+    }
+
+    /** ID3 tag with explicit header flags; [storedPayload] is what the file
+     * holds (already unsynchronised if the flag says so). */
+    private fun id3TagWith(flags: Int, storedPayload: ByteArray, version: Int = 3): ByteArray {
+        val tag = ByteArrayOutputStream()
+        tag.write("ID3".toByteArray(Charsets.US_ASCII))
+        tag.write(version)
+        tag.write(0) // revision
+        tag.write(flags)
+        val size = storedPayload.size
+        tag.write((size ushr 21) and 0x7F)
+        tag.write((size ushr 14) and 0x7F)
+        tag.write((size ushr 7) and 0x7F)
+        tag.write(size and 0x7F)
+        tag.write(storedPayload)
+        return tag.toByteArray()
+    }
+
+    /** The ID3 unsynchronisation encoder: insert 0x00 after every 0xFF. */
+    private fun applyUnsync(data: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream()
+        for (b in data) {
+            out.write(b.toInt() and 0xFF)
+            if (b == 0xFF.toByte()) out.write(0)
+        }
+        return out.toByteArray()
+    }
+
+    /** A minimal FLAC stream: magic + one last VORBIS_COMMENT block. */
+    private fun flacWithComments(vararg comments: String): ByteArray {
+        val block = ByteArrayOutputStream()
+        val vendor = "minimusic".toByteArray(Charsets.UTF_8)
+        writeLe32(block, vendor.size)
+        block.write(vendor)
+        writeLe32(block, comments.size)
+        for (comment in comments) {
+            val bytes = comment.toByteArray(Charsets.UTF_8)
+            writeLe32(block, bytes.size)
+            block.write(bytes)
+        }
+        val data = block.toByteArray()
+        val out = ByteArrayOutputStream()
+        out.write("fLaC".toByteArray(Charsets.US_ASCII))
+        out.write(0x84) // last metadata block | type 4 (VORBIS_COMMENT)
+        out.write((data.size ushr 16) and 0xFF)
+        out.write((data.size ushr 8) and 0xFF)
+        out.write(data.size and 0xFF)
+        out.write(data)
+        return out.toByteArray()
+    }
+
+    private fun writeLe32(out: ByteArrayOutputStream, value: Int) {
+        out.write(value and 0xFF)
+        out.write((value ushr 8) and 0xFF)
+        out.write((value ushr 16) and 0xFF)
+        out.write((value ushr 24) and 0xFF)
+    }
+
+    private fun mp4Box(type: String, content: ByteArray): ByteArray =
+        mp4BoxRaw(type.toByteArray(Charsets.US_ASCII), content)
+
+    private fun mp4BoxRaw(type: ByteArray, content: ByteArray): ByteArray {
+        val size = 8 + content.size
+        val out = ByteArrayOutputStream()
+        out.write((size ushr 24) and 0xFF)
+        out.write((size ushr 16) and 0xFF)
+        out.write((size ushr 8) and 0xFF)
+        out.write(size and 0xFF)
+        out.write(type)
+        out.write(content)
+        return out.toByteArray()
+    }
+
     private fun reader() = LyricsReader(mockk<Context>(relaxed = true))
 
     /** Builds an ID3v2.3 tag: 10-byte header + frames (10-byte frame headers,

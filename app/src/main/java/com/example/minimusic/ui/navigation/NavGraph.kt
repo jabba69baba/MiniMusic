@@ -98,10 +98,13 @@ fun MiniMusicNavGraph(
     val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
 
     LaunchedEffect(libraryState.allSongs, appSettings.resumeOnLaunch) {
-        if (libraryState.allSongs.isNotEmpty()) {
+        // Resume ON: restore the persisted queue (and continue playing if it
+        // was playing). OFF: genuinely fresh start — no restored queue, no
+        // position, no ghost mini player from the last session.
+        if (libraryState.allSongs.isNotEmpty() && appSettings.resumeOnLaunch) {
             playerViewModel.restoreLastSession(
                 libraryState.allSongs,
-                playOnLaunch = appSettings.resumeOnLaunch
+                playOnLaunch = true
             )
         }
     }
