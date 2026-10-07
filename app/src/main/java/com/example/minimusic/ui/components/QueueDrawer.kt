@@ -318,6 +318,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
     var locateRequest by remember { mutableStateOf(0) }
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
+    var queueTopRequest by remember { mutableStateOf(0) }
     var openRequest by remember { mutableStateOf(0) }
 
     LaunchedEffect(isOpen, panelHeight) {
@@ -410,11 +411,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                                 .clip(RoundedCornerShape(50))
                                 .clickable {
                                     if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    // The collapsed bar opens the drawer; the open
-                                    // cycle itself re-centres on the active song.
-                                    // The old "pin to top" jump was removed: the
-                                    // active song now sits mid-viewport on open.
-                                    if (!isOpen) onOpenChange(true)
+                                    if (isOpen) queueTopRequest++ else onOpenChange(true)
                                 }
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -473,6 +470,7 @@ private fun BoxWithConstraintsScope.LandscapeQueueBottomSheet(
                         onReorderEntry = onReorderEntry,
                         onRemoveEntry = onRemoveEntry,
                         locateRequest = locateRequest,
+                        queueTopRequest = queueTopRequest,
                         openRequest = openRequest,
                         onTopCloseDrag = {},
                         onTopCloseDragEnd = {}
@@ -511,6 +509,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
     var locateRequest by remember { mutableStateOf(0) }
     val hapticView = LocalView.current
     val hapticsEnabled = LocalMiniMusicHaptics.current
+    var queueTopRequest by remember { mutableStateOf(0) }
     var openRequest by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
@@ -623,11 +622,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 .clip(RoundedCornerShape(50))
                                 .clickable {
                                     if (hapticsEnabled) hapticView.performMiniMusicHaptic()
-                                    // The collapsed bar opens the drawer; the open
-                                    // cycle itself re-centres on the active song.
-                                    // The old "pin to top" jump was removed: the
-                                    // active song now sits mid-viewport on open.
-                                    if (!isOpen) onOpenChange(true)
+                                    if (isOpen) queueTopRequest++ else onOpenChange(true)
                                 }
                                 .padding(horizontal = 12.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -702,6 +697,7 @@ private fun BoxWithConstraintsScope.QueueDrawerBottomSheet(
                                 onReorderEntry = onReorderEntry,
                                 onRemoveEntry = onRemoveEntry,
                                 locateRequest = locateRequest,
+                                queueTopRequest = queueTopRequest,
                                 openRequest = openRequest,
                                 onTopCloseDrag = { deltaY ->
                                     scope.launch {
@@ -747,6 +743,7 @@ private fun ColumnScope.QueueDrawerList(
     onReorderEntry: (Long, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
     locateRequest: Int,
+    queueTopRequest: Int,
     openRequest: Int,
     onTopCloseDrag: (Float) -> Unit,
     onTopCloseDragEnd: (Float) -> Unit
@@ -760,6 +757,7 @@ private fun ColumnScope.QueueDrawerList(
     val adapter = remember { PracticalQueueAdapter(context) }
     val latestSnapshot by rememberUpdatedState(snapshot)
     var previousLocateRequest by remember { mutableStateOf(locateRequest) }
+    var previousQueueTopRequest by remember { mutableStateOf(queueTopRequest) }
     var previousOpenRequest by remember { mutableStateOf(0) }
 
     // Pending while the list still owes the current song a placement; set again
@@ -897,6 +895,21 @@ private fun ColumnScope.QueueDrawerList(
                             placeQueueInstantly(recyclerView, currentPosition, rowHeightPx)
                         } else {
                             animateQueueScroll(recyclerView, currentPosition, rowHeightPx)
+                        }
+                    }
+                }
+            }
+            if (queueTopRequest != previousQueueTopRequest) {
+                previousQueueTopRequest = queueTopRequest
+                recyclerView.stopScroll()
+                recyclerView.post {
+                    recyclerView.stopScroll()
+                    val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+                    if (adapter.itemCount > 0) {
+                        if (reducedMotion) {
+                            placeQueueInstantly(recyclerView, 0, rowHeightPx)
+                        } else {
+                            animateQueueScroll(recyclerView, 0, rowHeightPx)
                         }
                     }
                 }

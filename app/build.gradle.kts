@@ -98,6 +98,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("androidx.media3:media3-common:1.5.1")
+    implementation("androidx.media3:media3-extractor:1.5.1")
+    implementation("androidx.media3:media3-datasource:1.5.1")
 
     // Album art loading
     implementation("io.coil-kt:coil-compose:2.7.0")
@@ -114,6 +116,10 @@ dependencies {
     // does not get the default framework mapping the JVM plugin provides, so
     // plain kotlin("test") leaves `kotlin.test.Test` unresolved.
     testImplementation(kotlin("test-junit"))
+    // The ported lyrics parsers drive the emulator-less XmlPullParserFactory and
+    // Media3 tag readers that need a real implementation on the JVM.
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
+
     // Song.contentUri is a non-null android.net.Uri; in JVM unit tests the Android
     // stub jar makes Uri.EMPTY null and Uri.parse throw, so tests mock the Uri.
     testImplementation("io.mockk:mockk:1.13.13")

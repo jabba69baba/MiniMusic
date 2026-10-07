@@ -14,8 +14,10 @@ from files already on the device.
 - Tap an album or artist to drill into its song list
 - Full playback: play/pause, next/previous, seek, **shuffle**, **repeat (off/all/one)**
 - Persistent mini player + full-screen "now playing" screen with queue ("Up next")
-- **Lyrics**, read straight out of the song file's own embedded ID3 `USLT` tag —
-  no network lookup, no `.lrc` sidecar files required
+- **Lyrics**, read from the song's own files — its `.lrc/.srt/.ttml` sidecar first, then
+  its embedded ID3 `USLT`/`SYLT`, FLAC Vorbis `LYRICS`, MP4 `©lyr`, or Ogg comments,
+  decoded with a GPL-3.0 port of the Gramophone lyrics stack (no network lookup).
+  Translations are ranked, word-timed lyrics highlight in real time.
 - **Settings** screen — Appearance (dynamic color, theme mode), Player (auto-open
   lyrics, resume on launch), Content (minimum song length, rescan library), About
 - Background playback via a `MediaSessionService` (system notification, lock-screen
@@ -101,9 +103,7 @@ I'd tackle them:
    "derive, don't cache" pattern the Albums/Artists tabs already use.
 3. **Widen lyrics support** — right now only ID3v2 `USLT` (MP3) is read. FLAC
    (Vorbis comment `LYRICS` tag) and M4A/AAC (`\xa9lyr` atom) are common enough
-   in real libraries that it's worth adding both; `LyricsReader` is structured so
-   each format is its own small parsing function, so this is additive, not a
-   rewrite.
+   in real libraries that it's worth adding both;  `LyricsReader` is structured so each source is its own small function.
 4. **Synced (word/line-timed) lyrics** — some files carry a synced `SYLT` ID3
    frame instead of (or alongside) `USLT`. If you want the karaoke-style
    highlight-as-it-plays effect Gramophone has, that's the frame to parse next,

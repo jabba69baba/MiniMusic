@@ -1,9 +1,6 @@
 package com.example.minimusic.ui.components
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -30,9 +27,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -43,6 +42,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.minimusic.data.PaletteStyle
+import com.example.minimusic.data.model.Song
 import com.example.minimusic.playback.PlaybackUiState
 import com.example.minimusic.ui.theme.MiniMusicMotion
 import com.example.minimusic.ui.theme.rememberArtColorRoles
@@ -99,12 +101,34 @@ fun MiniPlayer(
     val hapticsEnabled = LocalMiniMusicHaptics.current
     val song = playbackState.currentSong
     val isPlaying = playbackState.isPlaying
-    var lastDirectionIndex by remember { mutableIntStateOf(playbackState.currentIndex) }
-    // MiniPlayer only exposes Next, so it always uses the forward vertical
-    // handoff. Previous-direction logic belongs exclusively to PlayerScreen.
-    val trackTransitionDirection = 1
-    androidx.compose.runtime.SideEffect {
-        lastDirectionIndex = playbackState.currentIndex
+    // Film-strip slots for track changes: the outgoing song stays composed in
+    // slot 0 while the incoming one travels in from slot 1, both driven by one
+    // shared spring — the exact motion clock and geometry the full player's
+    // artwork/title strips use (horizontal, never vertical).
+    var stripSlots by remember { mutableStateOf<List<Song>>(listOfNotNull(song)) }
+    var stripLastSong by remember { mutableStateOf<Song?>(song) }
+    val stripProgress = remember { Animatable(0f) }
+    var stripWidthPx by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(song?.id) {
+        val incoming = song
+        if (incoming == null) {
+            stripSlots = emptyList()
+            stripLastSong = null
+            stripProgress.snapTo(0f)
+            return@LaunchedEffect
+        }
+        val outgoing = stripLastSong?.takeIf { it.id != incoming.id }
+        stripLastSong = incoming
+        if (outgoing != null) {
+            stripSlots = listOf(outgoing, incoming)
+            stripProgress.snapTo(0f)
+            stripProgress.animateTo(1f, MiniMusicMotion.carouselSpatial())
+        }
+        // Collapse back to the single resting slot and reset the clock; both
+        // writes land before the next frame, so the incoming row never blinks.
+        stripSlots = listOf(incoming)
+        stripProgress.snapTo(0f)
     }
     val positionMs = playbackState.positionMs
     val durationMs = playbackState.durationMs
@@ -155,53 +179,75 @@ fun MiniPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Keyed so a new bitmap never cross-dissolves over the old
-                // tile: the art swaps the instant its request resolves.
-                //
-                // No fades here. The guide is explicit that content should not
-                // be seen partially transparent and overlapping — "fully fade out
-                // content before fading new content in… avoid showing cross faded
-                // content" — which is what the previous fadeIn(180)/fadeOut(120)
-                // pair produced for 120ms on every track change. Both rows now
-                // travel on one axis and one clock, the incoming one arriving as
-                // the outgoing one leaves, which is the same film-strip motion the
-                // full player's artwork and title strips already use
-                // ([MiniMusicMotion.carouselSpatial] — critically damped, so a
-                // rapid skip burst never bounces).
-                AnimatedContent(
-                    targetState = song,
-                    transitionSpec = {
-                        slideInVertically(
-                            initialOffsetY = { trackTransitionDirection * it },
-                            animationSpec = MiniMusicMotion.carouselSpatial()
-                        ) togetherWith slideOutVertically(
-                            targetOffsetY = { -trackTransitionDirection * it },
-                            animationSpec = MiniMusicMotion.carouselSpatial()
-                        )
-                    },
-                    contentKey = { it?.id },
-                    label = "miniPlayerTrackSwitch",
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                ) { displayedSong ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MiniPlayerArt(artUri = displayedSong?.albumArtUri)
-                        Column(Modifier.weight(1f).clipToBounds()) {
-                            Text(
-                                text = displayedSong?.title ?: "What's the vibe?",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Normal,
-                                color = artColors.onPrimaryContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip,
-                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
-                            )
-                            // Emphasis comes from the role, not from a weight
-                            // bolted onto the body scale: the supporting line
-                            // is bodyMedium and stays regular, separated from
-                            // the title by size and color. 80% keeps it visibly
-                            // secondary while clearing the 4.5:1 contrast floor
-                            // the spec sets for small text.
-                            Text(text = displayedSong?.artist ?: "Tap a song to listen", style = MaterialTheme.typography.bodyMedium, color = artColors.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // One clip box holds the strip: each slot sits (slot − progress)
+                // full widths away on the graphicsLayer, so the incoming row
+                // arrives exactly as the outgoing one leaves — the same
+                // horizontal film-strip geometry and shared
+                // [MiniMusicMotion.carouselSpatial] spring the full player's
+                // artwork and title strips use. No fades, no vertical travel,
+                // no competing per-track clocks.
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .onSizeChanged { stripWidthPx = it.width }
+                        .clipToBounds()
+                ) {
+                    if (stripSlots.isEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            MiniPlayerArt(artUri = null)
+                            Column(Modifier.weight(1f).clipToBounds()) {
+                                Text(
+                                    text = "What's the vibe?",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Normal,
+                                    color = artColors.onPrimaryContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Clip
+                                )
+                                Text(
+                                    text = "Tap a song to listen",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = artColors.onPrimaryContainer.copy(alpha = 0.8f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    stripSlots.forEachIndexed { slot, displayedSong ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationX = (slot - stripProgress.value) * stripWidthPx
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            MiniPlayerArt(artUri = displayedSong.albumArtUri)
+                            Column(Modifier.weight(1f).clipToBounds()) {
+                                Text(
+                                    text = displayedSong.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Normal,
+                                    color = artColors.onPrimaryContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Clip,
+                                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 900, initialDelayMillis = 700, velocity = 19.dp)
+                                )
+                                // Emphasis comes from the role, not from a weight
+                                // bolted onto the body scale: the supporting line
+                                // is bodyMedium and stays regular, separated from
+                                // the title by size and color. 80% keeps it visibly
+                                // secondary while clearing the 4.5:1 contrast floor
+                                // the spec sets for small text.
+                                Text(text = displayedSong.artist, style = MaterialTheme.typography.bodyMedium, color = artColors.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
