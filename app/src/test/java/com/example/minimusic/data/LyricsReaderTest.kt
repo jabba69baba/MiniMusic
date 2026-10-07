@@ -1,14 +1,27 @@
 package com.example.minimusic.data
 
-import android.content.Context
-import io.mockk.mockk
-import java.io.ByteArrayInputStream
+import androidx.media3.common.MimeTypes
+import androidx.media3.extractor.metadata.vorbis.VorbisComment
+import com.example.minimusic.data.lyrics.LrcTestData
+import com.example.minimusic.data.lyrics.LrcTestData2
+import com.example.minimusic.data.lyrics.LrcUtils
+import com.example.minimusic.data.lyrics.SemanticLyrics
+import com.example.minimusic.data.lyrics.SemanticLyrics.SyncedLyrics
+import com.example.minimusic.data.lyrics.SemanticLyrics.UnsyncedLyrics
+import com.example.minimusic.data.lyrics.SpeakerEntity
+import com.example.minimusic.data.lyrics.bestCandidate
+import com.example.minimusic.data.lyrics.toLyricsText
 import java.io.ByteArrayOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LyricsReaderTest {
+
     @Test
     fun removesLrcMetadataHeadersFromEmbeddedText() {
         val input = """
@@ -40,297 +53,630 @@ class LyricsReaderTest {
         assertNull(cleanLyricsTextTopLevel("[ti:After Dark]\n[ar:Mr.Kitty]\n[offset:0]"))
     }
 
+    // ---- Gramophone's LrcUtils parser suite (GPL-3.0) ----
+
+    private fun parse(
+        lrcContent: String,
+        trim: Boolean? = null,
+        multiline: Boolean? = null,
+        mustSkip: Boolean? = false
+    ): SemanticLyrics? {
+        if (trim == null) {
+            val a = parse(lrcContent, false, multiline, mustSkip)
+            val b = parse(lrcContent, true, multiline, mustSkip)
+            assertFalse(
+                a is SyncedLyrics != b is SyncedLyrics,
+                "trim false and true should result in same type of lyrics"
+            )
+            if (b is SyncedLyrics) {
+                assertEquals(
+                    (a as SyncedLyrics).text,
+                    b.text,
+                    "trim false and true should result in same list for this string"
+                )
+            } else {
+                assertEquals(
+                    a?.unsyncedText,
+                    b?.unsyncedText,
+                    "trim false and true should result in same list for this string"
+                )
+            }
+            return a
+        }
+        if (multiline == null) {
+            val a = parse(lrcContent, trim, false, mustSkip)
+            val b = parse(lrcContent, trim, true, mustSkip)
+            assertFalse(
+                a is SyncedLyrics != b is SyncedLyrics,
+                "multiline false and true should result in same type of lyrics (trim=$trim)"
+            )
+            if (b is SyncedLyrics) {
+                assertEquals(
+                    (a as SyncedLyrics).text,
+                    b.text,
+                    "multiline false and true should result in same list for this string (trim=$trim)"
+                )
+            } else {
+                assertEquals(
+                    a?.unsyncedText,
+                    b?.unsyncedText,
+                    "multiline false and true should result in same list for this string (trim=$trim)"
+                )
+            }
+            return a
+        }
+        val a = LrcUtils.parseLyrics(
+            lrcContent,
+            MimeTypes.AUDIO_FLAC,
+            LrcUtils.LrcParserOptions(trim, multiline, null),
+            null
+        )
+        if (mustSkip != null) {
+            if (mustSkip) {
+                assertTrue(a is UnsyncedLyrics, "expected skip (trim=$trim multiline=$multiline)")
+            } else {
+                assertFalse(a is UnsyncedLyrics, "expected no skip (trim=$trim multiline=$multiline)")
+            }
+        }
+        return a
+    }
+
+    private fun parseSynced(
+        lrcContent: String,
+        trim: Boolean? = null,
+        multiline: Boolean? = null
+    ): List<SemanticLyrics.LyricLine>? {
+        return (parse(lrcContent, trim, multiline, mustSkip = false) as SyncedLyrics?)?.text
+    }
+
     @Test
-    fun decodesSyltFrameIntoTimedLrcLines() {
-        val tag = id3v23Tag(
-            "SYLT" to syltBody(
-                entries = listOf("Hello there" to 0, "Second line" to 15_000),
-                descriptor = "synced"
+    fun emptyInEmptyOut() {
+        val emptyLrc = parse("")
+        assertNull(emptyLrc)
+    }
+
+    @Test
+    fun blankInEmptyOut() {
+        val blankLrc = parse("   \t  \n    ")
+        assertNull(blankLrc)
+    }
+
+    @Test
+    fun testShortLrc() {
+        val lrc = parseSynced("[11:22.33]hello")
+        assertNotNull(lrc)
+        assertEquals(1, lrc!!.size)
+        assertEquals("hello", lrc[0].text)
+        assertEquals(682330uL, lrc[0].start)
+    }
+
+    @Test
+    fun testTemplateLrc1() {
+        val lrc = parseSynced(LrcTestData.AS_IT_WAS)
+        assertNotNull(lrc)
+        assertEquals(LrcTestData.AS_IT_WAS_PARSED, lrc)
+    }
+
+    @Test
+    fun testTemplateLrcSyntheticNewlines() {
+        val lrcS = parseSynced("[11:22.33]hello\ngood morning[33:44.55]how are you?", multiline = false)
+        assertNotNull(lrcS)
+        val lrcM = parseSynced("[11:22.33]hello\ngood morning[33:44.55]how are you?", multiline = true)
+        assertNotNull(lrcM)
+        assertNotEquals(lrcS!!, lrcM!!)
+        assertEquals(2, lrcS.size)
+        assertEquals(2, lrcM.size)
+        assertEquals("hello", lrcS[0].text)
+        assertEquals("hello\ngood morning", lrcM[0].text)
+        assertEquals("how are you?", lrcS[1].text)
+        assertEquals("how are you?", lrcM[1].text)
+    }
+
+    @Test
+    fun testTemplateLrc2() {
+        val lrc = parseSynced("[11:22.33]hello\n[33:44.55]good morning")
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.size)
+        assertEquals("hello", lrc[0].text)
+        assertEquals("good morning", lrc[1].text)
+    }
+
+    @Test
+    fun testTemplateLrcTrimToggle() {
+        val a = parseSynced(LrcTestData.AS_IT_WAS_NO_TRIM, trim = false)
+        val b = parseSynced(LrcTestData.AS_IT_WAS_NO_TRIM, trim = true)
+        assertEquals(LrcTestData.AS_IT_WAS_NO_TRIM_PARSED_FALSE, a)
+        assertEquals(LrcTestData.AS_IT_WAS_NO_TRIM_PARSED_TRUE, b)
+    }
+
+    @Test
+    fun testTemplateLrcTranslate2Compressed() {
+        val lrc = parseSynced(LrcTestData.DREAM_THREAD)
+        assertNotNull(lrc)
+        assertEquals(LrcTestData.DREAM_THREAD_PARSED, lrc)
+    }
+
+    @Test
+    fun testTemplateLrcZeroTimestamps() {
+        // An all-zero LRC is invalid and gets skipped: what comes back is the
+        // untimed text, in order, exactly as Gramophone's suite expects.
+        val lrc = parse(
+            LrcTestData.AS_IT_WAS.replace(
+                "\\[(\\d{2}):(\\d{2})([.:]\\d+)?]".toRegex(),
+                "[00:00.00]"
+            ), mustSkip = true
+        )
+        assertNotNull(lrc)
+        assertEquals(
+            LrcTestData.AS_IT_WAS_PARSED.map { it.text },
+            lrc!!.unsyncedText.map { it.first }
+        )
+    }
+
+    @Test
+    fun testSyntheticNewLineMultiLineParser() {
+        val lrcS = parseSynced("[11:22.33]hello\ngood morning[33:44.55]how are you?", multiline = false)
+        assertNotNull(lrcS)
+        val lrcM = parseSynced("[11:22.33]hello\ngood morning[33:44.55]how are you?", multiline = true)
+        assertNotNull(lrcM)
+        assertNotEquals(lrcS!!, lrcM!!)
+        assertEquals(2, lrcS.size)
+        assertEquals(2, lrcM.size)
+        assertEquals("hello", lrcS[0].text)
+        assertEquals("hello\ngood morning", lrcM[0].text)
+        assertEquals("how are you?", lrcS[1].text)
+        assertEquals("how are you?", lrcM[1].text)
+    }
+
+    @Test
+    fun testSimpleMultiLineParser() {
+        val lrcS = parseSynced("[11:22.33]hello\ngood morning\n[33:44.55]how are you?", multiline = false)
+        assertNotNull(lrcS)
+        val lrcM = parseSynced("[11:22.33]hello\ngood morning\n[33:44.55]how are you?", multiline = true)
+        assertNotNull(lrcM)
+        assertNotEquals(lrcS!!, lrcM!!)
+        assertEquals(2, lrcS.size)
+        assertEquals(2, lrcM.size)
+        assertEquals("hello", lrcS[0].text)
+        assertEquals("hello\ngood morning", lrcM[0].text)
+        assertEquals("how are you?", lrcS[1].text)
+        assertEquals("how are you?", lrcM[1].text)
+    }
+
+    @Test
+    fun testLongSyncTimestamp() {
+        val lrc = parseSynced("[101:56:78]One two three\n[1234:56:78]Four five six")
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.size)
+        assertEquals("One two three", lrc[0].text)
+        assertEquals(6116780uL, lrc[0].start)
+        assertEquals("Four five six", lrc[1].text)
+        assertEquals(74096780uL, lrc[1].start)
+    }
+
+    @Test
+    fun testOffsetMultiLineParser() {
+        val lrc = parseSynced(
+            "[offset:+3][00:00.004]hello\ngood morning\n[00:00.005]how are you?",
+            multiline = true
+        )
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.size)
+        assertEquals("hello\ngood morning", lrc[0].text)
+        assertEquals(1uL, lrc[0].start)
+        assertEquals("how are you?", lrc[1].text)
+        assertEquals(2uL, lrc[1].start)
+    }
+
+    @Test
+    fun testBogusOffsetMultiLineParser() {
+        val lrc = parseSynced(
+            "[offset:+200][00:00.004]hello\ngood morning\n[00:00.005]how are you?",
+            multiline = true
+        )
+        assertNotNull(lrc)
+        assertEquals(2, lrc.size)
+        assertEquals("hello\ngood morning", lrc[0].text)
+        assertEquals(0uL, lrc[0].start)
+        assertEquals("how are you?", lrc[1].text)
+        assertEquals(0uL, lrc[1].start)
+    }
+
+    @Test
+    fun testNegativeOffsetMultiLineParser() {
+        val lrc = parseSynced(
+            "[offset:-200][00:00.004]hello\ngood morning\n[00:00.005]how are you?",
+            multiline = true
+        )
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.size)
+        assertEquals("hello\ngood morning", lrc[0].text)
+        assertEquals(204uL, lrc[0].start)
+        assertEquals("how are you?", lrc[1].text)
+        assertEquals(205uL, lrc[1].start)
+    }
+
+    @Test
+    fun testDualOffsetMultiLineParser() {
+        val lrc = parseSynced(
+            "[offset:-200][00:00.004]hello\ngood morning\n[offset:+3][00:00.005]how are you?",
+            multiline = true
+        )
+        assertNotNull(lrc)
+        assertEquals(2, lrc.size)
+        assertEquals("how are you?", lrc[0].text)
+        assertEquals(2uL, lrc[0].start)
+        assertEquals("hello\ngood morning", lrc[1].text)
+        assertEquals(204uL, lrc[1].start)
+    }
+
+    @Test
+    fun testEmptyLyricNoTranslation() {
+        val lrc = parseSynced(
+            "[00:00.29]It's hard to breathe but that's alright\n[00:04.45]\n[00:04.45]Hush\n[00:14.23]\n[00:16.25]Shh"
+        )
+        assertNotNull(lrc)
+        assertEquals(5, lrc!!.size)
+
+        assertEquals("It's hard to breathe but that's alright", lrc[0].text)
+        assertEquals(290uL, lrc[0].start)
+        assertFalse(lrc[0].isTranslated)
+        assertEquals("", lrc[1].text)
+        assertEquals(4450uL, lrc[1].start)
+        assertFalse(lrc[1].isTranslated)
+        assertEquals("Hush", lrc[2].text)
+        assertEquals(4450uL, lrc[2].start)
+        assertFalse(lrc[2].isTranslated)
+        assertEquals("", lrc[3].text)
+        assertEquals(14230uL, lrc[3].start)
+        assertFalse(lrc[3].isTranslated)
+        assertEquals("Shh", lrc[4].text)
+        assertEquals(16250uL, lrc[4].start)
+        assertFalse(lrc[4].isTranslated)
+    }
+
+    @Test
+    fun testOnlyWordSyncPoints() {
+        val lrc = parseSynced("<00:00.02>a<00:01.00>l\n<00:03.00>b")
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.size)
+        assertEquals("al", lrc[0].text)
+        assertEquals(20uL, lrc[0].start)
+        assertEquals("b", lrc[1].text)
+        assertEquals(3000uL, lrc[1].start)
+    }
+
+    @Test
+    fun testOneLineOneWord() {
+        val lrc = parseSynced("[00:00.02]<00:00.02>a<00:01.00>")
+        assertNotNull(lrc)
+        assertEquals(1, lrc.size)
+        assertEquals("a", lrc[0].text)
+        assertNotNull(lrc[0].words)
+        assertEquals(1, lrc[0].words!!.size)
+        assertEquals(0..<1, lrc[0].words!![0].charRange)
+        assertEquals(20uL..<1000uL, lrc[0].words!![0].timeRange)
+    }
+
+    @Test
+    fun testTemplateLrcRenderBenchmark() {
+        val lrc = parseSynced(LrcTestData2.RENDER_BENCHMARK, trim = false)
+        assertNotNull(lrc)
+        assertEquals(LrcTestData2.RENDER_BENCHMARK_PARSED, lrc)
+    }
+
+    @Test
+    fun testTemplateLrcTranslationType1() {
+        val lrc = parseSynced(LrcTestData.ALL_STAR)
+        assertNotNull(lrc)
+        // Gramophone's fixture predates the hide-same-translations filter: it
+        // still contains the empty translated line at 24.3s, which the current
+        // filter (faithfully ported here) drops because it repeats the empty
+        // original directly above it. Everything else must match verbatim.
+        assertEquals(
+            LrcTestData.ALL_STAR_PARSED.filterNot { it.isTranslated && it.text.isEmpty() },
+            lrc
+        )
+    }
+
+    @Test
+    fun testTemplateLrcExtendedAppleTrimToggle() {
+        val lrc = parseSynced(LrcTestData.AM_I_DREAMING, trim = false)
+        val lrc2 = parseSynced(LrcTestData.AM_I_DREAMING, trim = true)
+        assertNotNull(lrc)
+        assertEquals(LrcTestData.AM_I_DREAMING_PARSED_NO_TRIM, lrc)
+        assertEquals(LrcTestData.AM_I_DREAMING_PARSED_TRIM, lrc2)
+    }
+
+    @Test
+    fun testCompressedWordScaling() {
+        val lrc = parseSynced("[00:00.100][00:10.100]hello<00:00.200>world<00:01.00>lol")
+        assertNotNull(lrc)
+        assertEquals(2, lrc!!.size)
+        assertEquals(100uL, lrc[0].start)
+        assertEquals(10100uL, lrc[1].start)
+        assertEquals(10099uL, lrc[0].end)
+        assertEquals(11270uL, lrc[1].end)
+        assertNotNull(lrc[0].words)
+        assertEquals(3, lrc[0].words!!.size)
+        assertEquals(100uL, lrc[0].words!![0].timeRange.first)
+        assertEquals(200uL - 1uL, lrc[0].words!![0].timeRange.last)
+        assertEquals(200uL, lrc[0].words!![1].timeRange.first)
+        assertEquals(1000uL - 1uL, lrc[0].words!![1].timeRange.last)
+        assertEquals(1000uL, lrc[0].words!![2].timeRange.first)
+        assertEquals(10099uL, lrc[0].words!![2].timeRange.last)
+        assertEquals(10100uL, lrc[1].start)
+        assertNotNull(lrc[1].words)
+        assertEquals(3, lrc[1].words!!.size)
+        assertEquals(10100uL, lrc[1].words!![0].timeRange.first)
+        assertEquals(10200uL - 1uL, lrc[1].words!![0].timeRange.last)
+        assertEquals(10200uL, lrc[1].words!![1].timeRange.first)
+        assertEquals(11000uL - 1uL, lrc[1].words!![1].timeRange.last)
+        assertEquals(11000uL, lrc[1].words!![2].timeRange.first)
+        assertEquals(11270uL, lrc[1].words!![2].timeRange.last)
+    }
+
+    @Test
+    fun testCompressedWithSpaces() {
+        assertEquals(
+            parseSynced("[00:01.00][00:20.01][00:99.00]Can we find a way back?"),
+            parseSynced("[00:01.00] [00:20.01] [00:99.00]Can we find a way back?")
+        )
+    }
+
+    @Test
+    fun testBidirectionalWordSplitting() {
+        parseSynced("[00:13.00] <00:13.00>یکtwo", trim = false) // must not crash
+        val lrc = parseSynced("[00:13.00] <00:13.00>یکtwo", trim = true)
+        assertNotNull(lrc)
+        assertEquals(1, lrc.size)
+        assertNotNull(lrc[0].words)
+        assertEquals(2, lrc[0].words!!.size)
+        assertEquals(0..<2, lrc[0].words!![0].charRange)
+        assertEquals(2..<5, lrc[0].words!![1].charRange)
+    }
+
+    @Test
+    fun testParserSkippedHello() {
+        parse("hello", mustSkip = true)
+    }
+
+    @Test
+    fun testParserSkipped2() {
+        parse("2", mustSkip = true)
+    }
+
+    @Test
+    fun testParserSkippedDoesNotEatNewlines() {
+        assertEquals(listOf("Hello" to null, "" to null, "It's me" to null),
+            parse("Hello\n\nIt's me", mustSkip = true)!!.unsyncedText)
+        assertEquals(listOf("Hello" to null, "" to null, "It's me" to null, "" to null),
+            parse("Hello\n\nIt's me\n", mustSkip = true)!!.unsyncedText)
+    }
+
+    @Test
+    fun testParserTtmlTemplate() {
+        val ttml = parseSynced(LrcTestData2.TTML_DEATH_BED)
+        assertEquals(LrcTestData2.TTML_DEATH_BED_PARSED, ttml)
+    }
+
+    @Test
+    fun testParserTtmlTemplate2() {
+        val ttml = parseSynced(LrcTestData2.TTML_SATISIFED)
+        assertEquals(LrcTestData2.TTML_SATISFIED_PARSED, ttml)
+    }
+
+    @Test
+    fun tsZeroIsNotTranslated() {
+        val lrc = parseSynced("[00:00.00]hello[00:01.00]bye")
+        assertNotNull(lrc)
+        assertEquals(2, lrc.size)
+        assertEquals("hello", lrc[0].text)
+        assertEquals("bye", lrc[1].text)
+        assert(!lrc[0].isTranslated)
+        assert(!lrc[1].isTranslated)
+    }
+
+    @Test
+    fun voiceInsteadOfVoice1WhenNoVoice2() {
+        val lrc = parseSynced("[00:00.00]v1:hello\n[bg:[00:01.00]bye]")
+        assertNotNull(lrc)
+        assertEquals(2, lrc.size)
+        assertEquals("hello", lrc[0].text)
+        assertEquals("bye", lrc[1].text)
+        assertEquals(SpeakerEntity.Voice, lrc[0].speaker)
+        assertEquals(SpeakerEntity.VoiceBackground, lrc[1].speaker)
+    }
+
+    @Test
+    fun voice1WhenThereIsVoice2() {
+        val lrc = parseSynced(
+            "[00:00.00]v1:hello\n[bg:[00:01.00]bye]\n[00:02.00]v2:hello\n[bg:[00:03.00]bye]"
+        )
+        assertNotNull(lrc)
+        assertEquals(4, lrc.size)
+        assertEquals("hello", lrc[0].text)
+        assertEquals("bye", lrc[1].text)
+        assertEquals("hello", lrc[2].text)
+        assertEquals("bye", lrc[3].text)
+        assertEquals(SpeakerEntity.Voice1, lrc[0].speaker)
+        assertEquals(SpeakerEntity.Voice1Background, lrc[1].speaker)
+        assertEquals(SpeakerEntity.Voice2, lrc[2].speaker)
+        assertEquals(SpeakerEntity.Voice2Background, lrc[3].speaker)
+    }
+
+    @Test
+    fun explicitEndFromWordRecognized() {
+        val lrc = parseSynced("[00:00.00][00:10.00]<00:01.00>hello<00:02.00><00:03.00>")
+        assertNotNull(lrc)
+        assertEquals(2, lrc.size)
+        assertEquals("hello", lrc[0].text)
+        assertEquals(0uL, lrc[0].start)
+        assertNotNull(lrc[0].words)
+        assertEquals(1, lrc[0].words!!.size)
+        assertEquals(1000uL..1999uL, lrc[0].words!![0].timeRange)
+        assertEquals(2999uL, lrc[0].end)
+        assertEquals("hello", lrc[1].text)
+        assertEquals(10000uL, lrc[1].start)
+        assertNotNull(lrc[1].words)
+        assertEquals(1, lrc[1].words!!.size)
+        assertEquals(11000uL..11999uL, lrc[1].words!![0].timeRange)
+        assertEquals(12999uL, lrc[1].end)
+    }
+
+    // ---- Embedded metadata path (synthetic Media3 Metadata) ----
+
+    @Test
+    fun extractSyLtBinaryFrameIsParsedAsSyncedLyrics() {
+        // SYLT line breaks live at the start of the following entry (ID3 spec,
+        // as the decoder expects): "Hello" then "\nWorld".
+        val metadata = createMetadata(
+            BinaryFrame("SYLT", makeSyltBody(listOf("Hello" to 0, "\nWorld" to 5_000), "test"))
+        )
+        val result = LrcUtils.extractAndParseLyrics(44100, MimeTypes.AUDIO_MPEG, metadata, LrcUtils.LrcParserOptions(true, true, null))
+        assertTrue(result.isNotEmpty())
+        assertTrue(result[0] is SyncedLyrics)
+        assertEquals(listOf("Hello", "World"), (result[0] as SyncedLyrics).text.map { it.text })
+    }
+
+    @Test
+    fun vorbisCommentLyricsAreParsed() {
+        val metadata = createMetadata(VorbisComment("LYRICS", "Line one\nLine two"))
+        val result = LrcUtils.extractAndParseLyrics(44100, MimeTypes.AUDIO_FLAC, metadata, LrcUtils.LrcParserOptions(true, true, null))
+        assertTrue(result.isNotEmpty())
+        // A Vorbis LYRICS comment is plain text: it lands unsynced.
+        val unsynced = result[0] as UnsyncedLyrics
+        assertEquals(listOf("Line one" to null, "Line two" to null), unsynced.unsyncedText)
+    }
+
+    @Test
+    fun mpegUsltFrameIsParsed() {
+        val metadata = createMetadata(BinaryFrame("USLT", makeUsltBody("Lyric line")))
+        val result = LrcUtils.extractAndParseLyrics(44100, MimeTypes.AUDIO_MPEG, metadata, LrcUtils.LrcParserOptions(true, true, null))
+        assertTrue(result.isNotEmpty())
+        // USLT is plain text: it comes back unsynced, rendered as-is by the screen.
+        val unsynced = result[0] as UnsyncedLyrics
+        assertEquals(listOf("Lyric line" to null), unsynced.unsyncedText)
+    }
+
+    @Test
+    fun bestCandidatePrefersWordTimedOverPlain() {
+        val metadata = createMetadata(
+            BinaryFrame("SYLT", makeSyltBody(listOf("Word-timed" to 100), "test")),
+            USLT(BinaryFrame("USLT", makeUsltBody("plain text")))
+        )
+        val result = LrcUtils.extractAndParseLyrics(44100, MimeTypes.AUDIO_MPEG, metadata, LrcUtils.LrcParserOptions(true, true, null))
+        val best = result.bestCandidate()
+        assertNotNull(best)
+        assertTrue(best is SyncedLyrics)
+        assertEquals("Word-timed", (best as SyncedLyrics).text.first().text)
+    }
+
+    @Test
+    fun rendererEmitsDisplayReadyLrc() {
+        val text = SyncedLyrics(
+            listOf(
+                SemanticLyrics.LyricLine(
+                    text = "Hello", start = 0uL, end = 1000uL, endIsImplicit = false,
+                    words = null, speaker = null, isTranslated = false
+                )
             )
         )
-
-        assertEquals(
-            "[00:00.00]Hello there\n[00:15.00]Second line",
-            reader().parseId3Lyrics(ByteArrayInputStream(tag))
-        )
+        assertEquals("[00:00.00]Hello", text.toLyricsText())
     }
 
     @Test
-    fun decodesSyltFrameWithEmptyDescriptor() {
-        // Regression: the timestamp format used to be read from byte 6 (the
-        // descriptor's first byte), so spec-compliant frames with an empty
-        // descriptor decoded to nothing at all.
-        val tag = id3v23Tag(
-            "SYLT" to syltBody(entries = listOf("Only line" to 12_340), descriptor = "")
-        )
-
-        assertEquals(
-            "[00:12.34]Only line",
-            reader().parseId3Lyrics(ByteArrayInputStream(tag))
-        )
+    fun rendererJoinsUnsyncedText() {
+        val text = UnsyncedLyrics(listOf("First line" to null, "Second line" to null))
+        assertEquals("First line\nSecond line", text.toLyricsText())
     }
 
     @Test
-    fun prefersSyltOverUsltWhenBothFramesExist() {
-        val tag = id3v23Tag(
-            "USLT" to usltBody("plain unsynced text"),
-            "SYLT" to syltBody(entries = listOf("Timed line" to 5_000), descriptor = "")
+    fun bestCandidateFallsBackToPlainWhenNoTimed() {
+        val metadata = createMetadata(
+            USLT(BinaryFrame("USLT", makeUsltBody("plain lyrics")))
         )
+        val result = LrcUtils.extractAndParseLyrics(44100, MimeTypes.AUDIO_MPEG, metadata, LrcUtils.LrcParserOptions(true, true, null))
+        assertEquals("plain lyrics", result.bestCandidate()?.toLyricsText())
+    }
 
-        assertEquals(
-            "[00:05.00]Timed line",
-            reader().parseId3Lyrics(ByteArrayInputStream(tag))
+    @Test
+    fun parseLrcKeepsTimestampsAndDropsMetadata() {
+        val input = "[ti:After Dark]\n[offset:0]\n[00:00.10]Actual lyric"
+        val lyrics = LrcUtils.parseLyrics(input, null, LrcUtils.LrcParserOptions(true, true, null), null)
+        assertNotNull(lyrics)
+        val synced = lyrics as SyncedLyrics
+        assertEquals(1, synced.text.size)
+        assertEquals("Actual lyric", synced.text[0].text)
+        assertEquals(100uL, synced.text[0].start)
+    }
+
+    private fun createMetadata(vararg entries: Any): androidx.media3.common.Metadata {
+        val list = entries.map { it as androidx.media3.common.Metadata.Entry }.toMutableList()
+        return androidx.media3.common.Metadata(list)
+    }
+
+    private fun BinaryFrame(id: String, data: ByteArray) =
+        androidx.media3.extractor.metadata.id3.BinaryFrame(id, data)
+
+    private fun USLT(frame: androidx.media3.extractor.metadata.id3.BinaryFrame) = frame
+
+    /**
+     * ID3v2.4 USLT frame body: [encoding][language(3)][descriptor \0][text].
+     * Encoding 3 = UTF-8, whose delimiter is a single zero byte.
+     */
+    private fun makeUsltBody(text: String): ByteArray {
+        val header = byteArrayOf(
+            3, // UTF-8 encoding
+            'e'.code.toByte(), 'n'.code.toByte(), 'g'.code.toByte(), // ISO-639-2 language
+            0 // empty content descriptor, terminated
         )
-    }
-
-    @Test
-    fun fallsBackToUsltWhenSyltUsesTickTimestamps() {
-        // Timestamp format $01 (MPEG frames) cannot be converted to ms without
-        // the frame rate — the SYLT frame is dropped and plain USLT must win.
-        val tag = id3v23Tag(
-            "SYLT" to syltBody(entries = listOf("Tick line" to 1), descriptor = "", timestampFormat = 1),
-            "USLT" to usltBody("plain unsynced text")
-        )
-
-        assertEquals("plain unsynced text", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
-    }
-
-    @Test
-    fun parsesUsltFromTagWithUnsynchronisation() {
-        // A tag-level unsync flag stores the payload with 0x00 inserted after
-        // every 0xFF. Without decoding that first, the frame walk lands
-        // mid-header and the USLT frame behind it is never found.
-        val frames = v23Frame("TIT2", byteArrayOf(0x00, 0xFF.toByte(), 0x41)) +
-            v23Frame("USLT", usltBody("unsync survivor"))
-        val tag = id3TagWith(flags = 0x80, storedPayload = applyUnsync(frames))
-
-        assertEquals("unsync survivor", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
-    }
-
-    @Test
-    fun parsesTagWithExtendedHeader() {
-        // v2.3 extended header: size field excludes itself (6 bytes of flags +
-        // padding-size follow). Left unread, the first frame header lands
-        // mid-field and no lyric frame is found.
-        val ext = ByteArrayOutputStream().apply {
-            write(0); write(0); write(0); write(6) // size (excludes itself)
-            write(0); write(0)                     // extended flags
-            write(0); write(0); write(0); write(0) // size of padding
-        }
-        val payload = ext.toByteArray() + v23Frame("USLT", usltBody("behind extended header"))
-        val tag = id3TagWith(flags = 0x40, storedPayload = payload)
-
-        assertEquals("behind extended header", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
-    }
-
-    @Test
-    fun parsesV22UltFrame() {
-        // ID3v2.2 uses 3-byte frame ids ("ULT"/"SLT") and 6-byte frame
-        // headers; the old walker read 10-byte headers and never matched.
-        val body = usltBody("v22 lyrics")
-        val frame = ByteArrayOutputStream().apply {
-            write("ULT".toByteArray(Charsets.US_ASCII))
-            write((body.size ushr 16) and 0xFF)
-            write((body.size ushr 8) and 0xFF)
-            write(body.size and 0xFF)
-            write(body)
-        }
-        val tag = id3TagWith(flags = 0, storedPayload = frame.toByteArray(), version = 2)
-
-        assertEquals("v22 lyrics", reader().parseId3Lyrics(ByteArrayInputStream(tag)))
-    }
-
-    @Test
-    fun readsLyricsFromFlacVorbisComment() {
-        val flac = flacWithComments("LYRICS=[00:01.50]Line one\n[00:03.00]Line two")
-
-        assertEquals(
-            "[00:01.50]Line one\n[00:03.00]Line two",
-            reader().parseFlacLyrics(ByteArrayInputStream(flac))
-        )
-    }
-
-    @Test
-    fun prefersFlacSyncedLyricsOverPlainLyrics() {
-        // Order in the block must not decide: SYNCEDLYRICS wins even when the
-        // plain LYRICS comment appears first.
-        val flac = flacWithComments(
-            "LYRICS=plain text here",
-            "SYNCEDLYRICS=[00:00.50]Timed line"
-        )
-
-        assertEquals("[00:00.50]Timed line", reader().parseFlacLyrics(ByteArrayInputStream(flac)))
-    }
-
-    @Test
-    fun readsM4aCopyrightLyricAtom() {
-        val text = "[00:02.00]M4A line".toByteArray(Charsets.UTF_8)
-        val dataAtom = mp4Box("data", ByteArray(8) + text) // version/flags + locale
-        val lyricAtom = mp4BoxRaw(
-            byteArrayOf(0xA9.toByte(), 'l'.code.toByte(), 'y'.code.toByte(), 'r'.code.toByte()),
-            dataAtom
-        )
-        val meta = mp4Box("meta", ByteArray(4) + mp4Box("ilst", lyricAtom))
-        val file = mp4Box("ftyp", "isom".toByteArray(Charsets.US_ASCII) + ByteArray(4)) +
-            mp4Box("moov", mp4Box("udta", meta))
-
-        assertEquals("[00:02.00]M4A line", reader().parseMp4Lyrics(ByteArrayInputStream(file)))
-    }
-
-    private fun v23Frame(id: String, body: ByteArray): ByteArray {
-        val out = ByteArrayOutputStream()
-        out.write(id.toByteArray(Charsets.US_ASCII))
-        val size = body.size
-        out.write((size ushr 24) and 0xFF)
-        out.write((size ushr 16) and 0xFF)
-        out.write((size ushr 8) and 0xFF)
-        out.write(size and 0xFF)
-        out.write(0) // frame flags, byte 1
-        out.write(0) // frame flags, byte 2
-        out.write(body)
-        return out.toByteArray()
-    }
-
-    /** ID3 tag with explicit header flags; [storedPayload] is what the file
-     * holds (already unsynchronised if the flag says so). */
-    private fun id3TagWith(flags: Int, storedPayload: ByteArray, version: Int = 3): ByteArray {
-        val tag = ByteArrayOutputStream()
-        tag.write("ID3".toByteArray(Charsets.US_ASCII))
-        tag.write(version)
-        tag.write(0) // revision
-        tag.write(flags)
-        val size = storedPayload.size
-        tag.write((size ushr 21) and 0x7F)
-        tag.write((size ushr 14) and 0x7F)
-        tag.write((size ushr 7) and 0x7F)
-        tag.write(size and 0x7F)
-        tag.write(storedPayload)
-        return tag.toByteArray()
-    }
-
-    /** The ID3 unsynchronisation encoder: insert 0x00 after every 0xFF. */
-    private fun applyUnsync(data: ByteArray): ByteArray {
-        val out = ByteArrayOutputStream()
-        for (b in data) {
-            out.write(b.toInt() and 0xFF)
-            if (b == 0xFF.toByte()) out.write(0)
-        }
-        return out.toByteArray()
-    }
-
-    /** A minimal FLAC stream: magic + one last VORBIS_COMMENT block. */
-    private fun flacWithComments(vararg comments: String): ByteArray {
-        val block = ByteArrayOutputStream()
-        val vendor = "minimusic".toByteArray(Charsets.UTF_8)
-        writeLe32(block, vendor.size)
-        block.write(vendor)
-        writeLe32(block, comments.size)
-        for (comment in comments) {
-            val bytes = comment.toByteArray(Charsets.UTF_8)
-            writeLe32(block, bytes.size)
-            block.write(bytes)
-        }
-        val data = block.toByteArray()
-        val out = ByteArrayOutputStream()
-        out.write("fLaC".toByteArray(Charsets.US_ASCII))
-        out.write(0x84) // last metadata block | type 4 (VORBIS_COMMENT)
-        out.write((data.size ushr 16) and 0xFF)
-        out.write((data.size ushr 8) and 0xFF)
-        out.write(data.size and 0xFF)
-        out.write(data)
-        return out.toByteArray()
-    }
-
-    private fun writeLe32(out: ByteArrayOutputStream, value: Int) {
-        out.write(value and 0xFF)
-        out.write((value ushr 8) and 0xFF)
-        out.write((value ushr 16) and 0xFF)
-        out.write((value ushr 24) and 0xFF)
-    }
-
-    private fun mp4Box(type: String, content: ByteArray): ByteArray =
-        mp4BoxRaw(type.toByteArray(Charsets.US_ASCII), content)
-
-    private fun mp4BoxRaw(type: ByteArray, content: ByteArray): ByteArray {
-        val size = 8 + content.size
-        val out = ByteArrayOutputStream()
-        out.write((size ushr 24) and 0xFF)
-        out.write((size ushr 16) and 0xFF)
-        out.write((size ushr 8) and 0xFF)
-        out.write(size and 0xFF)
-        out.write(type)
-        out.write(content)
-        return out.toByteArray()
-    }
-
-    private fun reader() = LyricsReader(mockk<Context>(relaxed = true))
-
-    /** Builds an ID3v2.3 tag: 10-byte header + frames (10-byte frame headers,
-     * big-endian sizes) + padding. */
-    private fun id3v23Tag(vararg frames: Pair<String, ByteArray>): ByteArray {
-        val body = ByteArrayOutputStream()
-        for ((id, data) in frames) {
-            body.write(id.toByteArray(Charsets.US_ASCII))
-            val size = data.size
-            body.write((size ushr 24) and 0xFF)
-            body.write((size ushr 16) and 0xFF)
-            body.write((size ushr 8) and 0xFF)
-            body.write(size and 0xFF)
-            body.write(0) // frame flags, byte 1
-            body.write(0) // frame flags, byte 2
-            body.write(data)
-        }
-        val frameData = body.toByteArray()
-        val tag = ByteArrayOutputStream()
-        tag.write("ID3".toByteArray(Charsets.US_ASCII))
-        tag.write(3) // version 2.3
-        tag.write(0) // revision
-        tag.write(0) // flags: no unsynchronisation, no extended header
-        val tagSize = frameData.size
-        tag.write((tagSize ushr 21) and 0x7F) // header size is always synchsafe
-        tag.write((tagSize ushr 14) and 0x7F)
-        tag.write((tagSize ushr 7) and 0x7F)
-        tag.write(tagSize and 0x7F)
-        tag.write(frameData)
-        tag.write(ByteArray(16)) // padding, as real tags have
-        return tag.toByteArray()
+        return header + text.toByteArray(Charsets.UTF_8) + byteArrayOf(0)
     }
 
     /**
-     * SYLT frame body per ID3v2.3 §4.10 / ID3v2.4 §4.9: [encoding][language:3]
-     * [time stamp format][content type][descriptor, null-terminated][entries].
-     * Each entry is a null-terminated text + 4-byte big-endian timestamp.
+     * ID3v2.4 SYLT frame body: [encoding][language(3)][timestamp format]
+     * [content type][descriptor \0] then per line [text \0][timestamp (4, BE)].
+     * Timestamp format 2 = absolute milliseconds; content type 1 = lyrics.
      */
-    private fun syltBody(
-        entries: List<Pair<String, Int>>,
-        descriptor: String,
-        timestampFormat: Int = 2,
-    ): ByteArray {
-        val out = ByteArrayOutputStream()
-        out.write(3) // encoding: UTF-8
-        out.write("eng".toByteArray(Charsets.US_ASCII))
-        out.write(timestampFormat) // $02 = milliseconds, $01 = MPEG frames
-        out.write(1) // content type: lyrics
-        out.write(descriptor.toByteArray(Charsets.UTF_8))
-        out.write(0) // descriptor terminator
+    private fun makeSyltBody(entries: List<Pair<String, Long>>, descriptor: String): ByteArray {
+        val charset = Charsets.UTF_8
+        val builder = ByteArrayOutputStream()
+        builder.write(3) // UTF-8 encoding
+        builder.write("eng".toByteArray(Charsets.ISO_8859_1)) // language
+        builder.write(2) // timestamp format: absolute milliseconds
+        builder.write(1) // content type: lyrics
+        builder.write(descriptor.toByteArray(charset))
+        builder.write(0) // descriptor terminator (no length prefix in ID3)
         for ((text, ms) in entries) {
-            out.write(text.toByteArray(Charsets.UTF_8))
-            out.write(0)
-            out.write((ms ushr 24) and 0xFF)
-            out.write((ms ushr 16) and 0xFF)
-            out.write((ms ushr 8) and 0xFF)
-            out.write(ms and 0xFF)
+            builder.write(text.toByteArray(charset))
+            builder.write(0)
+            builder.write(((ms ushr 24) and 0xFF).toInt())
+            builder.write(((ms ushr 16) and 0xFF).toInt())
+            builder.write(((ms ushr 8) and 0xFF).toInt())
+            builder.write((ms and 0xFF).toInt())
         }
-        return out.toByteArray()
+        return builder.toByteArray()
     }
 
-    /** USLT frame body: [encoding][language:3][descriptor, null-terminated][text]. */
-    private fun usltBody(text: String): ByteArray {
-        val out = ByteArrayOutputStream()
-        out.write(3) // encoding: UTF-8
-        out.write("eng".toByteArray(Charsets.US_ASCII))
-        out.write(0) // empty descriptor, null-terminated
-        out.write(text.toByteArray(Charsets.UTF_8))
-        return out.toByteArray()
+    private fun lyricArrayToString(lrc: List<SemanticLyrics.LyricLine>?): String {
+        val str = StringBuilder()
+        if (lrc == null) {
+            str.appendLine("null")
+        } else {
+            str.appendLine("listOf(")
+            for (i in lrc) {
+                str.appendLine(
+                    "\tLyricLine(start = ${i.start}uL, text = \"\"\"${i.text}\"\"\", words = " +
+                        "${i.words?.let { "mutableListOf(" + it.joinToString { w ->
+                            "SemanticLyrics.Word(timeRange = ${w.timeRange.first}uL..${w.timeRange.last}uL, charRange = ${w.charRange.first}..${w.charRange.last}, isRtl = ${w.isRtl})"
+                        } + ")" } ?: "null"}, speaker = " +
+                        "${i.speaker?.name?.let { "SpeakerEntity.$it" } ?: "null"}, end = ${i.end}uL, isTranslated = ${i.isTranslated}, " +
+                        "endIsImplicit = ${i.endIsImplicit}),"
+                )
+            }
+            str.appendLine(")")
+        }
+        return str.toString()
     }
 }
