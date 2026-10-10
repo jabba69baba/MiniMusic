@@ -3,6 +3,10 @@ package com.example.minimusic.data
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.provider.MediaStore
+import android.util.Log
+import androidx.media3.extractor.metadata.id3.BinaryFrame
+import androidx.media3.extractor.metadata.id3.TextInformationFrame
+import androidx.media3.extractor.metadata.vorbis.VorbisComment
 import com.example.minimusic.data.lyrics.EmbeddedMetadataReader
 import com.example.minimusic.data.lyrics.LrcUtils
 import com.example.minimusic.data.lyrics.bestCandidate
@@ -11,6 +15,8 @@ import com.example.minimusic.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+
+private const val LYRICS_TAG = "MiniMusicLyrics"
 
 private val LrcMetadataTagRegex = Regex(
     "\\[(?:ti|ar|al|by|offset|re|ve|length|la|au|id|tool|title|artist|album|composer|genre|language)\\s*:[^]]*]",
@@ -51,11 +57,37 @@ class LyricsReader(private val context: Context) {
     private val parserOptions = LrcUtils.LrcParserOptions(trim = true, multiLine = true, errorText = null)
 
     suspend fun readLyrics(song: Song): String? = withContext(Dispatchers.IO) {
+        Log.i(LYRICS_TAG, "Reading lyrics for song ${song.id} (${song.title}, ${song.contentUri})")
         // Each stage falls through on its own: one parser failing must not abort the
-        // chain that would have succeeded on the next stage.
-        runCatching { readSidecarLrc(song) }.getOrNull()
-            ?: runCatching { readEmbeddedLyrics(song) }.getOrNull()
-            ?: runCatching { readContainerLyrics(song) }.getOrNull()
+        // chain that would have succeeded on the next stage. Every stage logs its
+        // outcome (or the exception) so "No embedded lyrics found" is diagnosable
+        // from logcat alone — previously all of this failed silently.
+        runCatching { readSidecarLrc(song) }
+            .onFailure { Log.w(LYRICS_TAG, "Sidecar lookup failed", it) }
+            .getOrNull()
+            ?.let {
+                Log.i(LYRICS_TAG, "Source: sidecar file (${it.length} chars)")
+                return@withContext it
+            }
+
+        runCatching { readEmbeddedLyrics(song) }
+            .onFailure { Log.w(LYRICS_TAG, "Embedded tag read failed", it) }
+            .getOrNull()
+            ?.let {
+                Log.i(LYRICS_TAG, "Source: embedded tags (${it.length} chars)")
+                return@withContext it
+            }
+
+        runCatching { readContainerLyrics(song) }
+            .onFailure { Log.w(LYRICS_TAG, "MediaMetadataRetriever read failed", it) }
+            .getOrNull()
+            ?.let {
+                Log.i(LYRICS_TAG, "Source: MediaMetadataRetriever (${it.length} chars)")
+                return@withContext it
+            }
+
+        Log.i(LYRICS_TAG, "Result: no lyrics found for song ${song.id}")
+        null
     }
 
     /**
@@ -75,15 +107,39 @@ class LyricsReader(private val context: Context) {
      * layer expects.
      */
     private fun readEmbeddedLyrics(song: Song): String? {
-        val audioMetadata = EmbeddedMetadataReader.read(context, song.contentUri) ?: return null
+        val audioMetadata = EmbeddedMetadataReader.read(context, song.contentUri)
+            ?: run {
+                Log.i(LYRICS_TAG, "Embedded: no tag metadata in container")
+                return null
+            }
+        // List which tags the container actually delivered — this is the single
+        // most useful line when a user's file "has lyrics but none show up":
+        // it shows exactly what the extractor found (or didn't).
+        val entries = (0 until audioMetadata.metadata.length()).joinToString(", ") { i ->
+            val e = audioMetadata.metadata.get(i)
+            when (e) {
+                is BinaryFrame -> "Binary:${e.id}"
+                is TextInformationFrame -> "Text:${e.id}"
+                is VorbisComment -> "Vorbis:${e.key}"
+                else -> e.javaClass.simpleName
+            }
+        }
+        Log.i(
+            LYRICS_TAG,
+            "Embedded: mime=${audioMetadata.sampleMimeType} sampleRate=${audioMetadata.sampleRate} tags=[$entries]"
+        )
         // Ranked candidate list (word-timed first). Null metadata means no lyric tags.
-        val best = LrcUtils.extractAndParseLyrics(
+        val candidates = LrcUtils.extractAndParseLyrics(
             audioMetadata.sampleRate,
             audioMetadata.sampleMimeType,
             audioMetadata.metadata,
             parserOptions
-        ).bestCandidate()
-        return best?.toLyricsText()?.let(::cleanLyricsTextTopLevel)
+        )
+        Log.i(LYRICS_TAG, "Embedded: ${candidates.size} lyrics candidate(s) decoded")
+        val best = candidates.bestCandidate() ?: return null
+        val text = best.toLyricsText()?.let(::cleanLyricsTextTopLevel)
+        if (text == null) Log.i(LYRICS_TAG, "Embedded: candidate decoded to empty text")
+        return text
     }
 
     /**

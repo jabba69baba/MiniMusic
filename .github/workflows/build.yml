@@ -2,7 +2,7 @@ name: Build MiniMusic APK
 
 on:
   push:
-    branches: [ main, master, m3e-expressive-rollout, arena/01a096d7-minimusic, arena/01a0a8eb-minimusic, arena/01a0aead-minimusic ]
+    branches: [ main, master, m3e-expressive-rollout, arena/01a096d7-minimusic, arena/01a0a8eb-minimusic, arena/01a0aead-minimusic, arena/7909bc0b-minimusic ]
   workflow_dispatch:
 
 jobs:
@@ -19,10 +19,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+    - name: Run unit tests
+      run: ./gradlew testDebugUnitTest --stacktrace
+
+    - name: Build debug APK
         run: |
           set -o pipefail
           ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log

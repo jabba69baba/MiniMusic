@@ -64,6 +64,13 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        // The extraction tests drive Media3's real extractors on the JVM:
+        // stubbed Android methods (android.util.Log, android.net.Uri) must
+        // return defaults instead of throwing "Stub!".
+        unitTests.isReturnDefaultValues = true
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

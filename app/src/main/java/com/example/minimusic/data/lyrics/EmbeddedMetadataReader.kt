@@ -2,6 +2,7 @@ package com.example.minimusic.data.lyrics
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.DataReader
 import androidx.media3.common.Format
@@ -32,6 +33,8 @@ import androidx.media3.extractor.TrackOutput
  */
 internal object EmbeddedMetadataReader {
 
+    const val LYRICS_TAG = "MiniMusicLyrics"
+
     /** Tag metadata plus the audio format values [LrcUtils] needs. */
     data class AudioMetadata(
         val sampleRate: Int,
@@ -49,7 +52,9 @@ internal object EmbeddedMetadataReader {
         } finally {
             runCatching { dataSource.close() }
         }
-    }.getOrNull()
+    }
+        .onFailure { Log.w(LYRICS_TAG, "Embedded metadata read failed for $uri", it) }
+        .getOrNull()
 
     /**
      * Sniffs [dataSpec] with [DefaultExtractorsFactory], then drives the winning
@@ -64,12 +69,17 @@ internal object EmbeddedMetadataReader {
                 dataSpec.position,
                 dataSpec.length
             )
-            val extractor = sniff(input) ?: return null
+            val extractor = sniff(input)
+            if (extractor == null) {
+                Log.i(LYRICS_TAG, "Embedded: no extractor matched the file header (sniff failed)")
+                return null
+            }
+            Log.i(LYRICS_TAG, "Embedded: sniff matched ${extractor.javaClass.simpleName}")
             val output = CapturingOutput()
             try {
                 extractor.init(output)
                 val seekPosition = PositionHolder()
-                var result: Int
+                var result: Int = -1
                 var reads = 0
                 do {
                     result = extractor.read(input, seekPosition)
@@ -96,6 +106,17 @@ internal object EmbeddedMetadataReader {
                 } while (result == Extractor.RESULT_CONTINUE &&
                     output.formats.isEmpty() &&
                     reads < MAX_READS
+                )
+                val stopReason = when {
+                    output.formats.isNotEmpty() -> "track format emitted"
+                    reads >= MAX_READS -> "read limit reached ($MAX_READS)"
+                    result == Extractor.RESULT_END_OF_INPUT -> "end of input"
+                    result == Extractor.RESULT_SEEK -> "pending seek"
+                    else -> "extractor stopped (result=$result)"
+                }
+                Log.i(
+                    LYRICS_TAG,
+                    "Embedded: read loop stopped — $stopReason after $reads read(s), ${output.formats.size} format(s)"
                 )
             } finally {
                 runCatching { extractor.release() }
@@ -177,7 +198,13 @@ internal object EmbeddedMetadataReader {
             for (format in formats) {
                 format.metadata?.let { merged = merged.copyWithAppendedEntriesFrom(it) }
             }
-            if (merged.length() == 0) return null
+            if (merged.length() == 0) {
+                Log.i(
+                    LYRICS_TAG,
+                    "Embedded: ${formats.size} format(s) but zero metadata entries — the container has no readable tags"
+                )
+                return null
+            }
             return AudioMetadata(
                 sampleRate = audioFormat.sampleRate.takeIf { it > 0 } ?: 0,
                 sampleMimeType = audioFormat.sampleMimeType,
