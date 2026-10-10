@@ -69,7 +69,7 @@ internal object EmbeddedMetadataReader {
                 dataSpec.position,
                 dataSpec.length
             )
-            val extractor = sniff(input)
+            val extractor = sniff(input, dataSpec)
             if (extractor == null) {
                 Log.i(LYRICS_TAG, "Embedded: no extractor matched the file header (sniff failed)")
                 return null
@@ -129,8 +129,13 @@ internal object EmbeddedMetadataReader {
 
     private const val MAX_READS = 5_000
 
-    private fun sniff(input: DefaultExtractorInput): Extractor? {
-        for (candidate in DefaultExtractorsFactory().createExtractors()) {
+    private fun sniff(input: DefaultExtractorInput, dataSpec: DataSpec): Extractor? {
+        // Pass the spec's URI so the factory can infer the file type from it
+        // (file/http URIs with a real extension). This also avoids the no-arg
+        // overload, which passes Uri.EMPTY — a null under the mockable Android
+        // jar used by plain JVM unit tests.
+        val uri = dataSpec.uri ?: Uri.EMPTY
+        for (candidate in DefaultExtractorsFactory().createExtractors(uri, emptyMap())) {
             input.resetPeekPosition()
             val matched = try {
                 candidate.sniff(input)

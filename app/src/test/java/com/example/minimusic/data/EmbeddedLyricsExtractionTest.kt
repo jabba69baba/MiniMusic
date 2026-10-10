@@ -5,6 +5,7 @@ import androidx.media3.common.Metadata
 import androidx.media3.common.Metadata.Entry
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.Extractor
 import androidx.media3.extractor.metadata.id3.BinaryFrame
@@ -128,6 +129,10 @@ class EmbeddedLyricsExtractionTest {
             // Nothing to release.
         }
 
+        override fun addTransferListener(transferListener: TransferListener) {
+            // Not needed for an in-memory source.
+        }
+
         override fun getUri(): Uri? = null
 
         override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
@@ -177,7 +182,12 @@ class EmbeddedLyricsExtractionTest {
             ByteArrayDataSource(mp3), 0, C.LENGTH_UNSET.toLong()
         )
         var sniffed: Extractor? = null
-        for (candidate in DefaultExtractorsFactory().createExtractors()) {
+        // NOTE: the no-arg createExtractors() passes Uri.EMPTY, which is null under
+        // the mockable Android jar used by plain JVM unit tests and would NPE in
+        // FileTypes.inferFileTypeFromUri. A fresh Uri() instance is non-null and
+        // makes the factory fall through to the default extractor order.
+        val candidates = DefaultExtractorsFactory().createExtractors(Uri(), emptyMap())
+        for (candidate in candidates) {
             input.resetPeekPosition()
             val matched = try {
                 candidate.sniff(input)
