@@ -82,6 +82,7 @@ fun MiniMusicNavGraph(
     playerViewModel: PlayerViewModel,
     settingsViewModel: SettingsViewModel,
     openPlayerFromWidget: Boolean = false,
+    onOpenPlayerFromWidgetConsumed: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
@@ -196,6 +197,9 @@ fun MiniMusicNavGraph(
         }
         LaunchedEffect(openPlayerFromWidget, hasActiveSong) {
             if (openPlayerFromWidget && hasActiveSong) {
+                // Consume the request before expanding: recomposition must not
+                // re-fire the auto-open on the same flag value.
+                onOpenPlayerFromWidgetConsumed()
                 sheetState.settle(
                     velocityPxPerSecond = 0f,
                     targetProgressOverride = 1f,
