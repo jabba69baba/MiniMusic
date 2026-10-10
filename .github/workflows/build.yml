@@ -34,6 +34,19 @@ jobs:
           name: unit-test-log
           path: test-output.log
 
+      - name: Report unit-test failure as commit comment
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Unit-test failure (tail of test-output.log)"
+            echo '```'
+            tail -n 80 test-output.log
+            echo '```'
+          } > /tmp/failure-report.md
+          gh api repos/"$GITHUB_REPOSITORY"/commits/"$GITHUB_SHA" -F body=@/tmp/failure-report.md
+
       - name: Build debug APK
         run: |
           set -o pipefail
