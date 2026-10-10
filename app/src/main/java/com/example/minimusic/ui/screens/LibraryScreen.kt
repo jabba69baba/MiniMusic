@@ -85,7 +85,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -564,6 +566,7 @@ private fun SongsTab(
     val listState = rememberLazyListState(cacheWindow = ListPrefetchWindow)
     val scrollScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val density = LocalDensity.current
     var locateJob by remember { mutableStateOf<Job?>(null) }
     val letterForIndex = rememberLetterIndex(songs) { it.title }
 
@@ -609,16 +612,33 @@ private fun SongsTab(
                 preloadArtWindow(context, songs.size, index, ArtPreloadRadius, RowArtSizePx) {
                     songs.getOrNull(it)?.albumArtUri
                 }
+                // Far targets jump once (instantly) to the row, so a sweep
+                // across a big library doesn't compose and art-load every
+                // intermediate row — the lag that the old staged approach
+                // existed to avoid. The glide below carries the row the rest
+                // of the way.
                 val distance = abs(index - listState.firstVisibleItemIndex)
                 if (distance > LocateAnimateThreshold) {
-                    // Jump to just outside the target, then glide the final
-                    // stretch. A full-distance animateScrollToItem composes and
-                    // art-loads every intermediate row — the sustained loading
-                    // lag felt after shuffle-then-locate across a big library.
-                    val staged = (index + if (index > listState.firstVisibleItemIndex) -LocateGlideTail else LocateGlideTail)
-                        .coerceIn(0, songs.size - 1)
-                    listState.scrollToItem(index = staged, scrollOffset = 0)
-                    listState.animateScrollToItem(index = index, scrollOffset = 0)
+                    listState.scrollToItem(index = index, scrollOffset = 0)
+                }
+                // One measured, eased glide that lands the song dead-centre of
+                // the visible list area (clear of the floating footer) — the
+                // queue drawer's placement, ported to the library. An explicit
+                // tween replaces animateScrollToItem's fling-snap, which is
+                // what produced the springy finish.
+                val layout = listState.layoutInfo
+                val viewport = layout.viewportEndOffset - layout.viewportStartOffset
+                val target = layout.visibleItemsInfo.firstOrNull { it.index == index }
+                if (target != null) {
+                    val footerPx = with(density) { (bottomContentPadding + 4.dp).toPx() }
+                    val desiredTop = ((viewport - footerPx.toInt() - target.size) / 2).coerceAtLeast(0)
+                    val delta = target.offset - layout.viewportStartOffset - desiredTop
+                    if (delta != 0) {
+                        listState.animateScrollBy(
+                            delta.toFloat(),
+                            tween(durationMillis = 320, easing = FastOutSlowInEasing)
+                        )
+                    }
                 } else {
                     listState.animateScrollToItem(index = index, scrollOffset = 0)
                 }

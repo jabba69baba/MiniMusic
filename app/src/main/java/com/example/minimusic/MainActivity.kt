@@ -133,16 +133,7 @@ class MainActivity : ComponentActivity() {
                             libraryViewModel = libraryViewModel,
                             playerViewModel = playerViewModel,
                             settingsViewModel = settingsViewModel,
-                            openPlayerFromWidget = openPlayerFromWidget,
-                            // One-shot: the widget's OPEN_PLAYER request must
-                            // be cleared once it has opened the player. The
-                            // flag lives across Activity relaunches from
-                            // launcher/recents (onCreate does not run again
-                            // and onNewIntent from a normal launch does not
-                            // carry the extra), so leaving it set would
-                            // re-expand the player on every app open until
-                            // the OS killed the process.
-                            onOpenPlayerFromWidgetConsumed = { openPlayerFromWidget = false }
+                            openPlayerFromWidget = openPlayerFromWidget
                         )
                     } else {
                         PermissionScreen(onGrantClick = { permissionLauncher.launch(audioPermission) })

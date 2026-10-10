@@ -82,7 +82,6 @@ fun MiniMusicNavGraph(
     playerViewModel: PlayerViewModel,
     settingsViewModel: SettingsViewModel,
     openPlayerFromWidget: Boolean = false,
-    onOpenPlayerFromWidgetConsumed: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
     val libraryState by libraryViewModel.uiState.collectAsState()
@@ -99,10 +98,13 @@ fun MiniMusicNavGraph(
     val sleepTimerState by playerViewModel.sleepTimerState.collectAsState()
 
     LaunchedEffect(libraryState.allSongs, appSettings.resumeOnLaunch) {
-        if (libraryState.allSongs.isNotEmpty()) {
+        // Resume ON: restore the persisted queue (and continue playing if it
+        // was playing). OFF: genuinely fresh start — no restored queue, no
+        // position, no ghost mini player from the last session.
+        if (libraryState.allSongs.isNotEmpty() && appSettings.resumeOnLaunch) {
             playerViewModel.restoreLastSession(
                 libraryState.allSongs,
-                playOnLaunch = appSettings.resumeOnLaunch
+                playOnLaunch = true
             )
         }
     }
@@ -194,9 +196,6 @@ fun MiniMusicNavGraph(
         }
         LaunchedEffect(openPlayerFromWidget, hasActiveSong) {
             if (openPlayerFromWidget && hasActiveSong) {
-                // Consume the request before expanding: recomposition must not
-                // re-fire the auto-open on the same flag value.
-                onOpenPlayerFromWidgetConsumed()
                 sheetState.settle(
                     velocityPxPerSecond = 0f,
                     targetProgressOverride = 1f,
