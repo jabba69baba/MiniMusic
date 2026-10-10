@@ -17,6 +17,8 @@ import com.example.minimusic.data.lyrics.SemanticLyrics
 import com.example.minimusic.data.lyrics.bestCandidate
 import com.example.minimusic.data.lyrics.toLyricsText
 import android.net.Uri
+import io.mockk.every
+import io.mockk.mockk
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -35,6 +37,17 @@ import kotlin.test.assertTrue
 class EmbeddedLyricsExtractionTest {
 
     private val parserOptions = LrcUtils.LrcParserOptions(trim = true, multiLine = true, errorText = null)
+
+    /**
+     * android.net.Uri is abstract with a package-private constructor, and the
+     * mockable Android jar leaves Uri.EMPTY null, so a mockk stub is the only
+     * usable Uri here. FileTypes.inferFileTypeFromUri only consults
+     * getLastPathSegment(); null sends it to UNKNOWN (the default extractor
+     * order).
+     */
+    private val mockUri: Uri = mockk {
+        every { getLastPathSegment() } returns null
+    }
 
     private val fixtureLyrics =
         "[00:12.34]Hello from embedded lyrics\n" +
@@ -146,11 +159,11 @@ class EmbeddedLyricsExtractionTest {
 
     /** Runs the production extraction path (sniff -> read loop -> tag decode) on raw bytes. */
     private fun extractFromBytes(bytes: ByteArray): List<SemanticLyrics> {
-        // The extractor only ever reads position/length from the spec; the Uri
-        // instance is a JVM-test stand-in (methods stubbed to no-ops via
-        // unitTests.isReturnDefaultValues) that is never dereferenced.
+        // The extractor only ever reads position/length from the spec; the
+        // Uri instance is a JVM-test stand-in that the factory uses only for
+        // file-type inference.
         val dataSpec = DataSpec.Builder()
-            .setUri(Uri())
+            .setUri(mockUri)
             .setPosition(0)
             .setLength(C.LENGTH_UNSET.toLong())
             .build()
@@ -182,11 +195,10 @@ class EmbeddedLyricsExtractionTest {
             ByteArrayDataSource(mp3), 0, C.LENGTH_UNSET.toLong()
         )
         var sniffed: Extractor? = null
-        // NOTE: the no-arg createExtractors() passes Uri.EMPTY, which is null under
-        // the mockable Android jar used by plain JVM unit tests and would NPE in
-        // FileTypes.inferFileTypeFromUri. A fresh Uri() instance is non-null and
-        // makes the factory fall through to the default extractor order.
-        val candidates = DefaultExtractorsFactory().createExtractors(Uri(), emptyMap())
+        // The no-arg createExtractors() passes Uri.EMPTY, which is null under
+        // the mockable Android jar used by plain JVM unit tests and would NPE
+        // in FileTypes.inferFileTypeFromUri — hence the explicit mockUri.
+        val candidates = DefaultExtractorsFactory().createExtractors(mockUri, emptyMap())
         for (candidate in candidates) {
             input.resetPeekPosition()
             val matched = try {
