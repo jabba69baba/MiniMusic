@@ -242,10 +242,13 @@ class EmbeddedLyricsExtractionTest {
 
     @Test
     fun mp3SyltFrameParsesToSyncedLyrics() {
+        // ID3v2 SYLT convention (and what toSyncedLyrics expects): every
+        // continuation line starts with a newline in its text segment; the
+        // grouping logic splits LyricLines at those segments.
         val sylt = syltPayload(
             listOf(
                 12_340L to "Synced first line",
-                15_500L to "Synced second line"
+                15_500L to "\nSynced second line"
             )
         )
         val metadata = metadataWith(BinaryFrame("SYLT", sylt))
