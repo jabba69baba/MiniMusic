@@ -34,26 +34,31 @@ jobs:
           name: unit-test-log
           path: test-output.log
 
-      - name: Report unit-test failure as commit comment
+      - name: Surface unit-test failure (annotation + artifact name)
+        id: failreport
         if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
+          FIRST=$(grep -m1 -E "^e: |error:|FAILED|Exception" test-output.log | tr '\n' ' ' | cut -c1-300)
+          [ -z "$FIRST" ] && FIRST="see unit-test-log artifact"
+          # Check-run annotation: readable via the Checks API without any write
+          # permission on the repo.
+          echo "::error title=Unit-test failure::$(echo "$FIRST" | cut -c1-300)"
+          # Artifact name: also API-listable, second channel.
+          echo "name=fail_$(echo "$FIRST" | tr -c 'A-Za-z0-9' '_' | cut -c1-120)" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/failart
           {
-            echo "### Unit-test failure (tail of test-output.log)"
-            echo '```'
+            echo "first matching error line:"
+            echo "$FIRST"
+            echo
+            echo "tail of test-output.log:"
             tail -n 80 test-output.log
-            echo '```'
-          } > /tmp/failure-report.md
-          gh api -X POST repos/"$GITHUB_REPOSITORY"/commits/"$GITHUB_SHA" -F body=@/tmp/failure-report.md && exit 0
-          echo "gh api failed; falling back to curl"
-          curl -s -o /tmp/gh-response.json -w "curl status: %{http_code}\n" \
-            -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" \
-            --data "$(jq -Rs '{body: .}' /tmp/failure-report.md)"
-          head -c 400 /tmp/gh-response.json
+          } > /tmp/failart/failure.txt
+      - name: Upload failure artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.failreport.outputs.name }}
+          path: /tmp/failart
 
       - name: Build debug APK
         run: |
