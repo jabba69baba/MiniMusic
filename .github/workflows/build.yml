@@ -41,7 +41,15 @@ jobs:
           # Kotlin compile errors look like:
           #   e: /home/runner/work/MiniMusic/MiniMusic/app/src/test/.../Foo.kt: (42, 23): Unresolved reference: bar
           # Keep "File.kt: (line, col): message" — that is the actionable part.
+          # Test failures look like:
+          #   FooTest > someTest FAILED
+          #       java.lang.AssertionError: <message>
           ERRS=$(grep -E "^e: " test-output.log | sed -E 's|^e: [^ ]*/||' | head -5 | tr '\n' ' | ' | cut -c1-400)
+          if [ -z "$ERRS" ]; then
+            ERRS=$({ grep -E " FAILED$" test-output.log | grep -v "^> Task" | head -4; \
+                     grep -m2 -E "AssertionError|Exception:" test-output.log; } \
+                | tr '\n' ' | ' | cut -c1-400)
+          fi
           if [ -z "$ERRS" ]; then
             ERRS=$(grep -m1 -E "What went wrong|> Task .* FAILED|Exception" test-output.log | tr '\n' ' ' | cut -c1-300)
           fi
