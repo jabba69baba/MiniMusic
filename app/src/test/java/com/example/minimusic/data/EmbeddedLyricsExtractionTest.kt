@@ -121,7 +121,7 @@ class EmbeddedLyricsExtractionTest {
             position = dataSpec.position.coerceIn(0L, bytes.size.toLong())
             // Media3 1.5.1: open() reports the available length, or
             // C.LENGTH_UNSET when unbounded.
-            return C.LENGTH_UNSET
+            return C.LENGTH_UNSET.toLong()
         }
 
         override fun close() {
@@ -147,7 +147,7 @@ class EmbeddedLyricsExtractionTest {
         val dataSpec = DataSpec.Builder()
             .setUri(Uri())
             .setPosition(0)
-            .setLength(C.LENGTH_UNSET)
+            .setLength(C.LENGTH_UNSET.toLong())
             .build()
         val metadata = EmbeddedMetadataReader.readFrom(
             ByteArrayDataSource(bytes),
@@ -174,7 +174,7 @@ class EmbeddedLyricsExtractionTest {
         // Sanity: the synthetic file must actually be sniffed as MP3, not fall
         // through to some other extractor.
         val input = androidx.media3.extractor.DefaultExtractorInput(
-            ByteArrayDataSource(mp3), 0, C.LENGTH_UNSET
+            ByteArrayDataSource(mp3), 0, C.LENGTH_UNSET.toLong()
         )
         var sniffed: Extractor? = null
         for (candidate in DefaultExtractorsFactory().createExtractors()) {

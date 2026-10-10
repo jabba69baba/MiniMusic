@@ -38,20 +38,26 @@ jobs:
         id: failreport
         if: failure()
         run: |
-          FIRST=$(grep -m1 -E "^e: |error:|FAILED|Exception" test-output.log | tr '\n' ' ' | cut -c1-300)
-          [ -z "$FIRST" ] && FIRST="see unit-test-log artifact"
+          # Kotlin compile errors look like:
+          #   e: /home/runner/work/MiniMusic/MiniMusic/app/src/test/.../Foo.kt: (42, 23): Unresolved reference: bar
+          # Keep "File.kt: (line, col): message" — that is the actionable part.
+          ERRS=$(grep -E "^e: " test-output.log | sed -E 's|^e: [^ ]*/||' | head -5 | tr '\n' ' | ' | cut -c1-400)
+          if [ -z "$ERRS" ]; then
+            ERRS=$(grep -m1 -E "What went wrong|> Task .* FAILED|Exception" test-output.log | tr '\n' ' ' | cut -c1-300)
+          fi
+          [ -z "$ERRS" ] && ERRS="see unit-test-log artifact"
           # Check-run annotation: readable via the Checks API without any write
           # permission on the repo.
-          echo "::error title=Unit-test failure::$(echo "$FIRST" | cut -c1-300)"
+          echo "::error title=Unit-test failure::$(echo "$ERRS" | cut -c1-300)"
           # Artifact name: also API-listable, second channel.
-          echo "name=fail_$(echo "$FIRST" | tr -c 'A-Za-z0-9' '_' | cut -c1-120)" >> "$GITHUB_OUTPUT"
+          echo "name=fail_$(echo "$ERRS" | tr -c 'A-Za-z0-9' '_' | cut -c1-200)" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/failart
           {
-            echo "first matching error line:"
-            echo "$FIRST"
+            echo "extracted error line(s):"
+            echo "$ERRS"
             echo
             echo "tail of test-output.log:"
-            tail -n 80 test-output.log
+            tail -n 120 test-output.log
           } > /tmp/failart/failure.txt
       - name: Upload failure artifact
         if: failure()
