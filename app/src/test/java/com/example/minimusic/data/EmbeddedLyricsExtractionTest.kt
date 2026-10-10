@@ -119,7 +119,9 @@ class EmbeddedLyricsExtractionTest {
 
         override fun open(dataSpec: DataSpec): Long {
             position = dataSpec.position.coerceIn(0L, bytes.size.toLong())
-            return C.RESULT_CONFIRMED
+            // Media3 1.5.1: open() reports the available length, or
+            // C.LENGTH_UNSET when unbounded.
+            return C.LENGTH_UNSET
         }
 
         override fun close() {
@@ -177,7 +179,12 @@ class EmbeddedLyricsExtractionTest {
         var sniffed: Extractor? = null
         for (candidate in DefaultExtractorsFactory().createExtractors()) {
             input.resetPeekPosition()
-            if (candidate.sniff(input)) {
+            val matched = try {
+                candidate.sniff(input)
+            } catch (_: Exception) {
+                false
+            }
+            if (matched) {
                 sniffed = candidate
                 break
             }
