@@ -198,8 +198,8 @@ class EmbeddedLyricsExtractionTest {
         // The no-arg createExtractors() passes Uri.EMPTY, which is null under
         // the mockable Android jar used by plain JVM unit tests and would NPE
         // in FileTypes.inferFileTypeFromUri — hence the explicit mockUri.
-        val candidates = DefaultExtractorsFactory().createExtractors(mockUri, emptyMap())
-        for (candidate in candidates) {
+        val factoryCandidates = DefaultExtractorsFactory().createExtractors(mockUri, emptyMap())
+        for (candidate in factoryCandidates) {
             input.resetPeekPosition()
             val matched = try {
                 candidate.sniff(input)
